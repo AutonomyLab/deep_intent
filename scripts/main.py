@@ -54,6 +54,11 @@ print ("Loading network/training configuration...")
 batch_size = 128
 nb_epochs = 200
 lr_schedule = [60, 120, 160]  # epoch_step
+original_dim = 784
+latent_dim = 2
+intermediate_dim = 256
+epochs = 50
+epsilon_std = 1.0
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
@@ -80,6 +85,8 @@ if __name__ == '__main__':
     model = create_model()
     model.compile(optimizer=sgd, loss="categorical_crossentropy", metrics=['accuracy'])
 
+    print (data_path)
+
     callbacks = [LearningRateScheduler(schedule=schedule),
                  ModelCheckpoint(checkpoint_path + 'weights.{epoch:02d}-{val_loss:.2f}.hdf5',
                                  monitor='val_acc',
@@ -103,7 +110,7 @@ if __name__ == '__main__':
 
     if data_augmentation:
         # Data augmentation if corresponding bool parameter set true
-        print "Using real-time data augmentation"
+        print ("Using real-time data augmentation")
 
         train_datagen = ImageDataGenerator(
             featurewise_center=True,
