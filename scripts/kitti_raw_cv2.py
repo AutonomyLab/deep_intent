@@ -1,7 +1,6 @@
 """Example of pykitti.raw usage with OpenCV."""
 import cv2
 import matplotlib.pyplot as plt
-
 import pykitti
 
 __author__ = "Lee Clement"
@@ -15,17 +14,17 @@ date = '2011_09_29'
 drive = '0071'
 
 # Optionally, specify the frame range to load
-frame_range = range(0, 20, 5)
+frame_range = 0
 
 # Load the data
 dataset = pykitti.raw(basedir, date, drive, frame_range)
 
 # Load image data
-dataset.load_gray(format='cv2')  # Loads images as uint8 grayscale
+# dataset.load_gray(format='cv2')  # Loads images as uint8 grayscale
 dataset.load_rgb(format='cv2')   # Loads images as uint8 with BGR ordering
 
 # Do some stereo processing
-stereo = cv2.StereoBM_create(numDisparities=64, blockSize=15)
+stereo = cv2.StereoBM(cv2.STEREO_BM_BASIC_PRESET, numDisparities=64, blockSize=15)
 disp_gray = stereo.compute(dataset.gray[0].left, dataset.gray[0].right)
 disp_rgb = stereo.compute(
     cv2.cvtColor(dataset.rgb[0].left, cv2.COLOR_BGR2GRAY),
