@@ -8,8 +8,8 @@ import os
 import math
 from keras.datasets import cifar10
 from keras.models import Model, Sequential
-from keras.layers import Input, Activation, merge, Dense, Flatten, Dropout, Lambda
-from keras.layers.convolutional import Conv2D
+from keras.layers import Input, Activation, Dense, Flatten, Dropout, Lambda, Reshape
+from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 from keras.regularizers import l2
@@ -56,14 +56,19 @@ batch_size = 128
 nb_epochs = 200
 lr_schedule = [60, 120, 160]  # epoch_step
 
-# input image dimensions
+# Input image dimensions
 img_rows, img_cols, img_chns = 374, 1238, 3
 original_image_size = (img_rows, img_cols, img_chns)
+
 latent_dim = 2
 intermediate_dim = 512
 epochs = 50
 epsilon_std = 1.0
+
+# Number of convolutional filters to use
 n_filters = 64
+# Convolutional kernel size
+n_conv = 3
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
@@ -91,7 +96,7 @@ def create_model():
     conv_2 = Conv2D(n_filters,
                     kernel_size=(3,3),
                     padding='same',
-                    strides=(1,1))(conv_1)
+                    strides=(2,2))(conv_1)      # Works similar to max-pooling
     conv_2 = BatchNormalization()(conv_2)
     conv_2 = Activation('relu')(conv_2)
     conv_2 = Dropout(0.2)(conv_2)
@@ -132,19 +137,48 @@ def create_model():
     decoder_hidden = Dense(intermediate_dim, activation='relu')
     decoder_upsample = Dense(n_filters * 14 * 14, activation='relu')
 
+    output_shape = (batch_size, 14, 14, n_filters)
+    decoder_reshape = Reshape(output_shape[1:])
 
+    decoder_deconv_1 = Conv2DTranspose(n_filters,
+                                       kernel_size=n_conv,
+                                       padding='same',
+                                       strides=1)
 
+    decoder_deconv_2 = Conv2DTranspose(n_filters,
+                                       kernel_size=n_conv,
+                                       padding='same',
+                                       strides=1)
 
-    decoder_mean = Dense(original_dim, activation='sigmoid')
-    h_decoded = decoder_h(z)
-    x_decoded_mean = decoder_mean(h_decoded)
+    output_shape = (batch_size, 29, 29, n_filters)
+    decoder_deconv_3_upsamp = Conv2DTranspose(n_filters,
+                                              kernel_size=(3,3),
+                                              strides=(2,2),
+                                              padding='valid',
+                                              activation='relu')
+    decoder_mean_squash = Conv2D(img_chns,
+                                 kernel_size=2,
+                                 padding='valid',
+                                 activation='sigmoid')
+
+    hidden_decoded = decoder_hidden(z)
+    up_decoded = decoder_upsample(hidden_decoded)
+    reshape_decoded = decoder_reshape(up_decoded)
+    deconv_1_decoded = decoder_deconv_1(reshape_decoded)
+    deconv_2_decoded = decoder_deconv_2(deconv_1_decoded)
+    x_decoded_relu = decoder_deconv_3_upsamp(deconv_2_decoded)
+    x_decoded_mean_squash = decoder_mean_squash(x_decoded_relu)
 
     def vae_loss(x, x_decoded_mean):
-        xent_loss = original_dim * metrics.binary_crossentropy(x, x_decoded_mean)
+        # NOTE: binary_crossentropy expects a batch_size by dim
+        # for x and x_decoded_mean, so we MUST flatten these!
+        x = K.flatten(x)
+        x_decoded_mean = K.flatten(x_decoded_mean)
+        xent_loss = img_rows * img_cols * metrics.binary_crossentropy(x, x_decoded_mean)
         kl_loss = - 0.5 * K.sum(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
         return xent_loss + kl_loss
 
-    vae = Model(x, x_decoded_mean)
+    vae = Model(input_img, x_decoded_mean_squash)
     vae.compile(optimizer='rmsprop', loss=vae_loss)
 
     return model

@@ -13,8 +13,6 @@ from keras.models import Model
 from keras import backend as K
 from keras import metrics
 from keras.datasets import mnist
-import tensorflow as tf
-tf.python.control_flow_ops = tf
 
 # input image dimensions
 img_rows, img_cols, img_chns = 28, 28, 1
