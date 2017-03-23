@@ -9,7 +9,7 @@ import math
 from keras.datasets import cifar10
 from keras.models import Model, Sequential
 from keras.layers import Input, Activation, merge, Dense, Flatten, Dropout, Lambda
-from keras.layers.convolutional import Convolution2D, MaxPooling2D, UpSampling2D
+from keras.layers.convolutional import Conv2D
 from keras.layers.normalization import BatchNormalization
 from keras.optimizers import SGD
 from keras.regularizers import l2
@@ -56,12 +56,14 @@ batch_size = 128
 nb_epochs = 200
 lr_schedule = [60, 120, 160]  # epoch_step
 
-original_x_dim = 28
-original_y_dim = 28
+# input image dimensions
+img_rows, img_cols, img_chns = 374, 1238, 3
+original_image_size = (img_rows, img_cols, img_chns)
 latent_dim = 2
-intermediate_dim = 256
+intermediate_dim = 512
 epochs = 50
 epsilon_std = 1.0
+n_filters = 64
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
@@ -78,20 +80,43 @@ sgd = SGD(lr=0.1, momentum=0.9, nesterov=True)
 # -------------------------------------------------
 def create_model():
     print ("Creating model...")
-    input_img = Input(shape=(original_x_dim, original_y_dim, 3))
-    x = Convolution2D(64, 3, 3, border_mode='same')(input_img)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.2)
+    input_img = Input(batch_shape=(batch_size,) + original_image_size)
+    conv_1 = Conv2D(img_chns,
+                    kernel_size=(3,3),
+                    padding='same')(input_img)
+    conv_1 = BatchNormalization()(conv_1)
+    conv_1 = Activation('relu')(conv_1)
+    conv_1 = Dropout(0.2)(conv_1)
 
-    x = Convolution2D(64, 3, 3, border_mode='same')(input_img)
-    x = BatchNormalization()(x)
-    x = Activation('relu')(x)
-    x = Dropout(0.2)
+    conv_2 = Conv2D(n_filters,
+                    kernel_size=(3,3),
+                    padding='same',
+                    strides=(1,1))(conv_1)
+    conv_2 = BatchNormalization()(conv_2)
+    conv_2 = Activation('relu')(conv_2)
+    conv_2 = Dropout(0.2)(conv_2)
 
-    h = Dense(intermediate_dim, activation='relu')(x)
-    z_mean = Dense(latent_dim)(h)
-    z_log_var = Dense(latent_dim)(h)
+    conv_3 = Conv2D(n_filters,
+                    kernel_size=(3, 3),
+                    padding='same',
+                    strides=(1, 1))(conv_2)
+    conv_3 = BatchNormalization()(conv_3)
+    conv_3 = Activation('relu')(conv_3)
+    conv_3 = Dropout(0.2)(conv_3)
+
+    conv_4 = Conv2D(n_filters,
+                    kernel_size=(3, 3),
+                    padding='same',
+                    strides=(1, 1))(conv_3)
+    conv_4 = BatchNormalization()(conv_4)
+    conv_4 = Activation('relu')(conv_4)
+    conv_4 = Dropout(0.2)(conv_4)
+
+    flat = Flatten()(conv_4)
+    hidden = Dense(intermediate_dim, activation='relu')(flat)
+
+    z_mean = Dense(latent_dim)(hidden)
+    z_log_var = Dense(latent_dim)(hidden)
 
     def sampling(args):
         z_mean, z_log_var = args
@@ -100,10 +125,16 @@ def create_model():
         return z_mean + K.exp(z_log_var / 2) * epsilon
 
     # note that "output_shape" isn't necessary with the TensorFlow backend
+    # so you could write `Lambda(sampling)([z_mean, z_log_var])
     z = Lambda(sampling, output_shape=(latent_dim,))([z_mean, z_log_var])
 
     # we instantiate these layers separately so as to reuse them later
-    decoder_h = Dense(intermediate_dim, activation='relu')
+    decoder_hidden = Dense(intermediate_dim, activation='relu')
+    decoder_upsample = Dense(n_filters * 14 * 14, activation='relu')
+
+
+
+
     decoder_mean = Dense(original_dim, activation='sigmoid')
     h_decoded = decoder_h(z)
     x_decoded_mean = decoder_mean(h_decoded)
