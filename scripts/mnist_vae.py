@@ -10,6 +10,7 @@ from scipy.stats import norm
 from keras.layers import Input, Dense, Lambda, Flatten, Reshape
 from keras.layers import Conv2D, Conv2DTranspose
 from keras.models import Model
+from keras.callbacks import TensorBoard
 from keras import backend as K
 from keras import metrics
 from keras.datasets import mnist
@@ -29,7 +30,7 @@ else:
 latent_dim = 2
 intermediate_dim = 128
 epsilon_std = 1.0
-epochs = 5
+epochs = 15
 
 x = Input(batch_shape=(batch_size,) + original_img_size)
 conv_1 = Conv2D(img_chns,
@@ -133,7 +134,8 @@ vae.fit(x_train, x_train,
         shuffle=True,
         epochs=epochs,
         batch_size=batch_size,
-        validation_data=(x_test, x_test))
+        validation_data=(x_test, x_test),
+        callbacks=[TensorBoard(log_dir='/tmp/mnist_vae')])
 
 # build a model to project inputs on the latent space
 encoder = Model(x, z_mean)
