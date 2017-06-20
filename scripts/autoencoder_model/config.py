@@ -14,7 +14,7 @@ data_augmentation = False
 print ("Loading network/training configuration...")
 
 batch_size = 10
-nb_epochs = 200
+nb_epochs = 20
 lr_schedule = [60, 120, 160]  # epoch_step
 
 # Input image dimensions
