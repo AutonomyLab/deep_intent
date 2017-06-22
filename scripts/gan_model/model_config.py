@@ -1,13 +1,22 @@
 from keras.optimizers import SGD
+import os
 
 # -------------------------------------------------
 # Background config:
-data_path= '../data/'
-model_path = '../models/'
-checkpoint_path = '../checkpoints/'
-print_model_summary = True
-save_model_plot = True
-data_augmentation = False
+DATA_DIR= '/home/pratik/DeepIntent_Datasets/'
+
+MODEL_DIR = 'models'Code borrowed from PredNet (Lotter et al. 2017, https://arxiv.org/abs/1605.08104)
+'''
+if not os.path.exists(MODEL_DIR):
+    os.mkdir(MODEL_DIR)
+
+CHECKPOINT_DIR = 'checkpoints'
+if not os.path.exists(CHECKPOINT_DIR):
+    os.mkdir(CHECKPOINT_DIR)
+
+PRINT_MODEL_SUMMARY = True
+SAVE_MODEL_PLOT = True
+DATA_AUGMENTATION = False
 
 # -------------------------------------------------
 # Network configuration:
@@ -19,7 +28,7 @@ lr_schedule = [60, 120, 160]  # epoch_step
 
 # Input image dimensions
 # Use grayscale video
-img_rows, img_cols, img_chns = 227, 227, 1
+img_rows, img_cols, img_chns = 64, 64, 3
 original_image_size = (img_rows, img_cols, img_chns)
 
 latent_dim = 2

@@ -13,11 +13,14 @@ from keras.layers.convolutional import Conv2D, MaxPooling2D, Conv2DTranspose
 from keras.layers.core import Flatten
 from keras.optimizers import SGD
 from keras.datasets import mnist
+from data_utils import SequenceGenerator
+from model_config import *
 import numpy as np
 np.random.seed(2 ** 10)
 from PIL import Image
 import argparse
 import math
+import os
 K.set_image_dim_ordering('tf')
 
 def generator_model():
@@ -58,7 +61,6 @@ def discriminator_model():
     model.add(Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same'))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
-
     model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
@@ -97,6 +99,31 @@ def combine_images(generated_images):
             img[0, :, :]
     return image
 
+
+def load_data():
+    # Data configuration:
+    print ("Loading data...")
+
+    train_file = os.path.join(DATA_DIR, 'X_train.hkl')
+    train_sources = os.path.join(DATA_DIR, 'sources_train.hkl')
+    val_file = os.path.join(DATA_DIR, 'X_val.hkl')
+    val_sources = os.path.join(DATA_DIR, 'sources_val.hkl')
+
+    train_generator = SequenceGenerator(train_file, train_sources, nt, batch_size=batch_size, shuffle=True)
+    val_generator = SequenceGenerator(val_file, val_sources, nt, batch_size=batch_size, N_seq=N_seq_val)
+
+    nb_classes = 10
+    image_size = 32
+
+    (X_train, y_train), (X_test, y_test) = cifar10.load_data()
+    X_train = X_train.astype('float32')
+    X_test = X_test.astype('float32')
+
+    # convert class vectors to binary class matrices
+    Y_train = np_utils.to_categorical(y_train, nb_classes)
+    Y_test = np_utils.to_categorical(y_test, nb_classes)
+
+    return X_train, Y_train, X_test, Y_test
 
 def train(BATCH_SIZE):
     (X_train, y_train), (X_test, y_test) = mnist.load_data()
