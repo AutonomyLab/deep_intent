@@ -2,6 +2,8 @@
 Code for downloading and processing KITTI data (Geiger et al. 2013, http://www.cvlibs.net/datasets/kitti/)
 Code borrowed from PredNet (Lotter et al. 2017, https://arxiv.org/abs/1605.08104)
 '''
+from __future__ import absolute_import
+from __future__ import division
 from __future__ import print_function
 
 import os

@@ -7,17 +7,21 @@ from keras.models import Sequential
 from keras.layers import Dense
 from keras.layers import Reshape
 from keras.layers.core import Activation
-from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import UpSampling2D
-from keras.layers.convolutional import Conv2D, MaxPooling2D, Conv2DTranspose
 from keras.layers.core import Flatten
+from keras.layers.normalization import BatchNormalization
+from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Conv2DTranspose
+from keras.layers.advanced_activations import LeakyReLU
+from keras.utils.visualize_util import plot
+# from keras.callbacks import TensorBoard
 from keras.optimizers import SGD
 from keras.datasets import mnist
-from data_utils import SequenceGenerator
 from model_config import *
+import hickle as hkl
 import numpy as np
 np.random.seed(2 ** 10)
 from PIL import Image
+import tb_callback
 import argparse
 import math
 import os
@@ -29,11 +33,16 @@ def generator_model():
     model.add(Activation('tanh'))
     model.add(Dense(512*4*4))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(Activation('relu'))
     model.add(Reshape((4, 4, 512), input_shape=(512*4*4,)))
     model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
-    model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same', activation='tanh'))
-    model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same', activation='tanh'))
+    model.add(BatchNormalization())
+    model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(BatchNormalization())
+    model.add((Activation('relu')))
+    model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(BatchNormalization())
+    model.add((Activation('relu')))
     # model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same', activation='tanh'))
     # model.add(UpSampling2D(size=(2, 2)))
     # model.add(Conv2D(filters=256, kernel_size=(4, 4), padding='same'))
@@ -45,7 +54,9 @@ def generator_model():
     # model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same'))
     # model.add(Activation('tanh'))
     # model.add(UpSampling2D(size=(2, 2)))
-    model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
+    model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
+    model.add(BatchNormalization())
+    model.add((Activation('tanh')))
     model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
     # model.add(Conv2D(filters=3, kernel_size=(4, 4), padding='same'))
     # model.add(Activation('tanh'))
@@ -56,18 +67,19 @@ def discriminator_model():
     model = Sequential()
     model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(64, 64, 3)))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(LeakyReLU())
 
     model.add(Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same'))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(LeakyReLU())
+
     model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(LeakyReLU())
 
     model.add(Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same'))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(LeakyReLU())
 
     model.add(Flatten())
     model.add(Dense(1024))
@@ -80,9 +92,15 @@ def discriminator_model():
 def generator_containing_discriminator(generator, discriminator):
     model = Sequential()
     model.add(generator)
-    discriminator.trainable = False
+    set_trainability(discriminator, False)
     model.add(discriminator)
     return model
+
+
+def set_trainability(model, trainable=False):
+    model.trainable = trainable
+    for layer in model.layers:
+        layer.trainable = trainable
 
 
 def combine_images(generated_images):
@@ -90,92 +108,108 @@ def combine_images(generated_images):
     width = int(math.sqrt(num))
     height = int(math.ceil(float(num)/width))
     shape = generated_images.shape[2:]
-    image = np.zeros((height*shape[0], width*shape[1]),
-                     dtype=generated_images.dtype)
+    image = np.zeros((height*shape[0], width*shape[1]), dtype=generated_images.dtype)
     for index, img in enumerate(generated_images):
         i = int(index/width)
         j = index % width
-        image[i*shape[0]:(i+1)*shape[0], j*shape[1]:(j+1)*shape[1]] = \
-            img[0, :, :]
+        image[i*shape[0]:(i+1)*shape[0], j*shape[1]:(j+1)*shape[1]] = img[0, :, :]
     return image
 
 
-def load_data():
-    # Data configuration:
-    print ("Loading data...")
-
-    train_file = os.path.join(DATA_DIR, 'X_train.hkl')
-    train_sources = os.path.join(DATA_DIR, 'sources_train.hkl')
-    val_file = os.path.join(DATA_DIR, 'X_val.hkl')
-    val_sources = os.path.join(DATA_DIR, 'sources_val.hkl')
-
-    train_generator = SequenceGenerator(train_file, train_sources, nt, batch_size=batch_size, shuffle=True)
-    val_generator = SequenceGenerator(val_file, val_sources, nt, batch_size=batch_size, N_seq=N_seq_val)
-
-    nb_classes = 10
-    image_size = 32
-
-    (X_train, y_train), (X_test, y_test) = cifar10.load_data()
-    X_train = X_train.astype('float32')
-    X_test = X_test.astype('float32')
-
-    # convert class vectors to binary class matrices
-    Y_train = np_utils.to_categorical(y_train, nb_classes)
-    Y_test = np_utils.to_categorical(y_test, nb_classes)
-
-    return X_train, Y_train, X_test, Y_test
-
 def train(BATCH_SIZE):
-    (X_train, y_train), (X_test, y_test) = mnist.load_data()
+    print ("Loading data...")
+    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
-    # X_train = X_train.reshape((X_train.shape[0], 1) + X_train.shape[1:])
-    X_train = np.expand_dims(X_train, axis=3)
+
+    print ("Creating models...")
+    # Create the Generator and Discriminator models
     discriminator = discriminator_model()
     generator = generator_model()
-    # print (generator.summary())
-    # print (discriminator.summary())
-    # print (discriminator_on_generator.summary())
-    # exit(0)
 
-    discriminator_on_generator = generator_containing_discriminator(generator, discriminator)
     d_optim = SGD(lr=0.0005, momentum=0.9, nesterov=True)
     g_optim = SGD(lr=0.0005, momentum=0.9, nesterov=True)
+
+    # Create the full GAN model with discriminator non-trainable
+    generator_on_discriminator = generator_containing_discriminator(generator, discriminator)
     generator.compile(loss='binary_crossentropy', optimizer="SGD")
-    discriminator_on_generator.compile(loss='binary_crossentropy', optimizer=g_optim)
-    discriminator.trainable = True
+    generator_on_discriminator.compile(loss='binary_crossentropy', optimizer=g_optim)
+    set_trainability(discriminator, True)
     discriminator.compile(loss='binary_crossentropy', optimizer=d_optim)
-    noise = np.zeros((BATCH_SIZE, 100))
 
-    print (generator.summary())
-    print (discriminator.summary())
+    if PRINT_MODEL_SUMMARY:
+        print (generator.summary())
+        print (discriminator.summary())
+        print (generator_on_discriminator.summary())
 
-    for epoch in range(100):
+    # Save model to file
+    if SAVE_MODEL:
+        print ("Saving models to file...")
+        model_json = generator.to_json()
+        with open(os.path.join(MODEL_DIR, "generator.json"), "w") as json_file:
+            json_file.write(model_json)
+        plot(generator, to_file=os.path.join(MODEL_DIR, 'generator.png'), show_shapes=True)
+
+        model_json = discriminator.to_json()
+        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+            json_file.write(model_json)
+        plot(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+
+        model_json = generator_on_discriminator.to_json()
+        with open(os.path.join(MODEL_DIR, "GAN.json"), "w") as json_file:
+            json_file.write(model_json)
+        plot(generator_on_discriminator, to_file=os.path.join(MODEL_DIR, 'GAN.png'), show_shapes=True)
+
+    NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
+
+    # Setup TensorBoard Callback
+    TC = tb_callback.TensorBoard(log_dir='./logs', histogram_freq=0, write_graph=True, write_images=True)
+    TC.set_model(generator, discriminator)
+
+    print ("Beginning Training...")
+    # Begin Training
+    for epoch in range(NB_EPOCHS):
         print("Epoch is", epoch)
-        print("Number of batches", int(X_train.shape[0]/BATCH_SIZE))
-        for index in range(int(X_train.shape[0]/BATCH_SIZE)):
-            for i in range(BATCH_SIZE):
-                noise[i, :] = np.random.uniform(-1, 1, 100)
-            image_batch = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE]
+        print("Number of batches", NB_ITERATIONS)
+        for index in range(NB_ITERATIONS):
+
+            # Generate images
+            noise = np.random.uniform(-1, 1, size=[BATCH_SIZE, 100])
+            print (noise.shape)
+            image_batch = X_train[index*BATCH_SIZE : (index+1)*BATCH_SIZE]
             generated_images = generator.predict(noise, verbose=0)
-            if index % 20 == 0:
-                image = combine_images(generated_images)
-                image = image*127.5+127.5
-                Image.fromarray(image.astype(np.uint8)).save(
-                    str(epoch)+"_"+str(index)+".png")
+
+            # Train Discriminator
             X = np.concatenate((image_batch, generated_images))
             y = [1] * BATCH_SIZE + [0] * BATCH_SIZE
+            print (X.shape)
+            print (np.asarray(y).shape)
             d_loss = discriminator.train_on_batch(X, y)
             print("batch %d d_loss : %f" % (index, d_loss))
-            for i in range(BATCH_SIZE):
-                noise[i, :] = np.random.uniform(-1, 1, 100)
-            discriminator.trainable = False
-            g_loss = discriminator_on_generator.train_on_batch(
-                noise, [1] * BATCH_SIZE)
+
+            print ("Discriminator Trained")
+            # Train GAN
+            noise = np.random.uniform(-1, 1, size=[BATCH_SIZE, 100])
+            set_trainability(discriminator, False)
+            g_loss = generator_on_discriminator.train_on_batch(noise, [1] * BATCH_SIZE)
             discriminator.trainable = True
             print("batch %d g_loss : %f" % (index, g_loss))
-            if index % 10 == 9:
-                generator.save_weights('generator', True)
-                discriminator.save_weights('discriminator', True)
+
+            # then after each epoch
+            logs = {'g_loss': d_loss, 'd_loss': g_loss}
+            TC.on_epoch_end(epoch, logs)
+
+        if SAVE_GENERATED_IMAGES:
+            # Save generated images to file
+            image = combine_images(generated_images)
+            image = image * 127.5 + 127.5
+            Image.fromarray(image.astype(np.uint8)).save(str(epoch) + "_" + str(index) + ".png")
+
+        # Save model weights per epoch to file
+        generator.save_weights(os.path.join(CHECKPOINT_DIR, 'generator_epoch_'+str(epoch)+'.h5'), True)
+        discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_'+str(epoch)+'.h5'), True)
+
+    # End TensorBoard Callback
+    TC.on_train_end()
 
 
 def generate(BATCH_SIZE, nice=False):
