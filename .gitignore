@@ -1,1 +1,3 @@
 .idea
+scripts/gan_model/generated_images/*
+scripts/gan_model/logs/*

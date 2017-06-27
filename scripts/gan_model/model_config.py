@@ -17,6 +17,10 @@ CHECKPOINT_DIR = './checkpoints'
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
 
+GEN_IMAGES_DIR = './generated_images'
+if not os.path.exists(GEN_IMAGES_DIR):
+    os.mkdir(GEN_IMAGES_DIR)
+
 PRINT_MODEL_SUMMARY = False
 SAVE_MODEL = False
 SAVE_GENERATED_IMAGES = True
@@ -28,7 +32,7 @@ print ("Loading network/training configuration...")
 
 BATCH_SIZE = 128
 NB_EPOCHS = 10
-
+IMAGE_SHAPE = (64, 64, 3)
 lr_schedule = [60, 120, 160]  # epoch_step
 
 def schedule(epoch_idx):

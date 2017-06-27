@@ -101,14 +101,15 @@ class TensorBoard(Callback):
                                          layer.output)
         self.merged = tf.summary.merge_all()
 
+
+    def on_epoch_end(self, epoch, logs=None):
+        logs = logs or {}
+
         if self.write_graph:
             self.writer = tf.summary.FileWriter(self.log_dir,
                                                 self.sess.graph)
         else:
             self.writer = tf.summary.FileWriter(self.log_dir)
-
-    def on_epoch_end(self, epoch, logs=None):
-        logs = logs or {}
 
         if self.validation_data and self.histogram_freq:
             if epoch % self.histogram_freq == 0:
@@ -124,7 +125,7 @@ class TensorBoard(Callback):
                 feed_dict = dict(zip(tensors, val_data))
                 result = self.sess.run([self.merged], feed_dict=feed_dict)
                 summary_str = result[0]
-                self.writer.add_summary(summary_str, epoch)
+                self.writer.add_summary(summary_str)
 
         for name, value in logs.items():
             if name in ['batch', 'size']:
@@ -133,7 +134,7 @@ class TensorBoard(Callback):
             summary_value = summary.value.add()
             summary_value.simple_value = value.item()
             summary_value.tag = name
-            self.writer.add_summary(summary, epoch)
+            self.writer.add_summary(summary)
         self.writer.flush()
 
     def on_train_end(self, _):
