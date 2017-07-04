@@ -7,37 +7,36 @@ import os
 
 # -------------------------------------------------
 # Background config:
-DATA_DIR= '/home/pratik/DeepIntent_Datasets/KITTI_Dataset/'
-# DATA_DIR= '/local_home/data/'
+# DATA_DIR= '/home/pratik/DeepIntent_Datasets/JAAD_Dataset/'
+DATA_DIR= '/local_home/data/JAAD_data/'
 
-MODEL_DIR = './models'
+MODEL_DIR = './models_128'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
 
-CHECKPOINT_DIR = './checkpoints'
+CHECKPOINT_DIR = './checkpoints_128'
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
 
-GEN_IMAGES_DIR = './generated_images'
+GEN_IMAGES_DIR = './generated_images_128'
 if not os.path.exists(GEN_IMAGES_DIR):
     os.mkdir(GEN_IMAGES_DIR)
 
-LOG_DIR = './logs'
+LOG_DIR = './logs_128'
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
-PRINT_MODEL_SUMMARY = False
-SAVE_MODEL = False
+PRINT_MODEL_SUMMARY = True
+SAVE_MODEL = True
 SAVE_GENERATED_IMAGES = True
-DATA_AUGMENTATION = False
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 
-BATCH_SIZE = 128
+BATCH_SIZE = 64
 NB_EPOCHS = 100
-IMAGE_SHAPE = (64, 64, 3)
+IMAGE_SHAPE = (128, 128, 3)
 lr_schedule = [60, 120, 160]  # epoch_step
 
 def schedule(epoch_idx):

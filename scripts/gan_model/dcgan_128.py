@@ -16,10 +16,9 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.advanced_activations import LeakyReLU
 from keras.utils.vis_utils import plot_model
-# from keras.callbacks import TensorBoard
 from keras.optimizers import Adam
 from keras.datasets import mnist
-from model_config import *
+from model_config_128 import *
 import hickle as hkl
 import numpy as np
 np.random.seed(2 ** 10)
@@ -82,6 +81,11 @@ def generator_model():
     model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
+
+    model.add(Conv2DTranspose(filters=32, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('tanh'))
+
     model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
 
     return model
@@ -113,7 +117,7 @@ def discriminator_model():
     # model = Model(inputs=d_input, outputs=d_output)
 
     model = Sequential()
-    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(64, 64, 3)))
+    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(128, 128, 3)))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
 
@@ -122,12 +126,17 @@ def discriminator_model():
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
-    model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
+    model.add(Conv2D(filters=128, kernel_size=(4, 4), padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
     model.add(Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same'))
+    # model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Dropout(rate=0.5))
+
+    model.add(Conv2D(filters=512, kernel_size=(4, 4), strides=2, padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
@@ -176,7 +185,7 @@ def combine_images(generated_images):
 
 def train(BATCH_SIZE):
     print ("Loading data...")
-    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
+    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train_128.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
 
     # Shuffle images to aid generalization
@@ -286,7 +295,7 @@ def train(BATCH_SIZE):
         discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_'+str(epoch)+'.h5'), True)
 
     # End TensorBoard Callback
-    TC.on_train_end(_)
+    TC.on_train_end()
 
 
 def generate(BATCH_SIZE, nice=False):
