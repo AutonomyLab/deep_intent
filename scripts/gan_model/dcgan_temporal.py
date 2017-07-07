@@ -14,12 +14,11 @@ from keras.layers.core import Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
+from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.advanced_activations import LeakyReLU
 from keras.utils.vis_utils import plot_model
-# from keras.callbacks import TensorBoard
 from keras.optimizers import Adam
-from keras.datasets import mnist
-from model_config import *
+from model_config_dcgan_temporal import *
 import hickle as hkl
 import numpy as np
 np.random.seed(2 ** 10)
@@ -31,6 +30,15 @@ import os
 import cv2
 from sys import stdout
 K.set_image_dim_ordering('tf')
+
+def encoder_model():
+    model = Sequential()
+    model.add()
+
+
+    return model
+
+
 
 def generator_model():
 
@@ -297,7 +305,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
         discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_'+str(epoch)+'.h5'), True)
 
     # End TensorBoard Callback
-    TC.on_train_end(_)
+    TC.on_train_end()
 
 
 def generate(BATCH_SIZE, nice=False):
