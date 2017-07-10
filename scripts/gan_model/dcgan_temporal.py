@@ -16,6 +16,7 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.wrappers import TimeDistributed
 from keras.utils.vis_utils import plot_model
 from keras.optimizers import Adam
 from model_config_dcgan_temporal import *
@@ -30,14 +31,6 @@ import os
 import cv2
 from sys import stdout
 K.set_image_dim_ordering('tf')
-
-def encoder_model():
-    model = Sequential()
-    model.add()
-
-
-    return model
-
 
 
 def generator_model():
@@ -64,30 +57,35 @@ def generator_model():
     model = Sequential()
     model.add(Dense(input_dim=100, units=1024))
     model.add(Activation('tanh'))
-    model.add(Dense(512*4*4))
+    model.add(Dense(2*512*4*4))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Reshape((4, 4, 512), input_shape=(512*4*4,)))
-    model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
+    model.add(Reshape((2, 4, 4, 512), input_shape=(2*512*4*4,)))
+    x = ConvLSTM2D(filters=512, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True)
+    model.add(x)
+    # model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
-    model.add(BatchNormalization())
-    model.add(LeakyReLU(0.2))
-    # model.add(Activation('relu'))
-    model.add(Dropout(0.5))
-
-    model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(TimeDistributed(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same')))
+    model.add(ConvLSTM2D(filters=256, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
+    model.add(TimeDistributed(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same')))
+    model.add(ConvLSTM2D(filters=128, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True))
+    model.add(BatchNormalization())
+    model.add(LeakyReLU(0.2))
+    # model.add(Activation('relu'))
+    model.add(Dropout(0.5))
+
+    model.add(TimeDistributed(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same')))
+    model.add(ConvLSTM2D(filters=64, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=False))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
     model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
@@ -99,6 +97,7 @@ def discriminator_model():
 
     # d_input = Input(shape=IMAGE_SHAPE)
     # x = Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=IMAGE_SHAPE)(d_input)
+
     # x = LeakyReLU()(x)
     #
     # x = Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same')(x)
@@ -234,6 +233,8 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
             json_file.write(model_json)
         plot_model(GAN, to_file=os.path.join(MODEL_DIR, 'GAN.png'), show_shapes=True)
 
+    print (str(GEN_WEIGHTS))
+
     if GEN_WEIGHTS != "None":
         print ("Pre-loading generator with weights...")
         load_weights(GEN_WEIGHTS, generator)
@@ -298,7 +299,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};" % (epoch, avg_g_loss, avg_d_loss))
+            log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};\n" % (epoch, avg_g_loss, avg_d_loss))
 
         # Save model weights per epoch to file
         generator.save_weights(os.path.join(CHECKPOINT_DIR, 'generator_epoch_'+str(epoch)+'.h5'), True)

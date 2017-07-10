@@ -26,7 +26,7 @@ LOG_DIR = './logs'
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
-PRINT_MODEL_SUMMARY = False
+PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = False
 SAVE_GENERATED_IMAGES = True
 DATA_AUGMENTATION = False

@@ -288,7 +288,7 @@ def train(BATCH_SIZE):
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};" % (epoch, avg_g_loss, avg_d_loss))
+            log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};\n" % (epoch, avg_g_loss, avg_d_loss))
 
         # Save model weights per epoch to file
         generator.save_weights(os.path.join(CHECKPOINT_DIR, 'generator_epoch_'+str(epoch)+'.h5'), True)

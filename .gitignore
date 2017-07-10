@@ -2,3 +2,4 @@
 scripts/gan_model/generated_images/*
 scripts/gan_model/logs/*
 scripts/gan_model/checkpoints/*
+scripts/gan_model/*.pyc
