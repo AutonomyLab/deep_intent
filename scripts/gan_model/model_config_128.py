@@ -29,6 +29,7 @@ if not os.path.exists(LOG_DIR):
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
 SAVE_GENERATED_IMAGES = True
+SHUFFLE = True
 
 # -------------------------------------------------
 # Network configuration:

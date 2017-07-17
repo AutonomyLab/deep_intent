@@ -57,14 +57,14 @@ def generator_model():
     model = Sequential()
     model.add(Dense(input_dim=100, units=1024))
     model.add(Activation('tanh'))
-    model.add(Dense(2*512*4*4))
+    model.add(Dense(2*256*4*4))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Reshape((2, 4, 4, 512), input_shape=(2*512*4*4,)))
-    x = ConvLSTM2D(filters=512, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True)
+    model.add(Reshape((2, 4, 4, 256), input_shape=(2*256*4*4,)))
+    x = ConvLSTM2D(filters=256, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True)
     model.add(x)
     # model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
     model.add(BatchNormalization())
@@ -190,8 +190,10 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
 
-    # Shuffle images to aid generalization
-    X_train = np.random.permutation(X_train)
+
+    if SHUFFLE:
+        # Shuffle images to aid generalization
+        X_train = np.random.permutation(X_train)
 
     print ("Creating models...")
     # Create the Generator and Discriminator models
@@ -200,10 +202,8 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
 
     # Create the full GAN model with discriminator non-trainable
     GAN = gan_model(generator, discriminator)
-    d_optim = SGD(lr=0.001, momentum=0.5, nesterov=True)
-    # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
-    # d_optim = Adam(lr=0.005, beta_1=0.5)
-    g_optim = Adam(lr=0.0001, beta_1=0.5)
+    g_optim = G_OPTIM
+    d_optim = D_OPTIM
 
     generator.compile(loss='binary_crossentropy', optimizer='sgd')
     GAN.compile(loss='binary_crossentropy', optimizer=g_optim)
@@ -245,7 +245,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
 
     # Setup TensorBoard Callback
-    TC = tb_callback.TensorBoard(log_dir='/local_home/logs', histogram_freq=0, write_graph=False, write_images=False)
+    TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     # TC.set_model(generator, discriminator)
 
     noise = np.zeros((BATCH_SIZE, 100), dtype=np.float32)

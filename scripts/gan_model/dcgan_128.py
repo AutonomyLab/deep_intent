@@ -188,8 +188,9 @@ def train(BATCH_SIZE):
     X_train = hkl.load(os.path.join(DATA_DIR, 'X_train_128.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
 
-    # Shuffle images to aid generalization
-    X_train = np.random.permutation(X_train)
+    if SHUFFLE:
+        # Shuffle images to aid generalization
+        X_train = np.random.permutation(X_train)
 
     print ("Creating models...")
     # Create the Generator and Discriminator models

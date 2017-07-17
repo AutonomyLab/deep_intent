@@ -30,6 +30,7 @@ PRINT_MODEL_SUMMARY = False
 SAVE_MODEL = False
 SAVE_GENERATED_IMAGES = True
 DATA_AUGMENTATION = False
+SHUFFLE = True
 
 # -------------------------------------------------
 # Network configuration:
