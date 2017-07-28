@@ -10,8 +10,9 @@ import os
 # Background config:
 # DATA_DIR= '/home/pratik/DeepIntent_Datasets/KITTI_Dataset/'
 # DATA_DIR= '/local_home/data/JAAD_data/'
+DATA_DIR= '/local_home/data/KITTI_data/'
 # DATA_DIR = '/grad/2/pgujjar/DeepIntent/data/JAAD_data'
-DATA_DIR = './../data/JAAD_data'
+# DATA_DIR = './../data/JAAD_data'
 
 MODEL_DIR = './models'
 if not os.path.exists(MODEL_DIR):
@@ -34,7 +35,7 @@ if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
 PRINT_MODEL_SUMMARY = True
-SAVE_MODEL = True
+SAVE_MODEL = False
 SAVE_GENERATED_IMAGES = True
 DATA_AUGMENTATION = False
 SHUFFLE = False
@@ -49,5 +50,5 @@ IMAGE_SHAPE = (64, 64, 3)
 
 # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
 # d_optim = Adam(lr=0.005, beta_1=0.5)
-G_OPTIM = Adam(lr=0.0002, beta_1=0.5)
-D_OPTIM = SGD(lr=0.001, momentum=0.5, nesterov=True)
+G_OPTIM = Adam(lr=0.000001, beta_1=0.5)
+D_OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)

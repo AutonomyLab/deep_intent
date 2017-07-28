@@ -2,29 +2,26 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import hickle as hkl
+import numpy as np
 from keras import backend as K
-from keras.models import Sequential
-from keras.models import Model
 from keras.layers import Dense
-from keras.layers import Reshape
 from keras.layers import Dropout
-from keras.layers import Input
+from keras.layers import Reshape
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.core import Activation
 from keras.layers.core import Flatten
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import Conv2DTranspose
-from keras.layers.advanced_activations import LeakyReLU
-from keras.utils.vis_utils import plot_model
-# from keras.callbacks import TensorBoard
+from keras.models import Sequential
 from keras.optimizers import Adam
-from keras.datasets import mnist
-from model_config import *
-import hickle as hkl
-import numpy as np
+from keras.utils.vis_utils import plot_model
+from model_config_128 import *
+
 np.random.seed(2 ** 10)
 from PIL import Image
-import tb_callback
+from scripts import tb_callback
 import argparse
 import math
 import os
@@ -82,6 +79,11 @@ def generator_model():
     model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
+
+    model.add(Conv2DTranspose(filters=32, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(BatchNormalization())
+    model.add(Activation('tanh'))
+
     model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
 
     return model
@@ -113,7 +115,7 @@ def discriminator_model():
     # model = Model(inputs=d_input, outputs=d_output)
 
     model = Sequential()
-    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(64, 64, 3)))
+    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(128, 128, 3)))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
 
@@ -122,12 +124,17 @@ def discriminator_model():
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
-    model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
+    model.add(Conv2D(filters=128, kernel_size=(4, 4), padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
     model.add(Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same'))
+    # model.add(BatchNormalization())
+    model.add(LeakyReLU(alpha=0.2))
+    model.add(Dropout(rate=0.5))
+
+    model.add(Conv2D(filters=512, kernel_size=(4, 4), strides=2, padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
@@ -174,13 +181,9 @@ def combine_images(generated_images):
     return image
 
 
-def load_weights(weights_file, model):
-    model.load_weights(weights_file)
-
-
-def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
+def train(BATCH_SIZE):
     print ("Loading data...")
-    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
+    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train_128.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
 
     if SHUFFLE:
@@ -194,9 +197,9 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
 
     # Create the full GAN model with discriminator non-trainable
     GAN = gan_model(generator, discriminator)
-    d_optim = SGD(lr=0.001, momentum=0.5, nesterov=True)
+    d_optim = SGD(lr=0.002, momentum=0.5, nesterov=True)
     # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
-    # d_optim = Adam(lr=0.005, beta_1=0.5)
+    # d_optim = Adam(lr=0.0001, beta_1=0.5)
     g_optim = Adam(lr=0.0001, beta_1=0.5)
 
     generator.compile(loss='binary_crossentropy', optimizer='sgd')
@@ -226,13 +229,6 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
         with open(os.path.join(MODEL_DIR, "GAN.json"), "w") as json_file:
             json_file.write(model_json)
         plot_model(GAN, to_file=os.path.join(MODEL_DIR, 'GAN.png'), show_shapes=True)
-
-    if GEN_WEIGHTS != "None":
-        print ("Pre-loading generator with weights...")
-        load_weights(GEN_WEIGHTS, generator)
-    if DISC_WEIGHTS != "None":
-        print ("Pre-loading discriminator with weights...")
-        load_weights(DISC_WEIGHTS, discriminator)
 
     NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
 
@@ -298,7 +294,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
         discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_'+str(epoch)+'.h5'), True)
 
     # End TensorBoard Callback
-    TC.on_train_end(_)
+    TC.on_train_end()
 
 
 def generate(BATCH_SIZE, nice=False):
@@ -338,8 +334,6 @@ def generate(BATCH_SIZE, nice=False):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str)
-    parser.add_argument("--weights_gen", type=str, default="None")
-    parser.add_argument("--weights_disc", type=str, default="None")
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--nice", dest="nice", action="store_true")
     parser.set_defaults(nice=False)
@@ -348,8 +342,7 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
-
     if args.mode == "train":
-        train(BATCH_SIZE=args.batch_size, GEN_WEIGHTS=args.weights_gen, DISC_WEIGHTS=args.weights_disc)
+        train(BATCH_SIZE=args.batch_size)
     elif args.mode == "generate":
         generate(BATCH_SIZE=args.batch_size, nice=args.nice)

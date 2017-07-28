@@ -2,36 +2,33 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import hickle as hkl
+import numpy as np
 from keras import backend as K
-from keras.models import Sequential
-from keras.models import Model
 from keras.layers import Dense
-from keras.layers import Reshape
 from keras.layers import Dropout
-from keras.layers import Input
+from keras.layers import Reshape
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.core import Activation
 from keras.layers.core import Flatten
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import Conv2DTranspose
-from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.advanced_activations import LeakyReLU
-from keras.layers.wrappers import TimeDistributed
-from keras.utils.vis_utils import plot_model
+from keras.models import Sequential
+# from keras.callbacks import TensorBoard
 from keras.optimizers import Adam
-from model_config_dcgan_temporal import *
-import hickle as hkl
-import numpy as np
+from keras.utils.vis_utils import plot_model
+from model_config import *
+
 np.random.seed(2 ** 10)
 from PIL import Image
-import tb_callback
+from scripts import tb_callback
 import argparse
 import math
 import os
 import cv2
 from sys import stdout
 K.set_image_dim_ordering('tf')
-
 
 def generator_model():
 
@@ -57,35 +54,30 @@ def generator_model():
     model = Sequential()
     model.add(Dense(input_dim=100, units=1024))
     model.add(Activation('tanh'))
-    model.add(Dense(2*256*4*4))
+    model.add(Dense(512*4*4))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Reshape((2, 4, 4, 256), input_shape=(2*256*4*4,)))
-    x = ConvLSTM2D(filters=256, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True)
-    model.add(x)
-    # model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
+    model.add(Reshape((4, 4, 512), input_shape=(512*4*4,)))
+    model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(TimeDistributed(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same')))
-    model.add(ConvLSTM2D(filters=256, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True))
+    model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(TimeDistributed(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same')))
-    model.add(ConvLSTM2D(filters=128, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=True))
+    model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
     # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(TimeDistributed(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same')))
-    model.add(ConvLSTM2D(filters=64, kernel_size=(4, 4), padding="same", data_format="channels_last", return_sequences=False))
+    model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
     model.add(BatchNormalization())
     model.add(Activation('tanh'))
     model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
@@ -97,7 +89,6 @@ def discriminator_model():
 
     # d_input = Input(shape=IMAGE_SHAPE)
     # x = Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=IMAGE_SHAPE)(d_input)
-
     # x = LeakyReLU()(x)
     #
     # x = Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same')(x)
@@ -190,7 +181,6 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
 
-
     if SHUFFLE:
         # Shuffle images to aid generalization
         X_train = np.random.permutation(X_train)
@@ -202,8 +192,10 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
 
     # Create the full GAN model with discriminator non-trainable
     GAN = gan_model(generator, discriminator)
-    g_optim = G_OPTIM
-    d_optim = D_OPTIM
+    d_optim = SGD(lr=0.001, momentum=0.5, nesterov=True)
+    # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
+    # d_optim = Adam(lr=0.005, beta_1=0.5)
+    g_optim = Adam(lr=0.0001, beta_1=0.5)
 
     generator.compile(loss='binary_crossentropy', optimizer='sgd')
     GAN.compile(loss='binary_crossentropy', optimizer=g_optim)
@@ -233,8 +225,6 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
             json_file.write(model_json)
         plot_model(GAN, to_file=os.path.join(MODEL_DIR, 'GAN.png'), show_shapes=True)
 
-    print (str(GEN_WEIGHTS))
-
     if GEN_WEIGHTS != "None":
         print ("Pre-loading generator with weights...")
         load_weights(GEN_WEIGHTS, generator)
@@ -245,7 +235,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
 
     # Setup TensorBoard Callback
-    TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
+    TC = tb_callback.TensorBoard(log_dir='/local_home/logs', histogram_freq=0, write_graph=False, write_images=False)
     # TC.set_model(generator, discriminator)
 
     noise = np.zeros((BATCH_SIZE, 100), dtype=np.float32)
@@ -306,7 +296,7 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
         discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_'+str(epoch)+'.h5'), True)
 
     # End TensorBoard Callback
-    TC.on_train_end()
+    TC.on_train_end(_)
 
 
 def generate(BATCH_SIZE, nice=False):

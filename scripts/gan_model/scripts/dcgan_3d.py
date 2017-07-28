@@ -2,28 +2,26 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import hickle as hkl
+import numpy as np
 from keras import backend as K
-from keras.models import Sequential
-from keras.models import Model
 from keras.layers import Dense
-from keras.layers import Reshape
 from keras.layers import Dropout
-from keras.layers import Input
+from keras.layers import Reshape
+from keras.layers.advanced_activations import LeakyReLU
+from keras.layers.convolutional import Conv2D
+from keras.layers.convolutional import Conv3D
+from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.core import Activation
 from keras.layers.core import Flatten
 from keras.layers.normalization import BatchNormalization
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import Conv2DTranspose
-from keras.layers.advanced_activations import LeakyReLU
+from keras.models import Sequential
 from keras.utils.vis_utils import plot_model
-from keras.optimizers import Adam
-from keras.datasets import mnist
-from model_config_128 import *
-import hickle as hkl
-import numpy as np
+from model_config_dcgan_temporal import *
+
 np.random.seed(2 ** 10)
 from PIL import Image
-import tb_callback
+from scripts import tb_callback
 import argparse
 import math
 import os
@@ -31,93 +29,64 @@ import cv2
 from sys import stdout
 K.set_image_dim_ordering('tf')
 
-def generator_model():
 
-    # g_input = Input(shape=(100,))
-    # x = Dense(512*4*4, input_dim=100)(g_input)
-    # x = Activation('relu')(x)
-    # x = Reshape((4, 4, 512), input_shape=(512*4*4,))(x)
-    # x = Conv2D(filters=512, kernel_size=(4,4), padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = (Activation('relu'))(x)
-    # x = Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('relu')(x)
-    # x = Conv2DTranspose(filters=64, kernel_size=(4, 4), strides=(2, 2), padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = Activation('tanh')(x)
-    # g_output = Conv2DTranspose(filters=3, kernel_size=(4, 4), strides=(2, 2), padding='same', activation='tanh')(x)
-    # model = Model(inputs=g_input, outputs=g_output)
+def generator_model():
 
     model = Sequential()
     model.add(Dense(input_dim=100, units=1024))
     model.add(Activation('tanh'))
-    model.add(Dense(512*4*4))
+    model.add(Dense(2*512*4*4))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
-    # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Reshape((4, 4, 512), input_shape=(512*4*4,)))
-    model.add(Conv2D(filters=512, kernel_size=(4,4), padding='same'))
+    # 4x4 image
+    model.add(Reshape((2, 4, 4, 512), input_shape=(2*512*4*4,)))
+    # model.add(Conv2D(filters=512, kernel_size=(4, 4), padding='same'))
+    model.add(Conv3D(filters=512,
+                     kernel_size=(2, 4, 4),
+                     strides=(1, 1, 1),
+                     padding='same',
+                     data_format="channels_last",
+                     activation=LeakyReLU(0.2)))
     model.add(BatchNormalization())
     model.add(Dropout(0.5))
 
-    model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    # 8x8 image
+    # model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    model.add(Conv3DTranspose(filters=256, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
-    # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Conv2DTranspose(filters=128, kernel_size=(4, 4), strides=(2, 2), padding='same'))
+    # 16x16 image
+    model.add(Conv3DTranspose(filters=128, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
     model.add(BatchNormalization())
     model.add(LeakyReLU(0.2))
-    # model.add(Activation('relu'))
     model.add(Dropout(0.5))
 
-    model.add(Conv2DTranspose(filters=64, kernel_size=(4,4), strides=(2,2), padding='same'))
+    # 32x32 image
+    model.add(Conv3DTranspose(filters=64, kernel_size=(2, 4, 4), strides=(1, 2, 2), padding='same'))
     model.add(BatchNormalization())
-    model.add(Activation('tanh'))
+    model.add(LeakyReLU(0.2))
 
-    model.add(Conv2DTranspose(filters=32, kernel_size=(4, 4), strides=(2, 2), padding='same'))
-    model.add(BatchNormalization())
-    model.add(Activation('tanh'))
-
-    model.add(Conv2DTranspose(filters=3, kernel_size=(4,4), strides=(2,2), padding='same', activation='tanh'))
+    # 64x64 image
+    model.add(Conv3DTranspose(filters=3, kernel_size=(2, 4, 4), strides=(1, 2, 2), padding='same', activation='tanh'))
+    model.add(Conv3D(filters=3,
+                     kernel_size=(2, 4, 4),
+                     strides=(2, 1, 1),
+                     padding='same',
+                     data_format="channels_last",
+                     activation='tanh'))
+    model.add(Reshape((64, 64, 3), input_shape=(1, 64, 64, 3)))
 
     return model
 
 
 def discriminator_model():
 
-    # d_input = Input(shape=IMAGE_SHAPE)
-    # x = Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=IMAGE_SHAPE)(d_input)
-    # x = LeakyReLU()(x)
-    #
-    # x = Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same')(x)
-    # x  = LeakyReLU()(x)
-    #
-    # x = Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = LeakyReLU()(x)
-    #
-    # x = Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same')(x)
-    # x = BatchNormalization()(x)
-    # x = LeakyReLU()(x)
-    #
-    # x = Flatten()(x)
-    # x = Dense(1024)(x)
-    # x = Activation('tanh')(x)
-    # x = Dense(1)(x)
-    # d_output = Activation('sigmoid')(x)
-    #
-    # model = Model(inputs=d_input, outputs=d_output)
-
     model = Sequential()
-    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(128, 128, 3)))
+    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(64, 64, 3)))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
 
@@ -126,17 +95,12 @@ def discriminator_model():
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
-    model.add(Conv2D(filters=128, kernel_size=(4, 4), padding='same'))
+    model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
 
     model.add(Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same'))
-    # model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
-    model.add(Dropout(rate=0.5))
-
-    model.add(Conv2D(filters=512, kernel_size=(4, 4), strides=2, padding='same'))
     # model.add(BatchNormalization())
     model.add(LeakyReLU(alpha=0.2))
     model.add(Dropout(rate=0.5))
@@ -150,12 +114,6 @@ def discriminator_model():
 
 
 def gan_model(generator, discriminator):
-    # gan_input = Input(shape=(100,))
-    # x = generator(gan_input)
-    # set_trainability(discriminator, False)
-    # gan_output = discriminator(x)
-    #
-    # model = Model(inputs=gan_input, outputs=gan_output)
 
     model = Sequential()
     model.add(generator)
@@ -183,10 +141,15 @@ def combine_images(generated_images):
     return image
 
 
-def train(BATCH_SIZE):
+def load_weights(weights_file, model):
+    model.load_weights(weights_file)
+
+
+def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     print ("Loading data...")
-    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train_128.hkl'))
+    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
     X_train = (X_train.astype(np.float32) - 127.5)/127.5
+
 
     if SHUFFLE:
         # Shuffle images to aid generalization
@@ -199,10 +162,8 @@ def train(BATCH_SIZE):
 
     # Create the full GAN model with discriminator non-trainable
     GAN = gan_model(generator, discriminator)
-    d_optim = SGD(lr=0.002, momentum=0.5, nesterov=True)
-    # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
-    # d_optim = Adam(lr=0.0001, beta_1=0.5)
-    g_optim = Adam(lr=0.0001, beta_1=0.5)
+    g_optim = G_OPTIM
+    d_optim = D_OPTIM
 
     generator.compile(loss='binary_crossentropy', optimizer='sgd')
     GAN.compile(loss='binary_crossentropy', optimizer=g_optim)
@@ -232,10 +193,19 @@ def train(BATCH_SIZE):
             json_file.write(model_json)
         plot_model(GAN, to_file=os.path.join(MODEL_DIR, 'GAN.png'), show_shapes=True)
 
+    print (str(GEN_WEIGHTS))
+
+    if GEN_WEIGHTS != "None":
+        print ("Pre-loading generator with weights...")
+        load_weights(GEN_WEIGHTS, generator)
+    if DISC_WEIGHTS != "None":
+        print ("Pre-loading discriminator with weights...")
+        load_weights(DISC_WEIGHTS, discriminator)
+
     NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
 
     # Setup TensorBoard Callback
-    TC = tb_callback.TensorBoard(log_dir='/local_home/logs', histogram_freq=0, write_graph=False, write_images=False)
+    TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     # TC.set_model(generator, discriminator)
 
     noise = np.zeros((BATCH_SIZE, 100), dtype=np.float32)
@@ -336,6 +306,8 @@ def generate(BATCH_SIZE, nice=False):
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str)
+    parser.add_argument("--weights_gen", type=str, default="None")
+    parser.add_argument("--weights_disc", type=str, default="None")
     parser.add_argument("--batch_size", type=int, default=128)
     parser.add_argument("--nice", dest="nice", action="store_true")
     parser.set_defaults(nice=False)
@@ -344,7 +316,8 @@ def get_args():
 
 if __name__ == "__main__":
     args = get_args()
+
     if args.mode == "train":
-        train(BATCH_SIZE=args.batch_size)
+        train(BATCH_SIZE=args.batch_size, GEN_WEIGHTS=args.weights_gen, DISC_WEIGHTS=args.weights_disc)
     elif args.mode == "generate":
         generate(BATCH_SIZE=args.batch_size, nice=args.nice)

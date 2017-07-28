@@ -3,17 +3,15 @@ from __future__ import division
 from __future__ import print_function
 
 import numpy as np
+
 np.random.seed(2 ** 10)
 import os
-import math
-import model_config as config
+from scripts import model_config as config
 from keras.datasets import cifar10
-from keras.models import Model, Sequential
-from keras.layers import Input, Activation, Dense, Flatten, Dropout, Lambda, Reshape, ConvLSTM2D
+from keras.models import Model
+from keras.layers import Input, Activation, Dense, Flatten, Dropout, Lambda, Reshape
 from keras.layers.convolutional import Conv2D, Conv2DTranspose
 from keras.layers.normalization import BatchNormalization
-from keras.optimizers import SGD
-from keras.regularizers import l2
 from keras.callbacks import LearningRateScheduler, ModelCheckpoint
 from keras.preprocessing.image import ImageDataGenerator
 from keras.utils import np_utils

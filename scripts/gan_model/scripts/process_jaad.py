@@ -6,11 +6,11 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
-import os
-import numpy as np
 import cv2
 import hickle as hkl
-from jaad_config import *
+import numpy as np
+
+from scripts.jaad_config import *
 
 desired_im_sz = (128, 128)
 

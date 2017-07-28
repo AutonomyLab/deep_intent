@@ -9,12 +9,13 @@ from __future__ import print_function
 import os
 import requests
 import urllib
-import numpy as np
+
 import cv2
 import hickle as hkl
-from kitti_config import *
-from scipy.misc import imread, imresize
+import numpy as np
 from bs4 import BeautifulSoup
+
+from scripts.kitti_config import *
 
 desired_im_sz = (64, 64)
 categories = ['city', 'residential', 'road', 'campus']
