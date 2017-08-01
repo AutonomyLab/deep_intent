@@ -18,7 +18,7 @@ from keras.layers.core import Flatten
 from keras.layers.normalization import BatchNormalization
 from keras.models import Sequential
 from keras.utils.vis_utils import plot_model
-from model_config_3d import *
+from model_config_dcgan_3d_full import *
 
 np.random.seed(2 ** 10)
 from PIL import Image
@@ -40,7 +40,7 @@ def generator_model():
     model.add(LeakyReLU(0.2))
     model.add(Dropout(0.5))
 
-    # 4x4 image
+    # 2x4x4
     model.add(Reshape((2, 4, 4, 256), input_shape=(2*256*4*4,)))
     # model.add(Conv2D(filters=512, kernel_size=(4, 4), padding='same'))
     model.add(Conv3D(filters=512,
@@ -51,68 +51,54 @@ def generator_model():
     model.add(TimeDistributed(BatchNormalization()))
     model.add(Dropout(0.5))
 
-    # 8x8 image
+    # 4x8x8 image
     # model.add(Conv2DTranspose(filters=256, kernel_size=(4, 4), strides=(2, 2), padding='same'))
     model.add(Conv3DTranspose(filters=256, kernel_size=(2, 4, 4), strides=(2, 2, 2), padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(0.5))
 
-    # 16x16 image
+    # 8x16x16 image
     model.add(Conv3DTranspose(filters=128, kernel_size=(2, 4, 4), strides=(2, 2, 2), padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(0.5))
 
-    # 32x32 image
-    model.add(Conv3DTranspose(filters=64, kernel_size=(2, 4, 4), strides=(1, 2, 2), padding='same'))
+    # 16x32x32 image
+    model.add(Conv3DTranspose(filters=64, kernel_size=(2, 4, 4), strides=(2, 2, 2), padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(0.5))
 
-    # 64x64 image
-    model.add(Conv3DTranspose(filters=3, kernel_size=(2, 4, 4), strides=(1, 2, 2), padding='same', activation='tanh'))
-
-    model.add(Conv3D(filters=3,
-                     kernel_size=(2, 1, 1),
-                     strides=(4, 1, 1),
-                     padding='same',
-                     data_format="channels_last",
-                     activation='relu'))
-    model.add(Conv3D(filters=3,
-                     kernel_size=(2, 1, 1),
-                     strides=(2, 1, 1),
-                     padding='same',
-                     data_format="channels_last",
-                     activation='tanh'))
-    model.add(Reshape((64, 64, 3), input_shape=(1, 64, 64, 3)))
+    # 32x64x64 image
+    model.add(Conv3DTranspose(filters=3, kernel_size=(2, 4, 4), strides=(2, 2, 2), padding='same', activation='tanh'))
 
     return model
 
 
 def discriminator_model():
     model = Sequential()
-    model.add(Conv2D(filters=64, kernel_size=(4, 4), padding='same', input_shape=(64, 64, 3)))
-    # model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv3D(filters=64, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same', input_shape=(32, 64, 64, 3)))
+    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(0.2)))
 
-    model.add(Conv2D(filters=64, kernel_size=(4, 4), strides=2, padding='same'))
-    # model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv3D(filters=128, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
+    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(rate=0.5))
 
-    model.add(Conv2D(filters=128, kernel_size=(4, 4), strides=2, padding='same'))
-    # model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv3D(filters=256, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
+    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(rate=0.5))
 
-    model.add(Conv2D(filters=256, kernel_size=(4, 4), strides=2, padding='same'))
-    # model.add(BatchNormalization())
-    model.add(LeakyReLU(alpha=0.2))
+    model.add(Conv3D(filters=512, kernel_size=(2, 4, 4), strides=(2, 2, 2), padding='same'))
+    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(Dropout(rate=0.5))
 
     model.add(Flatten())
-    model.add(Dense(256))
+    model.add(Dense(512))
     model.add(Activation('tanh'))
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
@@ -134,12 +120,22 @@ def set_trainability(model, trainable):
 
 
 def combine_images(generated_images):
-    num = generated_images.shape[0]
+
+    # Unroll all generated video frames
+    n_frames = generated_images.shape[0]*generated_images.shape[1]
+    frames = np.zeros((n_frames, ) + generated_images.shape[2:], dtype=generated_images.dtype)
+    frame_index = 0
+    # for i in range(generated_images.shape[0]):
+    #     for j in range(generated_images.shape[1]):
+    #         frames[frame_index] = generated_images[i, j]
+    #         frame_index += 1
+
+    num = frames.shape[0]
     width = int(math.sqrt(num))
     height = int(math.ceil(float(num) / width))
-    shape = generated_images.shape[1:]
+    shape = frames.shape[1:]
     image = np.zeros((height * shape[0], width * shape[1], shape[2]), dtype=generated_images.dtype)
-    for index, img in enumerate(generated_images):
+    for index, img in enumerate(frames):
         i = int(index / width)
         j = index % width
         image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
@@ -152,8 +148,15 @@ def load_weights(weights_file, model):
 
 def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     print ("Loading data...")
-    X_train = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
-    X_train = (X_train.astype(np.float32) - 127.5)/127.5
+    frames = hkl.load(os.path.join(DATA_DIR, 'X_train.hkl'))
+    frames = (frames.astype(np.float32) - 127.5)/127.5
+
+    n_videos = int(frames.shape[0]/VIDEO_LENGTH)
+    X_train = np.zeros((n_videos, VIDEO_LENGTH) + frames.shape[1:], dtype=np.float32)
+
+    # Arrange frames in a progression
+    for i in range(n_videos):
+        X_train[i] = frames[i*VIDEO_LENGTH:(i+1)*VIDEO_LENGTH]
 
     if SHUFFLE:
         # Shuffle images to aid generalization
@@ -163,6 +166,10 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
     # Create the Generator and Discriminator models
     generator = generator_model()
     discriminator = discriminator_model()
+
+    # print(generator.summary())
+    # print(discriminator.summary())
+    # exit(0)
 
     # Create the full GAN model with discriminator non-trainable
     GAN = gan_model(generator, discriminator)
@@ -223,7 +230,8 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
 
             # Generate images
             for i in range(BATCH_SIZE):
-                noise[i, :] = np.random.normal(0, 1, 100)
+                noise[i, :] = np.random.uniform(-1, 1, 100)
+
             image_batch = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE]
             generated_images = generator.predict(noise, verbose=0)
 
@@ -231,36 +239,26 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
             X = np.concatenate((image_batch, generated_images))
             y = [1] * BATCH_SIZE + [0] * BATCH_SIZE
             d_loss.append(discriminator.train_on_batch(X, y))
-            # print("Epoch %d Batch %d d_loss : %f" % (epoch, index, d_loss))
 
             # Train GAN
             for i in range(BATCH_SIZE):
-                noise[i, :] = np.random.normal(0, 1, 100)
+                noise[i, :] = np.random.uniform(-1, 1, 100)
             set_trainability(discriminator, False)
             g_loss.append(GAN.train_on_batch(noise, [1] * BATCH_SIZE))
             set_trainability(discriminator, True)
 
-            # Train GAN as to keep gen_loss lower than d_loss
-            while(g_loss[len(g_loss)-1] > d_loss[len(d_loss)-1]):
-                # Train GAN
-                for i in range(BATCH_SIZE):
-                    noise[i, :] = np.random.normal(0, 1, 100)
-                set_trainability(discriminator, False)
-                g_loss.append(GAN.train_on_batch(noise, [1] * BATCH_SIZE))
-                set_trainability(discriminator, True)
-
             arrow = int(index/10)
             stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                         "g_loss: " + str(g_loss[len(g_loss)-1]) + "\t    " + "d_loss: " + str(d_loss[len(d_loss)-1]) +
+                         "g_loss: " + str(g_loss[len(g_loss)-1]) + "\t    " + "d_loss: " + str(d_loss[len(g_loss)-1]) +
                          "\t    [" + "{0}>".format("="*(arrow)))
             stdout.flush()
 
-        if SAVE_GENERATED_IMAGES:
-            # Save generated images to file
-            image = combine_images(generated_images)
-            image = image * 127.5 + 127.5
-            # Image.fromarray(image.astype(np.uint8)).save(str(epoch) + "_" + str(index) + ".png")
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + ".png"), image)
+            if SAVE_GENERATED_IMAGES:
+                # Save generated images to file
+                image = combine_images(generated_images)
+                image = image * 127.5 + 127.5
+                # Image.fromarray(image.astype(np.uint8)).save(str(epoch) + "_" + str(index) + ".png")
+                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + ".png"), image)
 
         # then after each epoch/iteration
         avg_g_loss = sum(g_loss)/len(g_loss)
@@ -319,7 +317,7 @@ def get_args():
     parser.add_argument("--mode", type=str)
     parser.add_argument("--weights_gen", type=str, default="None")
     parser.add_argument("--weights_disc", type=str, default="None")
-    parser.add_argument("--batch_size", type=int, default=128)
+    parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--nice", dest="nice", action="store_true")
     parser.set_defaults(nice=False)
     args = parser.parse_args()
