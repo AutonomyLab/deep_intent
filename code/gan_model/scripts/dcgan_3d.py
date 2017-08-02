@@ -227,6 +227,20 @@ def train(BATCH_SIZE, GEN_WEIGHTS, DISC_WEIGHTS):
             image_batch = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE]
             generated_images = generator.predict(noise, verbose=0)
 
+            image = generated_images[1]
+            image = image * 127.5 + 127.5
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_1.png"), image)
+            print(image)
+            image = generated_images[2]
+            image = image * 127.5 + 127.5
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_2.png"), image)
+            image = generated_images[3]
+            image = image * 127.5 + 127.5
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_3.png"), image)
+            image = generated_images[4]
+            image = image * 127.5 + 127.5
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_4.png"), image)
+
             # Train Discriminator
             X = np.concatenate((image_batch, generated_images))
             y = [1] * BATCH_SIZE + [0] * BATCH_SIZE

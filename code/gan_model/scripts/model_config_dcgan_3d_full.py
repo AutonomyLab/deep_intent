@@ -10,9 +10,10 @@ import os
 # Background config:
 # DATA_DIR= '/home/pratik/DeepIntent_Datasets/KITTI_Dataset/'
 # DATA_DIR= '/local_home/data/JAAD_data/'
-DATA_DIR= '/local_home/data/KITTI_data/'
+# DATA_DIR= '/local_home/data/KITTI_data/'
 # DATA_DIR = '/grad/2/pgujjar/DeepIntent/data/JAAD_data'
-# DATA_DIR = './../data/KITTI_data'
+DATA_DIR = './../data/KITTI_data'
+# DATA_DIR = './../data/JAAD_data'
 
 MODEL_DIR = './../models'
 if not os.path.exists(MODEL_DIR):
@@ -40,17 +41,16 @@ SAVE_GENERATED_IMAGES = True
 DATA_AUGMENTATION = False
 SHUFFLE = True
 VIDEO_LENGTH = 32
-SHUFFLE_VIDEOS = True
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 4
-NB_EPOCHS = 100
+NB_EPOCHS = 1000
 IMAGE_SHAPE = (64, 64, 3)
 
 # g_optim = SGD(lr=0.0001, momentum=0.5, nesterov=True)
 # d_optim = Adam(lr=0.005, beta_1=0.5)
-G_OPTIM = Adam(lr=0.00001, beta_1=0.5)
-D_OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
+G_OPTIM = Adam(lr=0.001, beta_1=0.5)
+D_OPTIM = SGD(lr=0.001, momentum=0.5, nesterov=True)

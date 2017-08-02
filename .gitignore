@@ -1,5 +1,6 @@
 .idea
 code/gan_model/generated_images/*
+code/gan_model/gen_history/*
 code/gan_model/logs/*
 code/gan_model/checkpoints/*
 code/gan_model/*.pyc
