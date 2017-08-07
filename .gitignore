@@ -5,3 +5,9 @@ code/gan_model/logs/*
 code/gan_model/checkpoints/*
 code/gan_model/*.pyc
 code/gan_model/tf_logs/*
+code/autoencoder_model/generated_images/*
+code/autoencoder_model/gen_history/*
+code/autoencoder_model/logs/*
+code/autoencoder_model/checkpoints/*
+code/autoencoder_model/*.pyc
+code/autoencoder_model/tf_logs/*
