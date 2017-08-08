@@ -18,7 +18,7 @@ from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
 # from keras.callbacks import TensorBoard
-from scripts.config import *
+from scripts.config_fa import *
 
 from scripts import tb_callback
 import argparse
@@ -232,12 +232,17 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
     for epoch in range(NB_EPOCHS):
         print("\n\nEpoch ", epoch)
         loss = []
-        for index in range(NB_ITERATIONS):
-            # Train Autoencoder
-            X = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE]
-            loss.append(autoencoder.train_on_batch(X, X))
 
-            arrow = int(index / (NB_ITERATIONS / 30))
+        Y = X_train[0: BATCH_SIZE]
+        for index in range(NB_ITERATIONS - 1):
+            # Train Autoencoder with future frames
+            # Limit BATCH_SIZE to 10-20
+            X = Y
+            Y = X_train[(index + 1) * BATCH_SIZE: (index + 2) * BATCH_SIZE]
+
+            loss.append(autoencoder.train_on_batch(X, Y))
+
+            arrow = int(index/(NB_ITERATIONS/30))
             stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
                          "loss: " + str(loss[len(loss)-1]) +
                          "\t    [" + "{0}>".format("="*(arrow)))
