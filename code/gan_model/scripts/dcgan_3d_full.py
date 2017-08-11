@@ -32,12 +32,9 @@ K.set_image_dim_ordering('tf')
 
 def generator_model():
     model = Sequential()
-    model.add(Dense(input_dim=100, units=1024))
+    model.add(Dense(input_dim=100, units=2*512*4*4))
     model.add(Activation('tanh'))
-    model.add(Dense(2*512*4*4))
     model.add(BatchNormalization())
-    model.add(LeakyReLU(0.2))
-    model.add(Dropout(0.5))
 
     # 2x4x4
     model.add(Reshape((2, 4, 4, 512), input_shape=(2*512*4*4,)))
@@ -82,31 +79,29 @@ def discriminator_model():
 
     # 128x16x16
     model.add(Conv3D(filters=128, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
-    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
-    model.add(Dropout(rate=0.5))
+    model.add(TimeDistributed(Dropout(rate=0.5)))
 
     # 256x8x8
     model.add(Conv3D(filters=256, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
-    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
-    model.add(Dropout(rate=0.5))
+    model.add(TimeDistributed(Dropout(rate=0.5)))
 
     # 512x4x4
     model.add(Conv3D(filters=512, kernel_size=(4, 4, 4), strides=(2, 2, 2), padding='same'))
-    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
-    model.add(Dropout(rate=0.5))
+    model.add(TimeDistributed(Dropout(rate=0.5)))
 
     # 2x4x4
     model.add(Conv3D(filters=2, kernel_size=(2, 4, 4), strides=(1, 1, 1), padding='same'))
-    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(0.2)))
-    model.add(Dropout(rate=0.5))
+    model.add(TimeDistributed(Dropout(rate=0.5)))
 
     model.add(Flatten())
-    model.add(Dense(512))
-    model.add(Activation('tanh'))
     model.add(Dense(1))
     model.add(Activation('sigmoid'))
     return model
