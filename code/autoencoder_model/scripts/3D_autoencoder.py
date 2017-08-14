@@ -17,10 +17,8 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
-from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 from keras.layers.advanced_activations import LeakyReLU
-# from keras.callbacks import TensorBoard
 from config_3d import *
 
 import tb_callback
@@ -33,21 +31,40 @@ from sys import stdout
 def encoder_model():
     model = Sequential()
 
-    # 128x128
-    model.add(Conv3D(filters=128,
-                     strides=(1, 4, 4),
-                     kernel_size=(2, 11, 11),
+    model.add(Conv3D(filters=64,
+                     strides=(1, 2, 2),
+                     kernel_size=(4, 4, 4),
                      padding='same',
                      input_shape=(VIDEO_LENGTH, 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    # 32x32
-    model.add(Conv3D(filters=64, kernel_size=(2, 5, 5), padding='same', strides=(1, 2, 2)))
+    # 10x32x32
+    model.add(Conv3D(filters=128,
+                     strides=(1, 2, 2),
+                     kernel_size=(4, 4, 4),
+                     padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
-    # model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x16x16
+    model.add(Conv3D(filters=256,
+                     strides=(1, 2, 2),
+                     kernel_size=(4, 4, 4),
+                     padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x8x8
+    model.add(Conv3D(filters=512,
+                     strides=(1, 2, 2),
+                     kernel_size=(4, 4, 4),
+                     padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('tanh')))
     model.add(TimeDistributed(Dropout(0.5)))
 
     return model
@@ -56,24 +73,41 @@ def encoder_model():
 def decoder_model():
     model = Sequential()
 
-    # 32x32
-    model.add(Conv3DTranspose(filters=128,
-                              kernel_size=(2, 5, 5),
+    # 10x16x16
+    model.add(Conv3DTranspose(filters=256,
+                              kernel_size=(3, 3, 3),
                               padding='same',
                               strides=(1, 2, 2),
-                              input_shape=(VIDEO_LENGTH, 16, 16, 64)))
+                              input_shape=(10, 8, 8, 512)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     # model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    # 128x128
+    # 10x32x32
+    model.add(Conv3DTranspose(filters=128,
+                              kernel_size=(3, 3, 3),
+                              padding='same',
+                              strides=(1, 2, 2)))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x64x64
+    model.add(Conv3DTranspose(filters=64,
+                              kernel_size=(3, 3, 3),
+                              padding='same',
+                              strides=(1, 2, 2)))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x128x128
     model.add(Conv3DTranspose(filters=3,
-                              kernel_size=(2, 11, 11),
-                              strides=(1, 4, 4),
+                              kernel_size=(3, 3, 3),
+                              strides=(1, 2, 2),
                               padding='same',
                               activation='tanh'))
-
     return model
 
 
@@ -170,21 +204,34 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
         load_weights(DEC_WEIGHTS, decoder)
 
 
+def load_X_train(X_train_files, index):
+    X_train = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+    for i in range(BATCH_SIZE):
+        for j in range(VIDEO_LENGTH):
+            filename = "frame_" + str(X_train_files[(index*BATCH_SIZE + i), j]) + ".png"
+            im_file = os.path.join(DATA_DIR, filename)
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            X_train[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+
+    return X_train
+
+
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     print ("Loading data...")
-    frames = hkl.load(os.path.join(DATA_DIR, 'X_train_128.hkl'))
-    frames = (frames.astype(np.float32) - 127.5) / 127.5
+    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
+    n_frames = len(frames_source)
+    frame_numbers = np.arange(1, n_frames+1, dtype=np.int32)
 
-    n_videos = int(frames.shape[0] / VIDEO_LENGTH)
-    X_train = np.zeros((n_videos, VIDEO_LENGTH) + frames.shape[1:], dtype=np.float32)
+    n_videos = int(n_frames / VIDEO_LENGTH)
+    X_train_files = np.zeros((n_videos, VIDEO_LENGTH), dtype=np.int32)
 
-    # Arrange frames in a progression
+    # Arrange frames numbers in a progression
     for i in range(n_videos):
-        X_train[i] = frames[i * VIDEO_LENGTH:(i + 1) * VIDEO_LENGTH]
+        X_train_files[i] = frame_numbers[i * VIDEO_LENGTH:(i + 1) * VIDEO_LENGTH]
 
     if SHUFFLE:
         # Shuffle images to aid generalization
-        X_train = np.random.permutation(X_train)
+        X_train_files = np.random.permutation(X_train_files)
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models...")
@@ -200,7 +247,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # discriminator.compile(loss='binary_crossentropy', optimizer=d_optim)
     autoencoder.compile(loss='binary_crossentropy', optimizer=OPTIM)
 
-    NB_ITERATIONS = int(X_train.shape[0]/BATCH_SIZE)
+    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -212,10 +259,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         loss = []
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = X_train[index*BATCH_SIZE:(index+1)*BATCH_SIZE]
+            X = load_X_train(X_train_files, index)
             loss.append(autoencoder.train_on_batch(X, X))
 
-            arrow = int(index / (NB_ITERATIONS / 30))
+            arrow = int(index / (NB_ITERATIONS / 40))
             stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
                          "loss: " + str(loss[len(loss)-1]) +
                          "\t    [" + "{0}>".format("="*(arrow)))

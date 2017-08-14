@@ -9,7 +9,7 @@ import os
 # -------------------------------------------------
 # Background config:
 # DATA_DIR= '/home/pratik/DeepIntent_Datasets/KITTI_Dataset/'
-DATA_DIR= '/local_home/data/JAAD_data/'
+DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
 MODEL_DIR = './../models'
@@ -37,12 +37,13 @@ SAVE_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 10
+IMG_SIZE = (128, 128, 3)
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 
-BATCH_SIZE = 12
+BATCH_SIZE = 10
 NB_EPOCHS = 100
 
 OPTIM = Adam(lr=0.0001, beta_1=0.5)

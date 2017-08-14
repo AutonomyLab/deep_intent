@@ -12,7 +12,7 @@ import numpy as np
 
 from jaad_config import *
 
-desired_im_sz = (256, 256)
+desired_im_sz = (128, 128)
 
 # Recordings used for validation and testing.
 val_recordings = ['video_0015']
@@ -49,8 +49,12 @@ def process_data():
                 im = cv2.imread(im_file, cv2.IMREAD_COLOR)
                 X[i] = process_im(im, im_file, desired_im_sz)
                 if split=='train':
-                    print ("Saving image")
-                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
+                    # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i+1) + ".png"), X[i])
+                if split=='test':
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "test/frame_" + str(i+1) + ".png"), X[i])
+                if split == 'val':
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "val/frame_" + str(i+1) + ".png"), X[i])
             except cv2.error as e:
                 print("Image file being processed: ", im_file)
                 print (e)
