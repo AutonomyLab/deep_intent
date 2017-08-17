@@ -4,6 +4,8 @@ from __future__ import print_function
 
 from keras.optimizers import SGD
 from keras.optimizers import Adam
+from keras.optimizers import adadelta
+from keras.optimizers import rmsprop
 import os
 
 # -------------------------------------------------
@@ -46,6 +48,18 @@ print ("Loading network/training configuration...")
 BATCH_SIZE = 10
 NB_EPOCHS = 100
 
-OPTIM = Adam(lr=0.0001, beta_1=0.5)
-# OPTIM = SGD(lr=0.00001, momentum=0.5, nesterov=True)
+# OPTIM = Adam(lr=0.0001, beta_1=0.5)
+OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
+# OPTIM = rmsprop(lr=0.00001)
+
+lr_schedule = [10, 70, 80]  # epoch_step
+
+def schedule(epoch_idx):
+    if (epoch_idx + 1) < lr_schedule[0]:
+        return 0.01
+    elif (epoch_idx + 1) < lr_schedule[1]:
+        return 0.001  # lr_decay_ratio = 10
+    elif (epoch_idx + 1) < lr_schedule[2]:
+        return 0.0001
+    return 0.001
 

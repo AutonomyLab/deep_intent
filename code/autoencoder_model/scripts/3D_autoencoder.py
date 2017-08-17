@@ -18,10 +18,12 @@ from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.normalization import BatchNormalization
+from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from config_3d import *
 
 import tb_callback
+import lrs_callback
 import argparse
 import math
 import os
@@ -33,7 +35,7 @@ def encoder_model():
 
     model.add(Conv3D(filters=64,
                      strides=(1, 2, 2),
-                     kernel_size=(4, 4, 4),
+                     kernel_size=(3, 3, 3),
                      padding='same',
                      input_shape=(VIDEO_LENGTH, 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
@@ -43,28 +45,28 @@ def encoder_model():
     # 10x32x32
     model.add(Conv3D(filters=128,
                      strides=(1, 2, 2),
-                     kernel_size=(4, 4, 4),
+                     kernel_size=(3, 3, 3),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    # 10x16x16
+    # 10x32x32
     model.add(Conv3D(filters=256,
-                     strides=(1, 2, 2),
-                     kernel_size=(4, 4, 4),
+                     strides=(1, 1, 1),
+                     kernel_size=(3, 3, 3),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x8x8
-    model.add(Conv3D(filters=512,
-                     strides=(1, 2, 2),
-                     kernel_size=(4, 4, 4),
+    model.add(Conv3D(filters=256,
+                     strides=(1, 4, 4),
+                     kernel_size=(3, 3, 3),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
     return model
@@ -73,12 +75,12 @@ def encoder_model():
 def decoder_model():
     model = Sequential()
 
-    # 10x16x16
+    # 10x32x32
     model.add(Conv3DTranspose(filters=256,
                               kernel_size=(3, 3, 3),
                               padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 8, 8, 512)))
+                              strides=(1, 4, 4),
+                              input_shape=(10, 8, 8, 256)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     # model.add(TimeDistributed(LeakyReLU(0.2)))
@@ -88,7 +90,7 @@ def decoder_model():
     model.add(Conv3DTranspose(filters=128,
                               kernel_size=(3, 3, 3),
                               padding='same',
-                              strides=(1, 2, 2)))
+                              strides=(1, 1, 1)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
@@ -241,22 +243,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
-    # generator.compile(loss='binary_crossentropy', optimizer='sgd')
-    # GAN.compile(loss='binary_crossentropy', optimizer=g_optim)
-    # set_trainability(discriminator, True)
-    # discriminator.compile(loss='binary_crossentropy', optimizer=d_optim)
-    autoencoder.compile(loss='binary_crossentropy', optimizer=OPTIM)
+    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
+    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
     for epoch in range(NB_EPOCHS):
         print("\n\nEpoch ", epoch)
         loss = []
+
+        # Set learning rate every epoch
+        LRS.on_epoch_begin(epoch=epoch)
+        lr = K.get_value(autoencoder.optimizer.lr)
+        print ("Learninig rate: %f" %(lr))
+
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X = load_X_train(X_train_files, index)
@@ -274,20 +280,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
             orig_image, image = combine_images(generated_images, X)
             image = image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
+            if epoch == 0 :
+                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + ".png"), image)
-            # image = X[0, 1]
-            # image = image * 127.5 + 127.5
-            # cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_X_1.png"), image)
-            # image = X[0, 2]
-            # image = image * 127.5 + 127.5
-            # cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_X_2.png"), image)
-            # image = X[0, 3]
-            # image = image * 127.5 + 127.5
-            # cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_X_3.png"), image)
-            # image = X[0, 4]
-            # image = image * 127.5 + 127.5
-            # cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_X_4.png"), image)
 
         # then after each epoch/iteration
         avg_loss = sum(loss)/len(loss)
@@ -303,7 +298,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
     # End TensorBoard Callback
-    TC.on_train_end()
+    TC.on_train_end('_')
 
 
 def get_args():
