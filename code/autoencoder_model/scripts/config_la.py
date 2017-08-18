@@ -45,21 +45,21 @@ IMG_SIZE = (128, 128, 3)
 # Network configuration:
 print ("Loading network/training configuration...")
 
-BATCH_SIZE = 10
+BATCH_SIZE = 32
 NB_EPOCHS = 100
 
-OPTIM = Adam(lr=0.0001, beta_1=0.5)
-# OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
+# OPTIM = Adam(lr=0.000001, beta_1=0.5)
+OPTIM = SGD(lr=0.00001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.001
-    elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.0001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.0001
-    return 0.0001
+    elif (epoch_idx + 1) < lr_schedule[1]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx + 1) < lr_schedule[2]:
+        return 0.00001
+    return 0.00001
 

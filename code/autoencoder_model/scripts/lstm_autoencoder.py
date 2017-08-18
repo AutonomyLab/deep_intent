@@ -34,7 +34,7 @@ def encoder_model():
     model = Sequential()
 
     # 128x128
-    model.add(TimeDistributed(Conv2D(filters=128,
+    model.add(TimeDistributed(Conv2D(filters=256,
                                      kernel_size=(11, 11),
                                      strides=(4, 4),
                                      padding='same'),
@@ -44,13 +44,12 @@ def encoder_model():
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 32x32
-    model.add(TimeDistributed(Conv2D(filters=64,
+    model.add(TimeDistributed(Conv2D(filters=128,
                                      kernel_size=(5, 5),
                                      strides=(2, 2),
                                      padding='same')))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
-    # model.add(TimeDistributed(Activation('tanh')))
     model.add(TimeDistributed(Dropout(0.5)))
 
     return model
@@ -60,28 +59,37 @@ def temporal_model():
     model = Sequential()
 
     # 16x16
+    model.add(ConvLSTM2D(filters=128,
+                         kernel_size=(3, 3),
+                         padding='same',
+                         strides=(1, 1),
+                         return_sequences=True,
+                         activation='relu',
+                         dropout=0.5,
+                         recurrent_dropout=0.5,
+                         input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+    model.add(TimeDistributed(BatchNormalization()))
+
+    # 16x16
     model.add(ConvLSTM2D(filters=64,
                          kernel_size=(3, 3),
                          padding='same',
                          strides=(1, 1),
                          return_sequences=True,
-                         input_shape=(VIDEO_LENGTH, 16, 16, 64)))
+                         activation='relu',
+                         dropout=0.5,
+                         recurrent_dropout=0.5))
     model.add(TimeDistributed(BatchNormalization()))
 
     # 16x16
-    model.add(ConvLSTM2D(filters=32,
+    model.add(ConvLSTM2D(filters=128,
                          kernel_size=(3, 3),
                          padding='same',
                          strides=(1, 1),
-                         return_sequences=True))
-    model.add(TimeDistributed(BatchNormalization()))
-
-    # 16x16
-    model.add(ConvLSTM2D(filters=64,
-                         kernel_size=(3, 3),
-                         padding='same',
-                         strides=(1, 1),
-                         return_sequences=True))
+                         return_sequences=True,
+                         activation='relu',
+                         dropout=0.5,
+                         recurrent_dropout = 0.5))
     model.add(TimeDistributed(BatchNormalization()))
 
     return model
@@ -91,11 +99,11 @@ def decoder_model():
     model = Sequential()
 
     # 16x16
-    model.add(TimeDistributed(Conv2DTranspose(filters=128,
+    model.add(TimeDistributed(Conv2DTranspose(filters=256,
                                               kernel_size=(5, 5),
                                               padding='same',
                                               strides=(2, 2)),
-                                              input_shape=(VIDEO_LENGTH, 16, 16, 64)))
+                                              input_shape=(VIDEO_LENGTH, 16, 16, 128)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     # model.add(TimeDistributed(LeakyReLU(0.2)))
@@ -258,7 +266,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     temporizer = temporal_model()
     decoder = decoder_model()
-    autoencoder = autoencoder_model(encoder, decoder)
+    autoencoder = autoencoder_model(encoder, temporizer, decoder)
 
     run_utilities(encoder, temporizer, decoder, autoencoder, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS)
 
@@ -280,7 +288,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
         # Set learning rate every epoch
         # LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
-        print ("Learning rate: %f" %(lr))
+        print ("Learning rate: " + str(lr))
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
@@ -320,6 +328,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
     # End TensorBoard Callback
     TC.on_train_end('_')
 
+
+def test(ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
+
+    return
 
 def get_args():
     parser = argparse.ArgumentParser()
