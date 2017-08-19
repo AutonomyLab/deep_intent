@@ -17,6 +17,10 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
+from keras.layers.core import Flatten
+from keras.layers.core import Dense
+from keras.layers.recurrent import LSTM
+from keras.layers.core import Reshape
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from config_la import *
@@ -52,45 +56,59 @@ def encoder_model():
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
+    model.add(TimeDistributed(Flatten()))
+    model.add(TimeDistributed(Dense(256)))
     return model
 
 
 def temporal_model():
     model = Sequential()
 
-    # 16x16
-    model.add(ConvLSTM2D(filters=128,
-                         kernel_size=(3, 3),
-                         padding='same',
-                         strides=(1, 1),
-                         return_sequences=True,
-                         activation='relu',
-                         dropout=0.5,
-                         recurrent_dropout=0.5,
-                         input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+    model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True, input_shape=(VIDEO_LENGTH, 256)))
+    model.add(LSTM(units=128, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
+    model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
+    model.add(TimeDistributed(Reshape(target_shape=(16, 16, 1), input_shape=(256,))))
+    model.add(TimeDistributed(Conv2D(filters=128,
+                                     kernel_size=(3, 3),
+                                     padding='same',
+                                     strides=(1, 1),
+                                     activation='relu')))
     model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Dropout(0.5)))
 
-    # 16x16
-    model.add(ConvLSTM2D(filters=64,
-                         kernel_size=(3, 3),
-                         padding='same',
-                         strides=(1, 1),
-                         return_sequences=True,
-                         activation='relu',
-                         dropout=0.5,
-                         recurrent_dropout=0.5))
-    model.add(TimeDistributed(BatchNormalization()))
-
-    # 16x16
-    model.add(ConvLSTM2D(filters=128,
-                         kernel_size=(3, 3),
-                         padding='same',
-                         strides=(1, 1),
-                         return_sequences=True,
-                         activation='relu',
-                         dropout=0.5,
-                         recurrent_dropout = 0.5))
-    model.add(TimeDistributed(BatchNormalization()))
+    # # 16x16
+    # model.add(ConvLSTM2D(filters=128,
+    #                      kernel_size=(3, 3),
+    #                      padding='same',
+    #                      strides=(1, 1),
+    #                      return_sequences=True,
+    #                      activation='relu',
+    #                      dropout=0.5,
+    #                      recurrent_dropout=0.5,
+    #                      input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+    # model.add(TimeDistributed(BatchNormalization()))
+    #
+    # # 16x16
+    # model.add(ConvLSTM2D(filters=64,
+    #                      kernel_size=(3, 3),
+    #                      padding='same',
+    #                      strides=(1, 1),
+    #                      return_sequences=True,
+    #                      activation='relu',
+    #                      dropout=0.5,
+    #                      recurrent_dropout=0.5))
+    # model.add(TimeDistributed(BatchNormalization()))
+    #
+    # # 16x16
+    # model.add(ConvLSTM2D(filters=128,
+    #                      kernel_size=(3, 3),
+    #                      padding='same',
+    #                      strides=(1, 1),
+    #                      return_sequences=True,
+    #                      activation='relu',
+    #                      dropout=0.5,
+    #                      recurrent_dropout = 0.5))
+    # model.add(TimeDistributed(BatchNormalization()))
 
     return model
 
@@ -266,8 +284,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     temporizer = temporal_model()
     decoder = decoder_model()
-    autoencoder = autoencoder_model(encoder, temporizer, decoder)
 
+    print (encoder.summary())
+    print (temporizer.summary())
+    print (decoder.summary())
+
+    autoencoder = autoencoder_model(encoder, temporizer, decoder)
     run_utilities(encoder, temporizer, decoder, autoencoder, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS)
 
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)

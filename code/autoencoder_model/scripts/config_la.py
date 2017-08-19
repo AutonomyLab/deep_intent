@@ -45,11 +45,11 @@ IMG_SIZE = (128, 128, 3)
 # Network configuration:
 print ("Loading network/training configuration...")
 
-BATCH_SIZE = 32
+BATCH_SIZE = 10
 NB_EPOCHS = 100
 
-# OPTIM = Adam(lr=0.000001, beta_1=0.5)
-OPTIM = SGD(lr=0.00001, momentum=0.5, nesterov=True)
+# OPTIM = Adam(lr=0.0001, beta_1=0.5)
+OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step
