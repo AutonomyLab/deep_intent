@@ -61,8 +61,8 @@ def process_data():
             except IOError as e:
                 print (e)
 
-        hkl.dump(X, os.path.join(DATA_DIR, 'X_' + split + '_256' + '.hkl'))
-        hkl.dump(source_list, os.path.join(DATA_DIR, 'sources_' + split + '_256' + '.hkl'))
+        hkl.dump(X, os.path.join(DATA_DIR, 'X_' + split + '_128' + '.hkl'))
+        hkl.dump(source_list, os.path.join(DATA_DIR, 'sources_' + split + '_128' + '.hkl'))
 
 
 # resize image

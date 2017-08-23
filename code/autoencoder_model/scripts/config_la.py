@@ -35,7 +35,7 @@ if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
 PRINT_MODEL_SUMMARY = True
-SAVE_MODEL = False
+SAVE_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 10
@@ -48,8 +48,8 @@ print ("Loading network/training configuration...")
 BATCH_SIZE = 10
 NB_EPOCHS = 100
 
-# OPTIM = Adam(lr=0.0001, beta_1=0.5)
-OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
+OPTIM = Adam(lr=0.0001, beta_1=0.5)
+# OPTIM = SGD(lr=0.0001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step
@@ -58,7 +58,7 @@ def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
         return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.00001
     return 0.00001

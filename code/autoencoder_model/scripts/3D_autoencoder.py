@@ -44,7 +44,7 @@ def encoder_model():
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    # 10x8x8
+    # 10x16x16
     model.add(Conv3D(filters=64,
                      strides=(1, 2, 2),
                      kernel_size=(3, 5, 5),
@@ -74,8 +74,11 @@ def decoder_model():
     model.add(Conv3DTranspose(filters=3,
                               kernel_size=(3, 11, 11),
                               strides=(1, 4, 4),
-                              padding='same',
-                              activation='tanh'))
+                              padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
     return model
 
 def set_trainability(model, trainable):
@@ -226,8 +229,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
-    # LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    # LRS.set_model(autoencoder)
+    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
@@ -236,9 +239,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         loss = []
 
         # Set learning rate every epoch
-        # LRS.on_epoch_begin(epoch=epoch)
+        LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
-        print ("Learning rate: %f" %(lr))
+        print ("Learning rate: " + str(lr))
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder

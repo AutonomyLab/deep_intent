@@ -15,7 +15,7 @@ import hickle as hkl
 import numpy as np
 from bs4 import BeautifulSoup
 
-from scripts.kitti_config import *
+from kitti_config import *
 
 desired_im_sz = (64, 64)
 categories = ['city', 'residential', 'road', 'campus']
@@ -96,14 +96,21 @@ def process_data():
             try:
                 im = cv2.imread(im_file, cv2.IMREAD_COLOR)
                 X[i] = process_im(im, desired_im_sz)
+                if split == 'train':
+                    # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i + 1) + ".png"), X[i])
+                if split == 'test':
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "test/frame_" + str(i + 1) + ".png"), X[i])
+                if split == 'val':
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "val/frame_" + str(i + 1) + ".png"), X[i])
             except cv2.error as e:
                 print("Image file being processed: ", im_file)
                 print (e)
             except IOError as e:
                 print (e)
 
-        hkl.dump(X, os.path.join(DATA_DIR, 'X_' + split + '.hkl'))
-        hkl.dump(source_list, os.path.join(DATA_DIR, 'sources_' + split + '.hkl'))
+        hkl.dump(X, os.path.join(DATA_DIR, 'X_' + split + '_128' + '.hkl'))
+        hkl.dump(source_list, os.path.join(DATA_DIR, 'sources_' + split + '_128' + '.hkl'))
 
 
 # resize and crop image

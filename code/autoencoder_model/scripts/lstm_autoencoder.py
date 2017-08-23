@@ -17,6 +17,7 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
+from keras.layers.core import RepeatVector
 from keras.layers.core import Flatten
 from keras.layers.core import Dense
 from keras.layers.recurrent import LSTM
@@ -56,59 +57,61 @@ def encoder_model():
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    model.add(TimeDistributed(Flatten()))
-    model.add(TimeDistributed(Dense(256)))
     return model
 
 
 def temporal_model():
     model = Sequential()
 
-    model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True, input_shape=(VIDEO_LENGTH, 256)))
-    model.add(LSTM(units=128, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
-    model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
-    model.add(TimeDistributed(Reshape(target_shape=(16, 16, 1), input_shape=(256,))))
-    model.add(TimeDistributed(Conv2D(filters=128,
-                                     kernel_size=(3, 3),
-                                     padding='same',
-                                     strides=(1, 1),
-                                     activation='relu')))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Dropout(0.5)))
+    # model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True, input_shape=(VIDEO_LENGTH, 256)))
+    # model.add(LSTM(units=128, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
+    # model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
+    # model.add(TimeDistributed(Reshape(target_shape=(16, 16, 1), input_shape=(256,))))
+    # model.add(TimeDistributed(Conv2D(filters=128,
+    #                                  kernel_size=(3, 3),
+    #                                  padding='same',
+    #                                  strides=(1, 1),
+    #                                  activation='relu')))
+    # model.add(TimeDistributed(BatchNormalization()))
+    # model.add(TimeDistributed(Dropout(0.5)))
 
-    # # 16x16
-    # model.add(ConvLSTM2D(filters=128,
-    #                      kernel_size=(3, 3),
-    #                      padding='same',
-    #                      strides=(1, 1),
-    #                      return_sequences=True,
-    #                      activation='relu',
-    #                      dropout=0.5,
-    #                      recurrent_dropout=0.5,
-    #                      input_shape=(VIDEO_LENGTH, 16, 16, 128)))
-    # model.add(TimeDistributed(BatchNormalization()))
-    #
-    # # 16x16
-    # model.add(ConvLSTM2D(filters=64,
-    #                      kernel_size=(3, 3),
-    #                      padding='same',
-    #                      strides=(1, 1),
-    #                      return_sequences=True,
-    #                      activation='relu',
-    #                      dropout=0.5,
-    #                      recurrent_dropout=0.5))
-    # model.add(TimeDistributed(BatchNormalization()))
-    #
-    # # 16x16
-    # model.add(ConvLSTM2D(filters=128,
-    #                      kernel_size=(3, 3),
-    #                      padding='same',
-    #                      strides=(1, 1),
-    #                      return_sequences=True,
-    #                      activation='relu',
-    #                      dropout=0.5,
-    #                      recurrent_dropout = 0.5))
-    # model.add(TimeDistributed(BatchNormalization()))
+    # 16x16
+    model.add(ConvLSTM2D(filters=128,
+                         kernel_size=(3, 3),
+                         padding='same',
+                         strides=(1, 1),
+                         return_sequences=True,
+                         activation='tanh',
+                         dropout=0.5,
+                         recurrent_dropout=0.5,
+                         input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+    model.add(TimeDistributed(BatchNormalization()))
+
+    # 16x16
+    model.add(ConvLSTM2D(filters=64,
+                         kernel_size=(3, 3),
+                         padding='same',
+                         strides=(1, 1),
+                         return_sequences=True,
+                         activation='tanh',
+                         dropout=0.5,
+                         recurrent_dropout=0.5))
+    model.add(TimeDistributed(BatchNormalization()))
+
+    # 16x16
+    model.add(ConvLSTM2D(filters=128,
+                         kernel_size=(3, 3),
+                         padding='same',
+                         strides=(1, 1),
+                         return_sequences=False,
+                         activation='tanh',
+                         dropout=0.5,
+                         recurrent_dropout = 0.5))
+    model.add(TimeDistributed(BatchNormalization()))
+
+    model.add(Flatten())
+    model.add(RepeatVector(n=VIDEO_LENGTH))
+    model.add(Reshape(target_shape=(VIDEO_LENGTH, 16, 16, 128)))
 
     return model
 
@@ -131,8 +134,10 @@ def decoder_model():
     model.add(TimeDistributed(Conv2DTranspose(filters=3,
                                               kernel_size=(11, 11),
                                               strides=(4, 4),
-                                              padding='same',
-                                              activation='tanh')))
+                                              padding='same')))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Dropout(0.5)))
 
     return model
 
@@ -298,8 +303,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
-    # LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    # LRS.set_model(autoencoder)
+    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
@@ -308,7 +313,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
         loss = []
 
         # Set learning rate every epoch
-        # LRS.on_epoch_begin(epoch=epoch)
+        LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
         print ("Learning rate: " + str(lr))
 
