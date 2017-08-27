@@ -11,3 +11,6 @@ code/autoencoder_model/logs/*
 code/autoencoder_model/checkpoints/*
 code/autoencoder_model/*.pyc
 code/autoencoder_model/tf_logs/*
+code/autoencoder_model/gifs/*
+code/autoencoder_model/test_results_dir/*
+

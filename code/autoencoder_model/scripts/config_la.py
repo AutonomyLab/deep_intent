@@ -14,6 +14,8 @@ import os
 DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'
+
 MODEL_DIR = './../models'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -58,7 +60,7 @@ def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
         return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.0001  # lr_decay_ratio = 10
+        return 0.00001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.00001
     return 0.00001

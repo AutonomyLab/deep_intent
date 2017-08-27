@@ -40,7 +40,8 @@ def encoder_model():
 
     # 128x128
     model.add(TimeDistributed(Conv2D(filters=256,
-                                     kernel_size=(11, 11),
+                                     kernel_size=(5, 5),
+                                     dilation_rate=(1, 1),
                                      strides=(4, 4),
                                      padding='same'),
                                      input_shape=(VIDEO_LENGTH, 128, 128, 3)))
@@ -49,9 +50,30 @@ def encoder_model():
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 32x32
+    model.add(TimeDistributed(Conv2D(filters=256,
+                                     kernel_size=(5, 5),
+                                     dilation_rate=(2, 2),
+                                     strides=(1, 1),
+                                     padding='same')))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 32x32
     model.add(TimeDistributed(Conv2D(filters=128,
                                      kernel_size=(5, 5),
-                                     strides=(2, 2),
+                                     dilation_rate=(3, 3),
+                                     strides=(1, 1),
+                                     padding='same')))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 32x32
+    model.add(TimeDistributed(Conv2D(filters=64,
+                                     kernel_size=(5, 5),
+                                     dilation_rate=(4, 4),
+                                     strides=(1, 1),
                                      padding='same')))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
@@ -63,28 +85,16 @@ def encoder_model():
 def temporal_model():
     model = Sequential()
 
-    # model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True, input_shape=(VIDEO_LENGTH, 256)))
-    # model.add(LSTM(units=128, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
-    # model.add(LSTM(units=256, dropout=0.5, recurrent_dropout=0.5, return_sequences=True))
-    # model.add(TimeDistributed(Reshape(target_shape=(16, 16, 1), input_shape=(256,))))
-    # model.add(TimeDistributed(Conv2D(filters=128,
-    #                                  kernel_size=(3, 3),
-    #                                  padding='same',
-    #                                  strides=(1, 1),
-    #                                  activation='relu')))
-    # model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Dropout(0.5)))
-
-    # 16x16
-    model.add(ConvLSTM2D(filters=128,
+    # 32x32
+    model.add(ConvLSTM2D(filters=64,
                          kernel_size=(3, 3),
                          padding='same',
                          strides=(1, 1),
                          return_sequences=True,
-                         activation='tanh',
+                         # activation='tanh',
                          dropout=0.5,
                          recurrent_dropout=0.5,
-                         input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+                         input_shape=(VIDEO_LENGTH, 32, 32, 64)))
     model.add(TimeDistributed(BatchNormalization()))
 
     # 16x16
@@ -93,25 +103,25 @@ def temporal_model():
                          padding='same',
                          strides=(1, 1),
                          return_sequences=True,
-                         activation='tanh',
+                         # activation='tanh',
                          dropout=0.5,
                          recurrent_dropout=0.5))
     model.add(TimeDistributed(BatchNormalization()))
 
     # 16x16
-    model.add(ConvLSTM2D(filters=128,
+    model.add(ConvLSTM2D(filters=64,
                          kernel_size=(3, 3),
                          padding='same',
                          strides=(1, 1),
-                         return_sequences=False,
-                         activation='tanh',
+                         return_sequences=True,
+                         # activation='tanh',
                          dropout=0.5,
                          recurrent_dropout = 0.5))
     model.add(TimeDistributed(BatchNormalization()))
 
-    model.add(Flatten())
-    model.add(RepeatVector(n=VIDEO_LENGTH))
-    model.add(Reshape(target_shape=(VIDEO_LENGTH, 16, 16, 128)))
+    # model.add(Flatten())
+    # model.add(RepeatVector(n=VIDEO_LENGTH))
+    # model.add(Reshape(target_shape=(VIDEO_LENGTH, 32, 32, 64)))
 
     return model
 
@@ -120,11 +130,32 @@ def decoder_model():
     model = Sequential()
 
     # 16x16
+    model.add(TimeDistributed(Conv2DTranspose(filters=128,
+                                              kernel_size=(5, 5),
+                                              dilation_rate=(4, 4),
+                                              padding='same',
+                                              strides=(1, 1)),
+                                              input_shape=(VIDEO_LENGTH, 32, 32, 64)))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    # model.add(TimeDistributed(LeakyReLU(0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
     model.add(TimeDistributed(Conv2DTranspose(filters=256,
                                               kernel_size=(5, 5),
+                                              dilation_rate=(3, 3),
                                               padding='same',
-                                              strides=(2, 2)),
-                                              input_shape=(VIDEO_LENGTH, 16, 16, 128)))
+                                              strides=(1, 1))))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    # model.add(TimeDistributed(LeakyReLU(0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    model.add(TimeDistributed(Conv2DTranspose(filters=256,
+                                              kernel_size=(5, 5),
+                                              dilation_rate=(2, 2),
+                                              padding='same',
+                                              strides=(1, 1))))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     # model.add(TimeDistributed(LeakyReLU(0.2)))
@@ -132,7 +163,8 @@ def decoder_model():
 
     # 64x64
     model.add(TimeDistributed(Conv2DTranspose(filters=3,
-                                              kernel_size=(11, 11),
+                                              kernel_size=(5, 5),
+                                              dilation_rate=(1, 1),
                                               strides=(4, 4),
                                               padding='same')))
     model.add(TimeDistributed(BatchNormalization()))
@@ -243,20 +275,20 @@ def run_utilities(encoder, temporizer, decoder, autoencoder, ENC_WEIGHTS, TEM_WE
         load_weights(DEC_WEIGHTS, decoder)
 
 
-def load_X_train(videos_list, index):
-    X_train = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X(videos_list, index, data_dir):
+    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
     for i in range(BATCH_SIZE):
         for j in range(VIDEO_LENGTH):
             filename = "frame_" + str(videos_list[(index*BATCH_SIZE + i), j]) + ".png"
-            im_file = os.path.join(DATA_DIR, filename)
+            im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                X_train[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+                X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
                 print(e)
 
-    return X_train
+    return X
 
 
 def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
@@ -284,15 +316,33 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
 
+    # Build video progressions
+    videos_list = []
+    start_frame_index = 1
+    end_frame_index = VIDEO_LENGTH + 1
+    while (end_frame_index <= len(frames_source)):
+        frame_list = frames_source[start_frame_index:end_frame_index]
+        if (len(set(frame_list)) == 1):
+            videos_list.append(range(start_frame_index, end_frame_index))
+            start_frame_index = start_frame_index + 1
+            end_frame_index = end_frame_index + 1
+        else:
+            start_frame_index = end_frame_index - 1
+            end_frame_index = start_frame_index + VIDEO_LENGTH
+
+    videos_list = np.asarray(videos_list, dtype=np.int32)
+    n_videos = videos_list.shape[0]
+
+
     # Build the Spatio-temporal Autoencoder
     print ("Creating models...")
     encoder = encoder_model()
     temporizer = temporal_model()
     decoder = decoder_model()
 
-    print (encoder.summary())
-    print (temporizer.summary())
-    print (decoder.summary())
+    # print (encoder.summary())
+    # print (temporizer.summary())
+    # print (decoder.summary())
 
     autoencoder = autoencoder_model(encoder, temporizer, decoder)
     run_utilities(encoder, temporizer, decoder, autoencoder, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS)
@@ -319,7 +369,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = load_X_train(videos_list, index)
+            X = load_X(videos_list, index, DATA_DIR)
             loss.append(autoencoder.train_on_batch(X, X))
 
             arrow = int(index / (NB_ITERATIONS / 40))
@@ -345,7 +395,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"d_loss\":%f};\n" % (epoch, avg_loss))
+            log_file.write("{\"epoch\":%d, \"loss\":%f};\n" % (epoch, avg_loss))
+
+        print ("\nAvg loss: " +  str(avg_loss))
 
         # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_'+str(epoch)+'.h5'), True)
@@ -357,8 +409,64 @@ def train(BATCH_SIZE, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
 
 
 def test(ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS):
+    # Create test results directory
+    TEST_RESULTS_DIR = os.path.join(TEST_DATA_DIR, "../test_results/")
+    if not os.path.exists(TEST_RESULTS_DIR):
+        os.mkdir(TEST_RESULTS_DIR)
 
-    return
+    # Create models
+    print ("Creating models...")
+    encoder = encoder_model()
+    temporizer = temporal_model()
+    decoder = decoder_model()
+    autoencoder = autoencoder_model(encoder, temporizer, decoder)
+
+    run_utilities(encoder, temporizer, decoder, autoencoder, ENC_WEIGHTS, TEM_WEIGHTS, DEC_WEIGHTS)
+    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
+
+    # Build video progressions
+    frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    videos_list = []
+    start_frame_index = 1
+    end_frame_index = VIDEO_LENGTH + 1
+    while (end_frame_index <= len(frames_source)):
+        frame_list = frames_source[start_frame_index:end_frame_index]
+        if (len(set(frame_list)) == 1):
+            videos_list.append(range(start_frame_index, end_frame_index))
+            start_frame_index = start_frame_index + 1
+            end_frame_index = end_frame_index + 1
+        else:
+            start_frame_index = end_frame_index - 1
+            end_frame_index = start_frame_index + VIDEO_LENGTH
+
+    videos_list = np.asarray(videos_list, dtype=np.int32)
+    n_videos = videos_list.shape[0]
+
+    # Test model by making predictions
+    loss = []
+    NB_ITERATIONS = int(n_videos / BATCH_SIZE)
+    for index in range(NB_ITERATIONS):
+        # Test Autoencoder
+        X_test = load_X(videos_list, index, TEST_DATA_DIR)
+        loss.append(autoencoder.test_on_batch(X_test, X_test))
+        y = autoencoder.predict_on_batch(X_test)
+
+        arrow = int(index / (NB_ITERATIONS / 40))
+        stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
+                     "loss: " + str(loss[len(loss) - 1]) +
+                     "\t    [" + "{0}>".format("=" * (arrow)))
+        stdout.flush()
+
+        avg_loss = sum(loss) / len(loss)
+        print ("\nAvg loss: " +  str(avg_loss))
+
+        orig_image, image = combine_images(y, X_test)
+        image = image * 127.5 + 127.5
+        orig_image = orig_image * 127.5 + 127.5
+
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + ".png"), image)
+
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -367,8 +475,6 @@ def get_args():
     parser.add_argument("--tem_weights", type=str, default="None")
     parser.add_argument("--dec_weights", type=str, default="None")
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
-    parser.add_argument("--nice", dest="nice", action="store_true")
-    parser.set_defaults(nice=False)
     args = parser.parse_args()
     return args
 
@@ -380,3 +486,8 @@ if __name__ == "__main__":
               ENC_WEIGHTS=args.enc_weights,
               TEM_WEIGHTS=args.tem_weights,
               DEC_WEIGHTS=args.dec_weights)
+
+    if args.mode == "test":
+        test(ENC_WEIGHTS=args.enc_weights,
+             TEM_WEIGHTS=args.tem_weights,
+             DEC_WEIGHTS=args.dec_weights)

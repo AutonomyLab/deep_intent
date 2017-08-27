@@ -35,19 +35,41 @@ from sys import stdout
 def encoder_model():
     model = Sequential()
 
-    model.add(Conv3D(filters=128,
+    model.add(Conv3D(filters=64,
                      strides=(1, 4, 4),
-                     kernel_size=(3, 11, 11),
+                     kernel_size=(5, 11, 11),
+                     dilation_rate=(1, 1, 1),
                      padding='same',
-                     input_shape=(VIDEO_LENGTH, 128, 128, 3)))
+                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x16x16
-    model.add(Conv3D(filters=64,
-                     strides=(1, 2, 2),
-                     kernel_size=(3, 5, 5),
+    model.add(Conv3D(filters=128,
+                     dilation_rate=(2, 2, 2),
+                     strides=(1, 1, 1),
+                     kernel_size=(5, 5, 5),
+                     padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x16x16
+    model.add(Conv3D(filters=128,
+                     dilation_rate=(2, 2, 2),
+                     strides=(1, 1, 1),
+                     kernel_size=(5, 5, 5),
+                     padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x16x16
+    model.add(Conv3D(filters=128,
+                     dilation_rate=(2, 2, 2),
+                     strides=(1, 1, 1),
+                     kernel_size=(5, 5, 5),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
@@ -61,18 +83,40 @@ def decoder_model():
 
     # 10x32x32
     model.add(Conv3DTranspose(filters=128,
-                              kernel_size=(3, 5, 5),
+                              dilation_rate=(2, 2, 2),
+                              kernel_size=(5, 5, 5),
                               padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 16, 16, 64)))
+                              strides=(1, 1, 1),
+                              input_shape=(10, 32, 32, 128)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(Activation('relu')))
     # model.add(TimeDistributed(LeakyReLU(0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
+    # 10x32x32
+    model.add(Conv3DTranspose(filters=128,
+                              dilation_rate=(2, 2, 2),
+                              kernel_size=(5, 5, 5),
+                              strides=(1, 1, 1),
+                              padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x32x32
+    model.add(Conv3DTranspose(filters=64,
+                              dilation_rate=(2, 2, 2),
+                              kernel_size=(5, 5, 5),
+                              strides=(1, 1, 1),
+                              padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(Activation('tanh')))
+    model.add(TimeDistributed(Dropout(0.5)))
+
     # 10x128x128
     model.add(Conv3DTranspose(filters=3,
-                              kernel_size=(3, 11, 11),
+                              dilation_rate=(1, 1, 1),
+                              kernel_size=(5, 11, 11),
                               strides=(1, 4, 4),
                               padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
@@ -94,7 +138,7 @@ def autoencoder_model(encoder, decoder):
     return model
 
 
-def combine_images(generated_images, X):
+def combine_images(generated_images, X, y):
     # Unroll all generated video frames
     n_frames = generated_images.shape[0] * generated_images.shape[1]
     frames = np.zeros((n_frames,) + generated_images.shape[2:], dtype=generated_images.dtype)
@@ -135,7 +179,25 @@ def combine_images(generated_images, X):
         j = index % width
         orig_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
 
-    return orig_image, image
+    # Ground truth
+    truth_frames = np.zeros((n_frames,) + y.shape[2:], dtype=y.dtype)
+    frame_index = 0
+    for i in range(y.shape[0]):
+        for j in range(y.shape[1]):
+            truth_frames[frame_index] = y[i, j]
+            frame_index += 1
+
+    num = truth_frames.shape[0]
+    width = int(math.sqrt(num))
+    height = int(math.ceil(float(num) / width))
+    shape = truth_frames.shape[1:]
+    truth_image = np.zeros((height * shape[0], width * shape[1], shape[2]), dtype=y.dtype)
+    for index, img in enumerate(truth_frames):
+        i = int(index / width)
+        j = index % width
+        truth_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
+
+    return orig_image, image, truth_image
 
 
 def load_weights(weights_file, model):
@@ -246,7 +308,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X = load_X_train(videos_list, index)
-            loss.append(autoencoder.train_on_batch(X, X))
+            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            y_train = X[:, int(VIDEO_LENGTH/2) :]
+            loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
             stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
@@ -256,12 +320,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            generated_images = autoencoder.predict(X, verbose=0)
-            orig_image, image = combine_images(generated_images, X)
+            generated_images = autoencoder.predict(X_train, verbose=0)
+            orig_image, image, truth_image = combine_images(generated_images, X_train, y_train)
             image = image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
+            truth_image = truth_image * 127.5 + 127.5
             if epoch == 0 :
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
+                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + ".png"), image)
 
         # then after each epoch/iteration
@@ -272,6 +338,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
             log_file.write("{\"epoch\":%d, \"d_loss\":%f};\n" % (epoch, avg_loss))
+
+        print("\nAvg loss: " + str(avg_loss))
 
         # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_'+str(epoch)+'.h5'), True)
