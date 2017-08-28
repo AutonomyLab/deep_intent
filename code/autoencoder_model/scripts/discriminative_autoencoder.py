@@ -18,10 +18,12 @@ from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
+from keras.layers.core import Flatten
+from keras.layers.core import Dense
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
-from config_3d import *
+from config_da import *
 
 import tb_callback
 import lrs_callback
@@ -103,6 +105,52 @@ def decoder_model():
     return model
 
 
+def discriminator_model():
+
+    model = Sequential()
+    model.add(Conv3D(filters=64,
+                     kernel_size=(4, 4, 4),
+                     padding='same',
+                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+    # model.add(BatchNormalization())
+    # model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    model.add(Conv3D(filters=128,
+                     kernel_size=(4, 4, 4),
+                     strides=(2, 4, 4),
+                     padding='same'))
+    # model.add(BatchNormalization())
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    model.add(Conv3D(filters=128,
+                     kernel_size=(4, 4, 4),
+                     strides=(2, 2, 2),
+                     padding='same'))
+    # model.add(BatchNormalization())
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    model.add(Conv3D(filters=256,
+                     kernel_size=(4, 4, 4),
+                     strides=(2, 2, 2),
+                     padding='same'))
+    # model.add(BatchNormalization())
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    model.add(Flatten())
+    # model.add(Dense(256))
+    # model.add(Activation('tanh'))
+    model.add(Dense(1))
+    model.add(Activation('sigmoid'))
+    return model
+
+
 def set_trainability(model, trainable):
     model.trainable = trainable
     for layer in model.layers:
@@ -113,6 +161,14 @@ def autoencoder_model(encoder, decoder):
     model = Sequential()
     model.add(encoder)
     model.add(decoder)
+    return model
+
+
+def da_model(autoencoder, discriminator):
+    model = Sequential()
+    model.add(autoencoder)
+    set_trainability(discriminator, False)
+    model.add(discriminator)
     return model
 
 
@@ -182,11 +238,12 @@ def load_weights(weights_file, model):
     model.load_weights(weights_file)
 
 
-def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
+def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
         print (encoder.summary())
         print (decoder.summary())
         print (autoencoder.summary())
+        print (discriminator.summary())
         # exit(0)
 
     # Save model to file
@@ -206,12 +263,20 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
             json_file.write(model_json)
         plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
 
+        model_json = discriminator.to_json()
+        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+            json_file.write(model_json)
+        plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")
         load_weights(ENC_WEIGHTS, encoder)
     if DEC_WEIGHTS != "None":
         print ("Pre-loading decoder with weights...")
         load_weights(DEC_WEIGHTS, decoder)
+    if DIS_WEIGHTS != "None":
+        print("Pre-loading decoder with weights...")
+        load_weights(DIS_WEIGHTS, discriminator)
 
 
 def load_X_train(videos_list, index):
@@ -230,7 +295,7 @@ def load_X_train(videos_list, index):
     return X_train
 
 
-def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
+def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     print ("Loading data...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
@@ -259,41 +324,56 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     print ("Creating models...")
     encoder = encoder_model()
     decoder = decoder_model()
+    discriminator = discriminator_model()
     autoencoder = autoencoder_model(encoder, decoder)
+    da = da_model(autoencoder, discriminator)
 
-    run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
+    run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
 
-    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
-
+    da.compile(loss='binary_crossentropy', optimizer=OPTIM_A)
+    set_trainability(discriminator, True)
+    discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
-    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    LRS.set_model(autoencoder)
+    # LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
+    # LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
     for epoch in range(NB_EPOCHS):
         print("\n\nEpoch ", epoch)
-        loss = []
-
+        a_loss = []
+        d_loss = []
         # Set learning rate every epoch
-        LRS.on_epoch_begin(epoch=epoch)
-        lr = K.get_value(autoencoder.optimizer.lr)
-        print ("Learning rate: " + str(lr))
+        # LRS.on_epoch_begin(epoch=epoch)
+        # lr = K.get_value(autoencoder.optimizer.lr)
+        # print ("Learning rate: " + str(lr))
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X = load_X_train(videos_list, index)
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
-            loss.append(autoencoder.train_on_batch(X_train, y_train))
+
+            # Adversarially training a pre-trained autoencoder
+            future_images = autoencoder.predict(X_train, verbose=0)
+
+            # Train Discriminator on future images (y_train, not X_train)
+            X = np.concatenate((y_train, future_images))
+            y = [1] * BATCH_SIZE + [0] * BATCH_SIZE
+            d_loss.append(discriminator.train_on_batch(X, y))
+
+            # Train Discriminative Autoencoder
+            set_trainability(discriminator, False)
+            a_loss.append(da.train_on_batch(X_train, [1] * BATCH_SIZE))
+            set_trainability(discriminator, True)
 
             arrow = int(index / (NB_ITERATIONS / 40))
-            stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                         "loss: " + str(loss[len(loss)-1]) +
-                         "\t    [" + "{0}>".format("="*(arrow)))
+            stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
+                         "a_loss: " + str(a_loss[len(a_loss) - 1]) + "\t    " + "d_loss: " +
+                         str(d_loss[len(d_loss) - 1]) + "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
         if SAVE_GENERATED_IMAGES:
@@ -309,19 +389,21 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + ".png"), image)
 
         # then after each epoch/iteration
-        avg_loss = sum(loss)/len(loss)
-        logs = {'loss': avg_loss}
+        avg_a_loss = sum(a_loss)/len(a_loss)
+        avg_d_loss = sum(d_loss) / len(d_loss)
+        logs = {'a_loss': avg_a_loss, 'd_loss': avg_d_loss}
         TC.on_epoch_end(epoch, logs)
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"d_loss\":%f};\n" % (epoch, avg_loss))
+            log_file.write("{\"epoch\":%d, \"a_loss\":%f, \"d_loss\":%f};\n" % (epoch, avg_a_loss, avg_d_loss))
 
-        print("\nAvg loss: " + str(avg_loss))
+        print("\nAvg a_loss: " + str(avg_a_loss) + "  Avg d_loss: " + str(avg_d_loss))
 
         # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_'+str(epoch)+'.h5'), True)
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_epoch_' + str(epoch) + '.h5'), True)
 
     # End TensorBoard Callback
     TC.on_train_end('_')
@@ -332,6 +414,7 @@ def get_args():
     parser.add_argument("--mode", type=str)
     parser.add_argument("--enc_weights", type=str, default="None")
     parser.add_argument("--dec_weights", type=str, default="None")
+    parser.add_argument("--dis_weights", type=str, default="None")
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--nice", dest="nice", action="store_true")
     parser.set_defaults(nice=False)
@@ -344,4 +427,5 @@ if __name__ == "__main__":
     if args.mode == "train":
         train(BATCH_SIZE=args.batch_size,
               ENC_WEIGHTS=args.enc_weights,
-              DEC_WEIGHTS=args.dec_weights)
+              DEC_WEIGHTS=args.dec_weights,
+              DIS_WEIGHTS=args.dis_weights)
