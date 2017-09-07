@@ -75,7 +75,7 @@ def decoder_model():
     model.add(Conv3DTranspose(filters=64,
                               kernel_size=(3, 5, 5),
                               padding='same',
-                              strides=(1, 2, 2),
+                              strides=(1, 1, 1),
                               input_shape=(10, 16, 16, 32)))
     model.add(TimeDistributed(BatchNormalization()))
     # model.add(TimeDistributed(Activation('relu')))
@@ -84,6 +84,17 @@ def decoder_model():
 
     # 10x64x64
     model.add(Conv3DTranspose(filters=128,
+                              kernel_size=(3, 5, 5),
+                              padding='same',
+                              strides=(1, 2, 2),
+                              input_shape=(10, 16, 16, 64)))
+    model.add(TimeDistributed(BatchNormalization()))
+    # model.add(TimeDistributed(Activation('relu')))
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x64x64
+    model.add(Conv3DTranspose(filters=64,
                               kernel_size=(3, 5, 5),
                               padding='same',
                               strides=(1, 2, 2),
@@ -160,6 +171,7 @@ def set_trainability(model, trainable):
 def autoencoder_model(encoder, decoder):
     model = Sequential()
     model.add(encoder)
+    set_trainability(encoder, False)
     model.add(decoder)
     return model
 
@@ -250,23 +262,26 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
     if SAVE_MODEL:
         print ("Saving models to file...")
         model_json = encoder.to_json()
-        with open(os.path.join(MODEL_DIR, "encoder.json"), "w") as json_file:
-            json_file.write(model_json)
-        plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
-
-        with open(os.path.join(MODEL_DIR, "decoder.json"), "w") as json_file:
-            json_file.write(model_json)
-        plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
-
+        model_json = decoder.to_json()
         model_json = autoencoder.to_json()
-        with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
-            json_file.write(model_json)
-        plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
-
         model_json = discriminator.to_json()
-        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
-            json_file.write(model_json)
-        plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+
+        if PLOT_MODEL:
+            with open(os.path.join(MODEL_DIR, "encoder.json"), "w") as json_file:
+                json_file.write(model_json)
+            plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
+
+            with open(os.path.join(MODEL_DIR, "decoder.json"), "w") as json_file:
+                json_file.write(model_json)
+            plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
+
+            with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
+                json_file.write(model_json)
+            plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
+
+            with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+                json_file.write(model_json)
+            plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")

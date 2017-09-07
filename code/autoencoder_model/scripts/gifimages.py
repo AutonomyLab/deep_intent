@@ -32,8 +32,8 @@ def strip(image, img_size, vid_len):
                 vid_num = vid_num + 1
                 frame_num = 1
             filename = "vid_" + str(vid_num) + "_frame_" + str(frame_num) + ".png"
-            cv2.imwrite(os.path.join(GIF_DIR, filename), img)
-            filenames.append(os.path.join(GIF_DIR, filename))
+            cv2.imwrite(os.path.join(GIF_IMG_DIR, filename), img)
+            filenames.append(os.path.join(GIF_IMG_DIR, filename))
 
 
 def get_args():
@@ -49,6 +49,10 @@ if __name__ == "__main__":
     GIF_DIR = '../gifs/'
     if not os.path.exists(GIF_DIR):
         os.mkdir(GIF_DIR)
+
+    GIF_IMG_DIR = '../gifs/imgs/'
+    if not os.path.exists(GIF_IMG_DIR):
+        os.mkdir(GIF_IMG_DIR)
 
     args = get_args()
     try:

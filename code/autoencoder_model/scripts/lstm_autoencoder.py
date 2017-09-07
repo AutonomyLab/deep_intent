@@ -286,7 +286,7 @@ def load_X(videos_list, index, data_dir):
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
-                print(e)
+                print (e)
 
     return X
 

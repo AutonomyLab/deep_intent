@@ -17,7 +17,7 @@ from bs4 import BeautifulSoup
 
 from kitti_config import *
 
-desired_im_sz = (64, 64)
+desired_im_sz = (128, 128)
 categories = ['city', 'residential', 'road', 'campus']
 
 # Recordings used for validation and testing.
