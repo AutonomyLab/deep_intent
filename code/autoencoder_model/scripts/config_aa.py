@@ -17,8 +17,8 @@ if hostname == 'baymax':
 else:
     path_var = ''
 
-# DATA_DIR= '/local_home/KITTI_Dataset/resized_imgs_128/train/'
-DATA_DIR= '/local_home/data/'
+DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
+# DATA_DIR= '/local_home/data/KITTI_data/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'
 
@@ -47,12 +47,12 @@ if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
 
 PRINT_MODEL_SUMMARY = True
-SAVE_MODEL = True
+SAVE_MODEL = False
 PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
-IMG_SIZE = (64, 64, 1)
+IMG_SIZE = (128, 128, 3)
 
 # -------------------------------------------------
 # Network configuration:
@@ -61,7 +61,7 @@ print ("Loading network/training configuration...")
 BATCH_SIZE = 10
 NB_EPOCHS = 100
 
-OPTIM = Adam(lr=0.001, beta_1=0.5)
+OPTIM = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step

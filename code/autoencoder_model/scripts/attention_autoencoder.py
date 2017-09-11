@@ -18,11 +18,18 @@ from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.normalization import BatchNormalization
+from keras.layers.merge import multiply
+from keras.layers.core import RepeatVector
+from keras.layers.core import Lambda
 from keras.layers.core import Reshape
+from keras.layers.core import Flatten
+from keras.layers.recurrent import LSTM
+from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
-from config_ds import *
+from keras.layers import Input
+from keras.models import Model
+from config_aa import *
 
 import tb_callback
 import lrs_callback
@@ -36,28 +43,28 @@ from sys import stdout
 def encoder_model():
     model = Sequential()
 
-    # 10x64x64
-    model.add(Conv3D(filters=256,
-                     strides=(1, 2, 2),
+    # 10x128x128
+    model.add(Conv3D(filters=128,
+                     strides=(1, 4, 4),
                      kernel_size=(3, 11, 11),
                      padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 64, 64, 1)))
+                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x32x32
-    # model.add(Conv3D(filters=128,
-    #                  strides=(1, 2, 2),
-    #                  kernel_size=(3, 5, 5),
-    #                  padding='same'))
-    # model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    # model.add(TimeDistributed(Dropout(0.5)))
-
-    # 10x32x32
-    model.add(Conv3D(filters=128,
+    model.add(Conv3D(filters=64,
                      strides=(1, 2, 2),
+                     kernel_size=(3, 5, 5),
+                     padding='same'))
+    model.add(TimeDistributed(BatchNormalization()))
+    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    model.add(TimeDistributed(Dropout(0.5)))
+
+    # 10x16x16
+    model.add(Conv3D(filters=32,
+                     strides=(1, 1, 1),
                      kernel_size=(3, 5, 5),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
@@ -68,47 +75,114 @@ def encoder_model():
 
 
 def decoder_model():
-    model = Sequential()
+    inputs = Input(shape=(10, 16, 16, 32))
+
+    def attention(x, shape, n_repeat):
+        x = K.reshape(x, shape=shape)
+        x = K.repeat_elements(x, rep=n_repeat, axis=-1)
+
+        return x
+
+    def element_multiply(x, alpha):
+        attn = K.tf.multiply(x, alpha)
+        return attn
+
+    # convlstm_1 = ConvLSTM2D(filters=1,
+    #                         kernel_size=(5, 5),
+    #                         strides=(1, 1),
+    #                         padding='same',
+    #                         activation='softmax',
+    #                         return_sequences=True)(inputs)
+    # x = Reshape(target_shape=(10, 16*16*1))(convlstm_1)
+    # print(x.shape)
+    # x = RepeatVector(n=32)(x)
+    # print(x.output_shape)
+    # x = Reshape(target_shape=(10, 16, 16, 32))
+    # print (x.shape)
+
+
+    # Learn alpha_1
+    flat_1 = TimeDistributed(Flatten())(inputs)
+    lstm_1 = LSTM(units=16*16,
+                  activation='softmax',
+                  return_sequences=True)(flat_1)
+    alpha_1 = Lambda(function=attention,
+                   arguments={'shape':(10, 16, 16, 1),
+                              'n_repeat': 32})(lstm_1)
+    attn_1 = Lambda(function=element_multiply,
+                    arguments={'alpha': alpha_1})(inputs)
+
+    # x = Reshape(target_shape=(10, 16, 16, 1))(lstm_1)
+    # x = K.repeat_elements(x, rep=32, axis=-1)
+    # attn_1 = multiply([inputs, x])
+
+    # 10x64x64
+    conv_1 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 1, 1))(attn_1)
+    x = TimeDistributed(BatchNormalization())(conv_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_1 = TimeDistributed(Dropout(0.5))(x)
+
+    flat_2 = TimeDistributed(Flatten())(x)
+    lstm_2 = LSTM(units=16*16,
+                  activation='softmax',
+                  return_sequences=True)(flat_2)
+    # x = Reshape(target_shape=(10, 16, 16, 1))(lstm_2)
+    # x = K.repeat_elements(x, rep=64, axis=-1)
+    # attn_2 = multiply([out_1, x])
+
+    alpha_2 = Lambda(function=attention,
+                     arguments={'shape': (10, 16, 16, 1),
+                                'n_repeat': 64})(lstm_2)
+    attn_2 = Lambda(function=element_multiply,
+                    arguments={'alpha': alpha_2})(out_1)
 
     # 10x32x32
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 1, 1),
-                              input_shape=(10, 16, 16, 128)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_2 = Conv3DTranspose(filters=128,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(attn_2)
+    x = TimeDistributed(BatchNormalization())(conv_2)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2 = TimeDistributed(Dropout(0.5))(x)
+
+    # flat_3 = TimeDistributed(Flatten())(x)
+    # lstm_3 = LSTM(units=32 * 32,
+    #               activation='softmax',
+    #               return_sequences=True)(flat_3)
+    # x = Reshape(target_shape=(10, 32, 32, 1))(lstm_3)
+    # x = K.repeat_elements(x, rep=128, axis=-1)
+    # attn_3 = multiply([out_2, x])
 
     # 10x64x64
-    model.add(Conv3DTranspose(filters=128,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_3 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(out_2)
+    x = TimeDistributed(BatchNormalization())(conv_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = TimeDistributed(Dropout(0.5))(x)
 
-    # 10x64x64
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    # flat_4 = TimeDistributed(Flatten())(x)
+    # lstm_4 = LSTM(units=64 * 64,
+    #               activation='softmax',
+    #               return_sequences=True)(flat_4)
+    # x = Reshape(target_shape=(10, 64, 64, 1))(lstm_4)
+    # x = K.repeat_elements(x, rep=64, axis=-1)
+    # attn_4 = multiply([out_3, x])
 
     # 10x128x128
-    model.add(Conv3DTranspose(filters=1,
-                              kernel_size=(3, 5, 5),
-                              strides=(1, 1, 1),
-                              padding='same'))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Activation('tanh')))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_4 = Conv3DTranspose(filters=3,
+                             kernel_size=(3, 11, 11),
+                             strides=(1, 2, 2),
+                             padding='same')(out_3)
+    x = TimeDistributed(BatchNormalization())(conv_4)
+    x = TimeDistributed(Activation('tanh'))(x)
+    predictions = TimeDistributed(Dropout(0.5))(x)
+
+    model = Model(inputs=inputs ,outputs=predictions)
 
     return model
 
@@ -245,8 +319,28 @@ def load_X(videos_list, index, data_dir):
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     print ("Loading data...")
-    mnist = np.load(os.path.join(DATA_DIR, 'mnist_test_seq.npy'))
-    mnist = np.expand_dims(mnist, axis=4)
+    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
+
+    # Build video progressions
+    videos_list = []
+    start_frame_index = 1
+    end_frame_index = VIDEO_LENGTH + 1
+    while (end_frame_index <= len(frames_source)):
+        frame_list = frames_source[start_frame_index:end_frame_index]
+        if (len(set(frame_list)) == 1):
+            videos_list.append(range(start_frame_index, end_frame_index))
+            start_frame_index = start_frame_index + 1
+            end_frame_index = end_frame_index + 1
+        else:
+            start_frame_index = end_frame_index - 1
+            end_frame_index = start_frame_index + VIDEO_LENGTH
+
+    videos_list = np.asarray(videos_list, dtype=np.int32)
+    n_videos = videos_list.shape[0]
+
+    if SHUFFLE:
+        # Shuffle images to aid generalization
+        videos_list = np.random.permutation(videos_list)
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models...")
@@ -258,12 +352,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
 
-    NB_ITERATIONS = int(mnist.shape[1]/BATCH_SIZE)
+    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
-    # LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    # LRS.set_model(autoencoder)
+    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
@@ -272,21 +366,15 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         loss = []
 
         # Set learning rate every epoch
-        # LRS.on_epoch_begin(epoch=epoch)
+        LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
         print ("Learning rate: " + str(lr))
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X_train = np.zeros(shape=(10, 10, 64, 64, 1))
-            y_train = np.zeros(shape=(10, 10, 64, 64, 1))
-            for i in range(BATCH_SIZE):
-                X_train[i] = mnist[0 : int(VIDEO_LENGTH/2), index+i]
-                y_train[i] = mnist[int(VIDEO_LENGTH/2), index+i]
-
-            X_train = (X_train.astype(np.float32) - 127.5) / 127.5
-            y_train = (y_train.astype(np.float32) - 127.5) / 127.5
-
+            X = load_X(videos_list, index, DATA_DIR)
+            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))

@@ -17,7 +17,7 @@ if hostname == 'baymax':
 else:
     path_var = ''
 
-DATA_DIR= '/local_home/KITTI_Dataset/resized_imgs_128/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'

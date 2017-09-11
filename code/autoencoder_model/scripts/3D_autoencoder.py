@@ -21,6 +21,8 @@ from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
+from keras.layers import Input
+from keras.models import Model
 from config_3d import *
 
 import tb_callback
@@ -67,49 +69,47 @@ def encoder_model():
 
 
 def decoder_model():
-    model = Sequential()
+
+    inputs = Input(shape=(10, 16, 16, 32))
 
     # 10x32x32
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 1, 1),
-                              input_shape=(10, 16, 16, 32)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_1 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 1, 1),
+                             input_shape=(10, 16, 16, 32))(inputs)
+    x = TimeDistributed(BatchNormalization())(conv_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    x = TimeDistributed(Dropout(0.5))(x)
 
     # 10x64x64
-    model.add(Conv3DTranspose(filters=128,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 16, 16, 64)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_2 = Conv3DTranspose(filters=128,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(x)
+    x = TimeDistributed(BatchNormalization())(conv_2)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    x = TimeDistributed(Dropout(0.5))(x)
 
     # 10x64x64
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 16, 16, 64)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_3 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(x)
+    x = TimeDistributed(BatchNormalization())(conv_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    x = TimeDistributed(Dropout(0.5))(x)
 
     # 10x128x128
-    model.add(Conv3DTranspose(filters=3,
-                              kernel_size=(3, 11, 11),
-                              strides=(1, 2, 2),
-                              padding='same'))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Activation('tanh')))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_4 = Conv3DTranspose(filters=3,
+                             kernel_size=(3, 11, 11),
+                             strides=(1, 2, 2),
+                             padding='same')(x)
+    x = TimeDistributed(BatchNormalization())(conv_4)
+    x = TimeDistributed(Activation('tanh'))(x)
+    predictions = TimeDistributed(Dropout(0.5))(x)
+
+    model = Model(inputs=inputs, outputs=predictions)
 
     return model
 
