@@ -19,8 +19,10 @@ from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.merge import multiply
+from keras.layers.core import Permute
 from keras.layers.core import RepeatVector
 from keras.layers.core import Lambda
+from keras.layers import merge
 from keras.layers.core import Reshape
 from keras.layers.core import Flatten
 from keras.layers.recurrent import LSTM
@@ -77,84 +79,44 @@ def encoder_model():
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 32))
 
-    def attention(x, shape, n_repeat):
-        x = K.reshape(x, shape=shape)
-        x = K.repeat_elements(x, rep=n_repeat, axis=-1)
-
-        return x
-
-    def element_multiply(x, alpha):
-        attn = K.tf.multiply(x, alpha)
-        return attn
-
-    # convlstm_1 = ConvLSTM2D(filters=1,
-    #                         kernel_size=(5, 5),
-    #                         strides=(1, 1),
-    #                         padding='same',
-    #                         activation='softmax',
-    #                         return_sequences=True)(inputs)
-    # x = Reshape(target_shape=(10, 16*16*1))(convlstm_1)
-    # print(x.shape)
-    # x = RepeatVector(n=32)(x)
-    # print(x.output_shape)
-    # x = Reshape(target_shape=(10, 16, 16, 32))
-    # print (x.shape)
-
-
     # Learn alpha_1
-    flat_1 = TimeDistributed(Flatten())(inputs)
-    lstm_1 = LSTM(units=16*16,
-                  activation='softmax',
-                  return_sequences=True)(flat_1)
-    alpha_1 = Lambda(function=attention,
-                   arguments={'shape':(10, 16, 16, 1),
-                              'n_repeat': 32})(lstm_1)
-    attn_1 = Lambda(function=element_multiply,
-                    arguments={'alpha': alpha_1})(inputs)
-
-    # x = Reshape(target_shape=(10, 16, 16, 1))(lstm_1)
-    # x = K.repeat_elements(x, rep=32, axis=-1)
+    # flat_1 = TimeDistributed(Flatten())(inputs)
+    # lstm_1 = LSTM(units=16*16,
+    #               activation='softmax',
+    #               return_sequences=True)(flat_1)
+    # x = Flatten()(lstm_1)
+    # x = RepeatVector(n=32)(x)
+    # x = Permute((2, 1))(x)
+    # x = Reshape(target_shape=(10, 16, 16, 32))(x)
     # attn_1 = multiply([inputs, x])
 
     # 10x64x64
     conv_1 = Conv3DTranspose(filters=64,
                              kernel_size=(3, 5, 5),
                              padding='same',
-                             strides=(1, 1, 1))(attn_1)
+                             strides=(1, 1, 1))(inputs)
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    flat_2 = TimeDistributed(Flatten())(x)
-    lstm_2 = LSTM(units=16*16,
-                  activation='softmax',
-                  return_sequences=True)(flat_2)
-    # x = Reshape(target_shape=(10, 16, 16, 1))(lstm_2)
-    # x = K.repeat_elements(x, rep=64, axis=-1)
+    # flat_2 = TimeDistributed(Flatten())(out_1)
+    # lstm_2 = LSTM(units=16*16,
+    #               activation='softmax',
+    #               return_sequences=True)(flat_2)
+    # x = Flatten()(lstm_2)
+    # x = RepeatVector(n=64)(x)
+    # x = Permute((2, 1))(x)
+    # x = Reshape(target_shape=(10, 16, 16, 64))(x)
     # attn_2 = multiply([out_1, x])
-
-    alpha_2 = Lambda(function=attention,
-                     arguments={'shape': (10, 16, 16, 1),
-                                'n_repeat': 64})(lstm_2)
-    attn_2 = Lambda(function=element_multiply,
-                    arguments={'alpha': alpha_2})(out_1)
 
     # 10x32x32
     conv_2 = Conv3DTranspose(filters=128,
                              kernel_size=(3, 5, 5),
                              padding='same',
-                             strides=(1, 2, 2))(attn_2)
+                             strides=(1, 2, 2))(out_1)
     x = TimeDistributed(BatchNormalization())(conv_2)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = TimeDistributed(Dropout(0.5))(x)
-
-    # flat_3 = TimeDistributed(Flatten())(x)
-    # lstm_3 = LSTM(units=32 * 32,
-    #               activation='softmax',
-    #               return_sequences=True)(flat_3)
-    # x = Reshape(target_shape=(10, 32, 32, 1))(lstm_3)
-    # x = K.repeat_elements(x, rep=128, axis=-1)
-    # attn_3 = multiply([out_2, x])
 
     # 10x64x64
     conv_3 = Conv3DTranspose(filters=64,
@@ -165,19 +127,31 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = TimeDistributed(Dropout(0.5))(x)
 
-    # flat_4 = TimeDistributed(Flatten())(x)
-    # lstm_4 = LSTM(units=64 * 64,
+    # Learn alpha_1
+    # flat_1 = TimeDistributed(Flatten())(out_3)
+    convlstm_1 = ConvLSTM2D(filters=1,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            activation='softmax',
+                            return_sequences=True,
+                            name='convlstm_1')(out_3)
+    # lstm_1 = LSTM(units=64*64,
     #               activation='softmax',
-    #               return_sequences=True)(flat_4)
-    # x = Reshape(target_shape=(10, 64, 64, 1))(lstm_4)
-    # x = K.repeat_elements(x, rep=64, axis=-1)
-    # attn_4 = multiply([out_3, x])
+    #               return_sequences=True,
+    #               name='lstm_1')(flat_1)
+    x = Flatten()(convlstm_1)
+    x = RepeatVector(n=64)(x)
+    x = Permute((2, 1))(x)
+    x = Reshape(target_shape=(10, 64, 64, 64))(x)
+    attn_1 = multiply([out_3, x])
+
 
     # 10x128x128
     conv_4 = Conv3DTranspose(filters=3,
                              kernel_size=(3, 11, 11),
                              strides=(1, 2, 2),
-                             padding='same')(out_3)
+                             padding='same')(attn_1)
     x = TimeDistributed(BatchNormalization())(conv_4)
     x = TimeDistributed(Activation('tanh'))(x)
     predictions = TimeDistributed(Dropout(0.5))(x)
@@ -425,6 +399,26 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
 
+    def build_intermediate_model(encoder, decoder):
+        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers['convlstm_1'].output)
+        # intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
+
+        imodel_1 = Sequential()
+        imodel_1.add(encoder)
+        imodel_1.add(intermediate_decoder_1)
+
+        # imodel_2 = Sequential()
+        # imodel_2.add(encoder)
+        # imodel_2.add(intermediate_decoder_2)
+
+        return imodel_1
+
+    imodel_1 = build_intermediate_model(encoder, decoder)
+    imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
+    # imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
+
+    # imodel = build_intermediate_model(encoder, decoder)
+
     # Build video progressions
     frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
     videos_list = []
@@ -453,6 +447,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         y_test = X[:, int(VIDEO_LENGTH / 2):]
         loss.append(autoencoder.test_on_batch(X_test, y_test))
         y_pred = autoencoder.predict_on_batch(X_test)
+        a_pred_1 = imodel_1.predict_on_batch(X_test)
+        # a_pred_2 = imodel_2.predict_on_batch(X_test)
 
         arrow = int(index / (NB_ITERATIONS / 40))
         stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
@@ -468,6 +464,20 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
+
+        #------------------------------------------
+        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 16, 16, 1))
+        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights.npy'), a_pred_1[0])
+        orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
+        pred_image = (pred_image*100) * 127.5 + 127.5
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
+
+        # a_pred_2 = np.reshape(a_pred_2, newshape=(10, 10, 16, 16, 1))
+        # with open('attention_weights.txt', mode='w') as file:
+        #     file.write(str(a_pred_2[0, 4]))
+        # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_2)
+        # pred_image = (pred_image*100) * 127.5 + 127.5
+        # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_2.png"), pred_image)
 
     avg_loss = sum(loss) / len(loss)
     print("\nAvg loss: " + str(avg_loss))
