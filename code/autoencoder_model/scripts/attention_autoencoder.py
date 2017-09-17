@@ -120,15 +120,26 @@ def decoder_model():
     out_3 = TimeDistributed(Dropout(0.5))(x)
 
     # Learn alpha_1
-    convlstm_1 = ConvLSTM2D(filters=1,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            name='convlstm_1')(out_3)
-    flat_1 = TimeDistributed(Flatten())(convlstm_1)
+    conv3D_1 = Conv3D(filters=64,
+                      strides=(1, 1, 1),
+                      kernel_size=(3, 3, 3),
+                      dilation_rate=(2, 2, 2),
+                      padding='same')(out_3)
+    x = TimeDistributed(BatchNormalization())(conv3D_1)
+    x = TimeDistributed(Dropout(0.5))(x)
+
+    conv3D_2 = Conv3D(filters=1,
+                      strides=(1, 1, 1),
+                      kernel_size=(3, 3, 3),
+                      dilation_rate=(2, 2, 2),
+                      padding='same')(x)
+    x = TimeDistributed(BatchNormalization())(conv3D_2)
+    x = TimeDistributed(Dropout(0.5))(x)
+
+    flat_1 = TimeDistributed(Flatten())(x)
     dense_1 = TimeDistributed(Dense(units=64*64, activation='softmax'))(flat_1)
-    x = Flatten()(dense_1)
+    x = TimeDistributed(Dropout(0.5))(dense_1)
+    x = Flatten()(x)
     x = RepeatVector(n=64)(x)
     x = Permute((2, 1))(x)
     x = Reshape(target_shape=(10, 64, 64, 64))(x)
@@ -414,7 +425,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     # exit(0)
 
     def build_intermediate_model(encoder, decoder):
-        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[15].output)
+        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[18].output)
         # intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
 
         imodel_1 = Sequential()
@@ -481,11 +492,11 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
         #------------------------------------------
         a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) +'.npy'), a_pred_1)
+        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) +'.npy'), a_pred_1)
         orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
         pred_image = (pred_image*100) * 127.5 + 127.5
         y_pred = y_pred * 127.5 + 127.5
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) + '.npy'), y_pred)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) + '.npy'), y_pred)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
 
         # a_pred_2 = np.reshape(a_pred_2, newshape=(10, 10, 16, 16, 1))

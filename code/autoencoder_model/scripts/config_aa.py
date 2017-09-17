@@ -47,7 +47,7 @@ if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
 
 PRINT_MODEL_SUMMARY = True
-SAVE_MODEL = False
+SAVE_MODEL = True
 PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
