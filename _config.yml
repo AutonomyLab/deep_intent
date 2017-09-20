@@ -2,11 +2,11 @@
 permalink:           pretty
 
 # Setup
-title:               End-To-End Human-Flying Robot Interaction
-tagline:             Supplementary materials for "UAV, Come To Me; End-to-End, Multi-Scale Situated HRI with an Uninstrumented Human and a Distant UAV" paper (IROS 2016)
+title:               DeepIntent
+tagline:             Modeling Pedestrian Intent in Autonmous Driving Scenarios
 url:                 http://autonomylab.org
 paginate:            1
-baseurl:             /bebop_hri
+baseurl:             /deep_intent
 
 # Assets
 #
@@ -17,14 +17,14 @@ sass:
 
 # About/contact
 author:
-  name:              Mani Monajjemi, Sepehr Mohaimenianpour, Richard Vaughan
+  name:              Pratik Gujjar
   url:               http://autonomylab.org
-  email:             TBA
+  email:             pgujjar@sfu.ca
 
 # Custom vars
-version:             2.0.0
+version:             1.0.0
 github:
-  repo:              https://github.com/AutonomyLab/bebop_hri
+  repo:              https://github.com/AutonomyLab/deep_intent
 
 # Gems
 gems:
