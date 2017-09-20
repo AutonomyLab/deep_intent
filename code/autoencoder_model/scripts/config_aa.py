@@ -54,7 +54,7 @@ SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
-ATTN_COEFF = 0.1
+ATTN_COEFF = 10
 
 # -------------------------------------------------
 # Network configuration:
@@ -70,10 +70,10 @@ lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.0001
+        return 0.001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.000001
+        return 0.00001
     return 0.000001
 

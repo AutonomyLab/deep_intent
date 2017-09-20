@@ -13,16 +13,26 @@ from keras.models import Sequential
 from keras.layers.core import Activation
 from keras.utils.vis_utils import plot_model
 from keras.layers.wrappers import TimeDistributed
+from keras.layers import Layer
 from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.core import Flatten
+from keras.layers.merge import multiply
+from keras.layers.merge import concatenate
+from keras.layers.core import Permute
+from keras.layers.core import RepeatVector
 from keras.layers.core import Dense
+from keras.layers.core import Lambda
+from keras.layers.core import Reshape
+from keras.layers.core import Flatten
+from keras.layers.recurrent import LSTM
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
+from keras.layers import Input
+from keras.models import Model
 from config_da import *
 
 import tb_callback
@@ -69,49 +79,100 @@ def encoder_model():
 
 
 def decoder_model():
-    model = Sequential()
+    inputs = Input(shape=(10, 16, 16, 32))
+
+    # Learn alpha_1
+    # flat_1 = TimeDistributed(Flatten())(inputs)
+    # lstm_1 = LSTM(units=16*16,
+    #               activation='softmax',
+    #               return_sequences=True)(flat_1)
+    # x = Flatten()(lstm_1)
+    # x = RepeatVector(n=32)(x)
+    # x = Permute((2, 1))(x)
+    # x = Reshape(target_shape=(10, 16, 16, 32))(x)
+    # attn_1 = multiply([inputs, x])
+
+    # 10x64x64
+    conv_1 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 1, 1))(inputs)
+    x = TimeDistributed(BatchNormalization())(conv_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_1 = TimeDistributed(Dropout(0.5))(x)
 
     # 10x32x32
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 1, 1),
-                              input_shape=(10, 16, 16, 32)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_2 = Conv3DTranspose(filters=128,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(out_1)
+    x = TimeDistributed(BatchNormalization())(conv_2)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2 = TimeDistributed(Dropout(0.5))(x)
 
     # 10x64x64
-    model.add(Conv3DTranspose(filters=128,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 16, 16, 64)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_3 = Conv3DTranspose(filters=64,
+                             kernel_size=(3, 5, 5),
+                             padding='same',
+                             strides=(1, 2, 2))(out_2)
+    x = TimeDistributed(BatchNormalization())(conv_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = TimeDistributed(Dropout(0.5))(x)
 
-    # 10x64x64
-    model.add(Conv3DTranspose(filters=64,
-                              kernel_size=(3, 5, 5),
-                              padding='same',
-                              strides=(1, 2, 2),
-                              input_shape=(10, 16, 16, 64)))
-    model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(Activation('relu')))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+    # Learn alpha_1
+    conv3D_1 = Conv3D(filters=64,
+                      strides=(1, 1, 1),
+                      kernel_size=(3, 3, 3),
+                      dilation_rate=(3, 3, 3),
+                      padding='same')(out_3)
+    x = TimeDistributed(BatchNormalization())(conv3D_1)
+    x = TimeDistributed(Dropout(0.5))(x)
+
+    conv3D_2 = Conv3D(filters=1,
+                      strides=(1, 1, 1),
+                      kernel_size=(3, 3, 3),
+                      dilation_rate=(3, 3, 3),
+                      padding='same')(x)
+    x = TimeDistributed(BatchNormalization())(conv3D_2)
+    x = TimeDistributed(Dropout(0.5))(x)
+    flat_1 = TimeDistributed(Flatten())(x)
+
+    # convlstm_1 = ConvLSTM2D(filters=1,
+    #                         kernel_size=(3, 3),
+    #                         strides=(1, 1),
+    #                         dilation_rate=(2, 2),
+    #                         padding='same',
+    #                         return_sequences=True,
+    #                         name='convlstm_1')(out_3)
+
+    # convlstm_2 = ConvLSTM2D(filters=1,
+    #                         kernel_size=(3, 3),
+    #                         dilation_rate=(3, 3),
+    #                         strides=(1, 1),
+    #                         padding='same',
+    #                         return_sequences=True,
+    #                         name='convlstm_2')(convlstm_1)
+    # flat_1 = TimeDistributed(Flatten())(convlstm_1)
+
+    dense_1 = TimeDistributed(Dense(units=64*64, activation='softmax'))(flat_1)
+    x = TimeDistributed(Dropout(0.5))(dense_1)
+    x = Flatten()(x)
+    x = RepeatVector(n=64)(x)
+    x = Permute((2, 1))(x)
+    x = Reshape(target_shape=(10, 64, 64, 64))(x)
+    attn_1 = multiply([out_3, x])
+
 
     # 10x128x128
-    model.add(Conv3DTranspose(filters=3,
-                              kernel_size=(3, 11, 11),
-                              strides=(1, 2, 2),
-                              padding='same'))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(Activation('tanh')))
-    model.add(TimeDistributed(Dropout(0.5)))
+    conv_4 = Conv3DTranspose(filters=3,
+                             kernel_size=(3, 11, 11),
+                             strides=(1, 2, 2),
+                             padding='same')(attn_1)
+    x = TimeDistributed(BatchNormalization())(conv_4)
+    x = TimeDistributed(Activation('tanh'))(x)
+    predictions = TimeDistributed(Dropout(0.5))(x)
+
+    model = Model(inputs=inputs ,outputs=predictions)
 
     return model
 
@@ -146,7 +207,7 @@ def discriminator_model():
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
-    model.add(Conv3D(filters=256,
+    model.add(Conv3D(filters=128,
                      kernel_size=(4, 4, 4),
                      strides=(2, 2, 2),
                      padding='same'))
@@ -260,27 +321,27 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
 
     # Save model to file
     if SAVE_MODEL:
-        print ("Saving models to file...")
+        print("Saving models to file...")
         model_json = encoder.to_json()
+        with open(os.path.join(MODEL_DIR, "encoder.json"), "w") as json_file:
+            json_file.write(model_json)
+
         model_json = decoder.to_json()
+        with open(os.path.join(MODEL_DIR, "decoder.json"), "w") as json_file:
+            json_file.write(model_json)
+
         model_json = autoencoder.to_json()
+        with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
+            json_file.write(model_json)
+
         model_json = discriminator.to_json()
+        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+            json_file.write(model_json)
 
         if PLOT_MODEL:
-            with open(os.path.join(MODEL_DIR, "encoder.json"), "w") as json_file:
-                json_file.write(model_json)
             plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
-
-            with open(os.path.join(MODEL_DIR, "decoder.json"), "w") as json_file:
-                json_file.write(model_json)
             plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
-
-            with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
-                json_file.write(model_json)
             plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
-
-            with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
-                json_file.write(model_json)
             plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
@@ -294,20 +355,20 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
         load_weights(DIS_WEIGHTS, discriminator)
 
 
-def load_X_train(videos_list, index):
-    X_train = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X(videos_list, index, data_dir):
+    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
     for i in range(BATCH_SIZE):
         for j in range(VIDEO_LENGTH):
             filename = "frame_" + str(videos_list[(index*BATCH_SIZE + i), j]) + ".png"
-            im_file = os.path.join(DATA_DIR, filename)
+            im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                X_train[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+                X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
-                print(e)
+                print (e)
 
-    return X_train
+    return X
 
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
@@ -368,7 +429,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = load_X_train(videos_list, index)
+            X = load_X(videos_list, index, DATA_DIR)
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
 
@@ -424,6 +485,110 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     TC.on_train_end('_')
 
 
+def test(ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
+
+    # Create models
+    print ("Creating models...")
+    encoder = encoder_model()
+    decoder = decoder_model()
+    discriminator = discriminator_model()
+    autoencoder = autoencoder_model(encoder, decoder)
+    da = da_model(autoencoder, discriminator)
+
+    run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
+    da.compile(loss='binary_crossentropy', optimizer=OPTIM_A)
+
+    for i in range(len(decoder.layers)):
+        print (decoder.layers[i], str(i))
+
+    exit(0)
+
+    def build_intermediate_model(encoder, decoder):
+        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[18].output)
+        # intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
+
+        imodel_1 = Sequential()
+        imodel_1.add(encoder)
+        imodel_1.add(intermediate_decoder_1)
+
+        # imodel_2 = Sequential()
+        # imodel_2.add(encoder)
+        # imodel_2.add(intermediate_decoder_2)
+
+        return imodel_1
+
+    imodel_1 = build_intermediate_model(encoder, decoder)
+    imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
+    # imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
+
+    # imodel = build_intermediate_model(encoder, decoder)
+
+    # Build video progressions
+    frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    videos_list = []
+    start_frame_index = 1
+    end_frame_index = VIDEO_LENGTH + 1
+    while (end_frame_index <= len(frames_source)):
+        frame_list = frames_source[start_frame_index:end_frame_index]
+        if (len(set(frame_list)) == 1):
+            videos_list.append(range(start_frame_index, end_frame_index))
+            start_frame_index = start_frame_index + VIDEO_LENGTH
+            end_frame_index = end_frame_index + VIDEO_LENGTH
+        else:
+            start_frame_index = end_frame_index - 1
+            end_frame_index = start_frame_index + VIDEO_LENGTH
+
+    videos_list = np.asarray(videos_list, dtype=np.int32)
+    n_videos = videos_list.shape[0]
+
+    # Test model by making predictions
+    loss = []
+    NB_ITERATIONS = int(n_videos / BATCH_SIZE)
+    for index in range(NB_ITERATIONS):
+        # Test Autoencoder
+        X = load_X(videos_list, index, TEST_DATA_DIR)
+        X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
+        y_test = X[:, int(VIDEO_LENGTH / 2):]
+        loss.append(autoencoder.test_on_batch(X_test, y_test))
+        y_pred = autoencoder.predict_on_batch(X_test)
+        a_pred_1 = imodel_1.predict_on_batch(X_test)
+        # a_pred_2 = imodel_2.predict_on_batch(X_test)
+
+        arrow = int(index / (NB_ITERATIONS / 40))
+        stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
+                     "loss: " + str(loss[len(loss) - 1]) +
+                     "\t    [" + "{0}>".format("=" * (arrow)))
+        stdout.flush()
+
+        orig_image, truth_image, pred_image = combine_images(X_test, y_test, y_pred)
+        pred_image = pred_image * 127.5 + 127.5
+        orig_image = orig_image * 127.5 + 127.5
+        truth_image = truth_image * 127.5 + 127.5
+
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
+
+        #------------------------------------------
+        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
+        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) +'.npy'), a_pred_1)
+        orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
+        pred_image = (pred_image*100) * 127.5 + 127.5
+        y_pred = y_pred * 127.5 + 127.5
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) + '.npy'), y_pred)
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
+
+        # a_pred_2 = np.reshape(a_pred_2, newshape=(10, 10, 16, 16, 1))
+        # with open('attention_weights.txt', mode='w') as file:
+        #     file.write(str(a_pred_2[0, 4]))
+        # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_2)
+        # pred_image = (pred_image*100) * 127.5 + 127.5
+        # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_2.png"), pred_image)
+
+    avg_loss = sum(loss) / len(loss)
+    print("\nAvg loss: " + str(avg_loss))
+
+
 def get_args():
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", type=str)
@@ -436,6 +601,7 @@ def get_args():
     args = parser.parse_args()
     return args
 
+
 if __name__ == "__main__":
     args = get_args()
 
@@ -444,3 +610,8 @@ if __name__ == "__main__":
               ENC_WEIGHTS=args.enc_weights,
               DEC_WEIGHTS=args.dec_weights,
               DIS_WEIGHTS=args.dis_weights)
+
+    if args.mode == "test":
+        test(ENC_WEIGHTS=args.enc_weights,
+             DEC_WEIGHTS=args.dec_weights,
+             DIS_WEIGHTS=args.dis_weights)

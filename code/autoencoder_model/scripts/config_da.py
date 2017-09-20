@@ -20,6 +20,8 @@ else:
 DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'
+
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -40,6 +42,10 @@ TF_LOG_DIR = './../' + path_var + 'tf_logs'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
+TEST_RESULTS_DIR = './../' + path_var + 'test_results'
+if not os.path.exists(TEST_RESULTS_DIR):
+    os.mkdir(TEST_RESULTS_DIR)
+
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
 PLOT_MODEL = False
@@ -55,9 +61,9 @@ print ("Loading network/training configuration...")
 BATCH_SIZE = 10
 NB_EPOCHS = 100
 
-OPTIM_A = Adam(lr=0.000001, beta_1=0.5)
+OPTIM_A = Adam(lr=0.00001, beta_1=0.5)
 # OPTIM_D = Adam(lr=0.0000001, beta_1=0.5)
-OPTIM_D = SGD(lr=0.000001, momentum=0.5, nesterov=True)
+OPTIM_D = SGD(lr=0.00001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step

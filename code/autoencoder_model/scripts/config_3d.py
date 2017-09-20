@@ -51,7 +51,7 @@ SAVE_MODEL = True
 PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 20
+VIDEO_LENGTH = 30
 IMG_SIZE = (128, 128, 3)
 
 # -------------------------------------------------
