@@ -5,7 +5,7 @@ This page presents more example predictions made by the DeepIntent network
 
 ##### Network Structure
 
-<img src="/public/network.png" width="100%">
+<img src="../public/network.png" width="100%">
 
 ##### 10-frame predictions
 
