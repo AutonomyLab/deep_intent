@@ -38,5 +38,11 @@ Input | Predictions | Ground Truth
 <img src="./public/5_truth.png" width="100%">
 
 ----
+##### Insufficiently accurate predictions for samples from the KITTI dataset
+
+<img src="./public/kitti_1_pred.gif" width="100%"> <img src="./public/kitti_1_truth.gif" width="100%">
+<img src="./public/kitti_2_pred.gif" width="100%"> <img src="./public/kitti_2_truth.gif" width="100%">
+<img src="./public/kitti_3_pred.gif" width="100%"> <img src="./public/kitti_3_truth.gif" width="100%">
+
 
 
