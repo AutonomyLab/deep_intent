@@ -39,15 +39,15 @@ Input | Predictions | Ground Truth
 
 ----
 ##### Test results for samples from KITTI dataset. The network is not trained on this data.
-<img src="./public/kitti_highway_pred.gif" width="100%"> <img src="./public/kitti_highway_truth.gif" width="100%">
-<img src="./public/kitti_people_pred.gif" width="100%"> <img src="./public/kitti_people_truth.gif" width="100%">
+<img src="./public/kitti_highway_pred.gif"> <img src="./public/kitti_highway_truth.gif">
+<img src="./public/kitti_people_pred.gif"> <img src="./public/kitti_people_truth.gif">
 
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
-<img src="./public/kitti_1_pred.gif" width="100%"> <img src="./public/kitti_1_truth.gif" width="100%">
-<img src="./public/kitti_2_pred.gif" width="100%"> <img src="./public/kitti_2_truth.gif" width="100%">
-<img src="./public/kitti_3_pred.gif" width="100%"> <img src="./public/kitti_3_truth.gif" width="100%">
-<img src="./public/kitti_4_pred.gif" width="100%"> <img src="./public/kitti_4_truth.gif" width="100%">
+<img src="./public/kitti_1_pred.gif"> <img src="./public/kitti_1_truth.gif">
+<img src="./public/kitti_2_pred.gif"> <img src="./public/kitti_2_truth.gif">
+<img src="./public/kitti_3_pred.gif"> <img src="./public/kitti_3_truth.gif">
+<img src="./public/kitti_4_pred.gif"> <img src="./public/kitti_4_truth.gif">
 
 
 
