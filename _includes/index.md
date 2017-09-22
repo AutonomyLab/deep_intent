@@ -10,8 +10,8 @@ This page presents more example predictions made by the DeepIntent network
 ##### 10-frame predictions
 
 <img src="/public/1_orig.png" width="100%">
-<p align="center">#####Input Frames</p>
+##### Input Frames
 <img src="/public/1_pred.png" width="100%">
-<p align="center">#####Predicted Frames</p>
+##### Predicted Frames
 <img src="/public/1_truth.png" width="100%">
-<p align="center">#####Ground Truth</p>
+##### Ground Truth
