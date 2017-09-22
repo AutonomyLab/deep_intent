@@ -15,7 +15,7 @@ Input Frames
 Predicted Frames
 <figure>
     <img src='./public/1_truth.png'>
-    <figcaption>Caption goes here</figcaption>
+    <figcaption font-size: 18em>Caption goes here</figcaption>
 </figure>
 
 Ground Truth
