@@ -13,7 +13,10 @@ Input Frames
 ![Input Frames]<img src="./public/1_orig.png" width="100%"> <img src="./public/1_pred.png" width="100%">
 
 Predicted Frames
-
+<figure>
+    <img src='./public/1_truth.png' alt='missing' />
+    <figcaption>Caption goes here</figcaption>
+</figure>
 
 Ground Truth
 <img src="./public/1_truth.png" width="100%">
