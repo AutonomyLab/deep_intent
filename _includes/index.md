@@ -9,10 +9,27 @@ This page presents more example predictions made by the DeepIntent network
 
 ##### 10-frame predictions
 
-Input Frames
-<img src="./public/1_orig.png" width="50%"> <img src="./public/1_pred.png" width="50%">
-
-Ground Truth
+<img src="./public/1_orig.png" width="100%"> 
+<img src="./public/1_pred.png" width="100%">
 <img src="./public/1_truth.png" width="100%">
 
+
+<img src="./public/2_orig.png" width="100%"> 
+<img src="./public/2_pred.png" width="100%">
+<img src="./public/2_truth.png" width="100%">
+
+
+<img src="./public/3_orig.png" width="100%"> 
+<img src="./public/3_pred.png" width="100%">
+<img src="./public/3_truth.png" width="100%">
+
+
+<img src="./public/4_orig.png" width="100%"> 
+<img src="./public/4_pred.png" width="100%">
+<img src="./public/4_truth.png" width="100%">
+
+
+<img src="./public/5_orig.png" width="100%"> 
+<img src="./public/5_pred.png" width="100%">
+<img src="./public/5_truth.png" width="100%">
 
