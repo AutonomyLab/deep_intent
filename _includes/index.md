@@ -18,7 +18,7 @@ Drivers and pedestrians engage in non-verbal and social cues to signal their int
 
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
-<img src="./public/kitti_1_pred.gif"><img src="./public/kitti_1_truth.gif">
+<img align="right" src="./public/kitti_1_pred.gif"><img align="left" src="./public/kitti_1_truth.gif">
 <img src="./public/kitti_2_pred.gif"><img src="./public/kitti_2_truth.gif">
 <img src="./public/kitti_3_pred.gif"><img src="./public/kitti_3_truth.gif">
 <img src="./public/kitti_4_pred.gif"><img src="./public/kitti_4_truth.gif">
