@@ -13,8 +13,8 @@ Drivers and pedestrians engage in non-verbal and social cues to signal their int
 </p>
 
 
-<img src="./public/kitti_highway_pred.gif"> | <img src="./public/kitti_highway_truth.gif">
-<img src="./public/kitti_people_pred.gif"> | <img src="./public/kitti_people_truth.gif">
+<img align="right" src="./public/kitti_highway_pred.gif"> | <img align="left" src="./public/kitti_highway_truth.gif">
+<img align="right" src="./public/kitti_people_pred.gif"> | <img align="left" src="./public/kitti_people_truth.gif">
 
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
