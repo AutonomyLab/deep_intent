@@ -38,11 +38,16 @@ Input | Predictions | Ground Truth
 <img src="./public/5_truth.png" width="100%">
 
 ----
+##### Test results for samples from KITTI dataset. The network is not trained on this data.
+<img src="./public/kitti_highway_pred.gif" width="100%"> <img src="./public/kitti_highway_truth.gif" width="100%">
+<img src="./public/kitti_people_pred.gif" width="100%"> <img src="./public/kitti_people_truth.gif" width="100%">
+
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
 <img src="./public/kitti_1_pred.gif" width="100%"> <img src="./public/kitti_1_truth.gif" width="100%">
 <img src="./public/kitti_2_pred.gif" width="100%"> <img src="./public/kitti_2_truth.gif" width="100%">
 <img src="./public/kitti_3_pred.gif" width="100%"> <img src="./public/kitti_3_truth.gif" width="100%">
+<img src="./public/kitti_4_pred.gif" width="100%"> <img src="./public/kitti_4_truth.gif" width="100%">
 
 
 
