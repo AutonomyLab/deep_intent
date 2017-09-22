@@ -12,8 +12,6 @@ Drivers and pedestrians engage in non-verbal and social cues to signal their int
   <b>Some Links:</b><br>
   <img src="./public/kitti_highway_pred.gif" height="128" width="128">
   <img src="./public/kitti_highway_truth.gif" height="128" width="128">
-  <br><br>
-  <img src="http://s.4cdn.org/image/title/105.gif">
 </p>
 
 
