@@ -9,6 +9,6 @@ This page presents more example predictions made by the DeepIntent network
 
 ##### 10-frame predictions
 
-- [Git repository](https://github.com/AutonomyLab/autonomy_hri/tree/dev/autonomy_human)
-- Branch/version: `dev`
-- Note: Requires a version of ROS [vision_opencv](https://github.com/ros-perception/vision_opencv) package that is compiled against OpenCV 3.x (e.g. [our fork](https://github.com/AutonomyLab/vision_opencv))
+<img src="./public/1_orig.png" width="100%">
+<img src="./public/1_pred.png" width="100%">
+<img src="./public/1_truth.png" width="100%">
