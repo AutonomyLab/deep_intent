@@ -14,7 +14,7 @@ Input Frames
 
 Predicted Frames
 <figure>
-    <img src='./public/1_truth.png' alt='missing' />
+    <img src='./public/1_truth.png'>
     <figcaption>Caption goes here</figcaption>
 </figure>
 
