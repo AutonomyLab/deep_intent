@@ -12,6 +12,27 @@ Drivers and pedestrians engage in non-verbal and social cues to signal their int
   <img src="./public/kitti_highway_pred.gif" height="128" width="128"><img src="./public/kitti_highway_truth.gif" height="128" width="128">
 </p>
 
+<style>
+table, th, td {
+    border: 0px solid black;
+}
+</style>
+
+<table>
+  <tr>
+    <th>Month</th>
+    <th>Savings</th>
+  </tr>
+  <tr>
+    <td align="center"><img align="right" src="./public/kitti_highway_pred.gif"></td>
+    <td aligh="center"><img align="left" src="./public/kitti_highway_truth.gif"></td>
+  </tr>
+  <tr>
+    <td>February</td>
+    <td>$80</td>
+  </tr>
+</table>
+
 
 <img align="right" src="./public/kitti_highway_pred.gif"> | <img align="left" src="./public/kitti_highway_truth.gif">
 <img align="right" src="./public/kitti_people_pred.gif"> | <img align="left" src="./public/kitti_people_truth.gif">
