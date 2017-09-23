@@ -105,6 +105,7 @@ table, th, td {
     <td align="center"><img src="./public/model_1_epoch_0_2.gif"></td>
     <td aligh="center"><img src="./public/model_2_epoch_0_2.gif"></td>
     <td align="center"><img src="./public/model_1_epoch_6_2.gif"></td>
+    <td aligh="center"><img src="./public/model_2_epoch_6_2.gif"></td>
     <td aligh="center"><img src="./public/20_truth_2.gif"></td>
   </tr>
 </table>
