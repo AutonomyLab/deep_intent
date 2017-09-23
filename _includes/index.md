@@ -168,7 +168,7 @@ table, th, td {
   </tr>
 </table>
 
-##### 10-frame predictions 
+##### 10-frame predictions unrolled
 Input | Predictions | Ground Truth
 
 <img src="./public/1_orig.png" width="100%"> 
