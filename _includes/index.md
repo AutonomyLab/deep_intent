@@ -19,8 +19,6 @@ table, th, td {
     <td align="center"><img src="./public/1_orig.gif"></td>
     <td aligh="center"><img src="./public/1_pred.gif"></td>
     <td align="center"><img align="left" src="./public/1_truth.gif"></td>
-  </tr>
-  <tr>
     <td align="center"><img src="./public/2_orig.gif"></td>
     <td aligh="center"><img src="./public/2_pred.gif"></td>
     <td align="center"><img align="left" src="./public/2_truth.gif"></td>
