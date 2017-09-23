@@ -86,6 +86,7 @@ table, th, td {
   <tr>
     <td align="center" colspan="2">Epoch 1</td>
     <td align="center" colspan="2">Epoch 7</td>
+    <td align="center" rowspan="2">Truth</td>
   </tr>
   <tr>
     <td align="center">Model 1</td>
@@ -98,12 +99,13 @@ table, th, td {
     <td aligh="center"><img src="./public/model_2_epoch_0_1.gif"></td>
     <td align="center"><img src="./public/model_1_epoch_6_1.gif"></td>
     <td aligh="center"><img src="./public/model_2_epoch_6_1.gif"></td>
+    <td aligh="center"><img src="./public/20_truth_1.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/model_1_epoch_0_2.gif"></td>
     <td aligh="center"><img src="./public/model_2_epoch_0_2.gif"></td>
     <td align="center"><img src="./public/model_1_epoch_6_2.gif"></td>
-    <td aligh="center"><img src="./public/model_2_epoch_6_2.gif"></td>
+    <td aligh="center"><img src="./public/20_truth_2.gif"></td>
   </tr>
 </table>
 
