@@ -79,7 +79,7 @@ table, th, td {
   </tr>
 
 </table>
-
+<!---
 ##### 20 frame predictions compared across two models over two epochs of training. Model 1 upsamples 10 input frames to 20 output frames at early stages of the encoder. Model 2 does this in the final stage. 
 
 <table>
@@ -109,6 +109,7 @@ table, th, td {
     <td aligh="center"><img src="./public/20_truth_2.gif"></td>
   </tr>
 </table>
+--->
 
 ##### Asymmetric encoder-decoder against symmetric encoder-decoder architetures
 
