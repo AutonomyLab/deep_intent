@@ -110,7 +110,6 @@ table, th, td {
   </tr>
 </table>
 
-
 ##### Asymmetric encoder-decoder against symmetric encoder-decoder architetures
 
 <table>
@@ -118,7 +117,8 @@ table, th, td {
     <td align="center">Symmetric</td>
     <td align="center">Asymmetric</td>
     <td align="center">Symmetric</td>
-    <td align="center">Asymmetric</td><
+    <td align="center">Asymmetric</td>
+  </tr>
   <tr>
     <td align="center"><img src="./public/symmetric_1.gif"></td>
     <td aligh="center"><img src="./public/asymmetric_1.gif"></td>
