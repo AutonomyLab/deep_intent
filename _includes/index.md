@@ -18,32 +18,32 @@ table, th, td {
   <tr>
     <td align="center"><img src="./public/1_orig.gif"></td>
     <td aligh="center"><img src="./public/1_pred.gif"></td>
-    <td align="center"><img src="./public/1_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/1_truth.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/2_orig.gif"></td>
     <td aligh="center"><img src="./public/2_pred.gif"></td>
-    <td align="center"><img src="./public/2_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/2_truth.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/3_orig.gif"></td>
     <td aligh="center"><img src="./public/3_pred.gif"></td>
-    <td align="center"><img src="./public/3_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/3_truth.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/4_orig.gif"></td>
     <td aligh="center"><img src="./public/4_pred.gif"></td>
-    <td align="center"><img src="./public/4_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/4_truth.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/5_orig.gif"></td>
     <td aligh="center"><img src="./public/5_pred.gif"></td>
-    <td align="center"><img src="./public/5_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/5_truth.gif"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/6_orig.gif"></td>
     <td aligh="center"><img src="./public/6_pred.gif"></td>
-    <td align="center"><img src="./public/6_truth.gif"></td>
+    <td align="center"><img align="left" src="./public/6_truth.gif"></td>
   </tr>
 </table>
 
