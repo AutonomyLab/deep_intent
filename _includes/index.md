@@ -20,16 +20,8 @@ table, th, td {
 
 <table>
   <tr>
-    <th>Month</th>
-    <th>Savings</th>
-  </tr>
-  <tr>
     <td align="center"><img align="right" src="./public/kitti_highway_pred.gif"></td>
     <td aligh="center"><img align="left" src="./public/kitti_highway_truth.gif"></td>
-  </tr>
-  <tr>
-    <td>February</td>
-    <td>$80</td>
   </tr>
 </table>
 
