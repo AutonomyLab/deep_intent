@@ -53,6 +53,12 @@ table, th, td {
 
 <table>
   <tr>
+    <td align="center">Predictions</td>
+    <td align="center">Truth</td>
+    <td align="center">Predictions</td>
+    <td align="center">Truth</td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/kitti_highway_pred.gif"></td>
     <td aligh="center"><img src="./public/kitti_highway_truth.gif"></td>
     <td align="center"><img src="./public/kitti_people_pred.gif"></td>
@@ -64,6 +70,12 @@ table, th, td {
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
 <table>
+  <tr>
+    <td align="center">Predictions</td>
+    <td align="center">Truth</td>
+    <td align="center">Predictions</td>
+    <td align="center">Truth</td>
+  </tr>
   <tr>
     <td align="center"><img align="right" src="./public/kitti_1_pred.gif"></td>
     <td aligh="center"><img align="left" src="./public/kitti_1_truth.gif"></td>
