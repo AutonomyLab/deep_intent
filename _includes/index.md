@@ -25,15 +25,22 @@ table, th, td {
 </table>
 
 
-<img align="right" src="./public/kitti_highway_pred.gif"> | <img align="left" src="./public/kitti_highway_truth.gif">
-<img align="right" src="./public/kitti_people_pred.gif"> | <img align="left" src="./public/kitti_people_truth.gif">
-
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
 
-<img align="right" src="./public/kitti_1_pred.gif"><img align="left" src="./public/kitti_1_truth.gif">
-<img src="./public/kitti_2_pred.gif"><img src="./public/kitti_2_truth.gif">
-<img src="./public/kitti_3_pred.gif"><img src="./public/kitti_3_truth.gif">
-<img src="./public/kitti_4_pred.gif"><img src="./public/kitti_4_truth.gif">
+<table>
+  <tr>
+    <td align="center"><img align="right" src="./public/kitti_1_pred.gif"></td>
+    <td aligh="center"><img align="left" src="./public/kitti_1_truth.gif"></td>
+    <td align="center"><img align="right" src="./public/kitti_2_pred.gif"></td>
+    <td aligh="center"><img align="left" src="./public/kitti_2_truth.gif"></td>
+  </tr>
+   <tr>
+    <td align="center"><img align="right" src="./public/kitti_3_pred.gif"></td>
+    <td aligh="center"><img align="left" src="./public/kitti_3_truth.gif"></td>
+    <td align="center"><img align="right" src="./public/kitti_4_pred.gif"></td>
+    <td aligh="center"><img align="left" src="./public/kitti_4_truth.gif"></td>
+  </tr>
+</table>
 
 ##### 10-frame predictions 
 Input | Predictions | Ground Truth
