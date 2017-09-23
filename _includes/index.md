@@ -7,20 +7,54 @@ Drivers and pedestrians engage in non-verbal and social cues to signal their int
 
 <img src="./public/network.png" width="100%">
 
-##### Test results for samples from the KITTI dataset (The network is not trained on this data)
-
 <style>
 table, th, td {
     border: 0px solid black;
 }
 </style>
 
+##### Examples from the JAAD Dataset
 <table>
   <tr>
-    <td align="center"><img align="right" src="./public/kitti_highway_pred.gif"></td>
-    <td aligh="center"><img align="left" src="./public/kitti_highway_truth.gif"></td>
-    <td align="center"><img align="right" src="./public/kitti_people_pred.gif"></td>
-    <td aligh="center"><img align="left" src="./public/kitti_people_truth.gif"></td>
+    <td align="center"><img src="./public/1_orig.gif"></td>
+    <td aligh="center"><img src="./public/1_pred.gif"></td>
+    <td align="center"><img src="./public/1_truth.gif"></td>
+  </tr>
+  tr>
+    <td align="center"><img src="./public/2_orig.gif"></td>
+    <td aligh="center"><img src="./public/2_pred.gif"></td>
+    <td align="center"><img src="./public/2_truth.gif"></td>
+  </tr>
+  tr>
+    <td align="center"><img src="./public/3_orig.gif"></td>
+    <td aligh="center"><img src="./public/3_pred.gif"></td>
+    <td align="center"><img src="./public/3_truth.gif"></td>
+  </tr>
+  tr>
+    <td align="center"><img src="./public/4_orig.gif"></td>
+    <td aligh="center"><img src="./public/4_pred.gif"></td>
+    <td align="center"><img src="./public/4_truth.gif"></td>
+  </tr>
+  tr>
+    <td align="center"><img src="./public/5_orig.gif"></td>
+    <td aligh="center"><img src="./public/5_pred.gif"></td>
+    <td align="center"><img src="./public/5_truth.gif"></td>
+  </tr>
+  tr>
+    <td align="center"><img src="./public/6_orig.gif"></td>
+    <td aligh="center"><img src="./public/6_pred.gif"></td>
+    <td align="center"><img src="./public/6_truth.gif"></td>
+  </tr>
+</table>
+
+##### Test results for samples from the KITTI dataset (The network is not trained on this data)
+
+<table>
+  <tr>
+    <td align="center"><img src="./public/kitti_highway_pred.gif"></td>
+    <td aligh="center"><img src="./public/kitti_highway_truth.gif"></td>
+    <td align="center"><img src="./public/kitti_people_pred.gif"></td>
+    <td aligh="center"><img src="./public/kitti_people_truth.gif"></td>
   </tr>
 </table>
 
