@@ -111,6 +111,22 @@ table, th, td {
 </table>
 
 
+##### Asymmetric encoder-decoder against symmetric encoder-decoder architetures
+
+<table>
+  <tr>
+    <td align="center">Symmetric</td>
+    <td align="center">Asymmetric</td>
+    <td align="center">Symmetric</td>
+    <td align="center">Asymmetric</td><
+  <tr>
+    <td align="center"><img src="./public/symmetric_1.gif"></td>
+    <td aligh="center"><img src="./public/asymmetric_1.gif"></td>
+    <td align="center"><img src="./public/symmetric_2.gif"></td>
+    <td aligh="center"><img src="./public/asymmetric_2.gif"></td>
+  </tr>
+</table>
+
 ##### Test results for samples from the KITTI dataset (The network is not trained on this data)
 
 <table>
