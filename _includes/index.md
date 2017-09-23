@@ -1,10 +1,12 @@
 ### Abstract
 
-Drivers and pedestrians engage in non-verbal and social cues to signal their intent, which is crucial to their interactions in traffic scenarios. We propose to learn such cues and model a pedestrian’s intent. The learnt model then predicts actions likely to be performed 400 − 600ms in the future. Responding to adverse actions in advance, we tread towards full autonomy.
+Drivers and pedestrians engage in non-verbal and social cues to signal their intent, which is crucial to their interactions in traffic scenarios. We propose to learn such cues and model a pedestrian’s intent. The learnt model is used to predict actions likely to be performed 400 − 600ms in the future. Responding to adverse actions in advance, we tread towards full autonomy.
+<br />
 [Pratik Gujjar](https://www.sfu.ca/~pgujjar/) <br />
 <i class="fa fa-github"></i>&nbsp;<a href="https://github.com/AutonomyLab/deep_intent">Code</a>
 
 ##### Network Structure
+Encoder and decoder are both convolutional neural networks. Decoder employs transposed 3D convolutions to upsample learnt representation.
 
 <img src="./public/network.png" width="100%">
 
@@ -14,7 +16,8 @@ table, th, td {
 }
 </style>
 
-##### Examples from the JAAD Dataset (10 frames input -> 10 frames output)
+##### Examples from the JAAD Dataset 
+10 frames input -> 10 frames (1/3 seconds) future prediction
 
 <table>
   <tr>
@@ -51,7 +54,8 @@ table, th, td {
   </tr>
 </table>
 
-##### Examples from the JAAD Dataset (10 frames input -> 20 frames output)
+##### Examples from the JAAD Dataset 
+10 frames input -> 20 frames (2/3 seconds) of future predictions
 
 <table>
   <tr>
@@ -113,6 +117,8 @@ table, th, td {
 --->
 
 ##### Asymmetric encoder-decoder against symmetric encoder-decoder architetures
+We observed that an asymmetric structure, particularly so with a "stronger" decoder, performs better than using symmetric models
+derived extended from convolutional classifiers.
 
 <table>
   <tr>
@@ -130,6 +136,7 @@ table, th, td {
 </table>
 
 ##### Test results for samples from the KITTI dataset (The network is not trained on this data)
+Though the network has never seen these samples, predictions are coherent and plausible.
 
 <table>
   <tr>
@@ -148,6 +155,7 @@ table, th, td {
 
 
 ##### Insufficiently accurate predictions for samples from the KITTI dataset
+We deduce that the inaccuracies stem from the fast movement of the scene in samples from the KITTI dataset. Since the model is only trained on JAAD samples, object translations between frames for KITTI data are not without flaws.
 
 <table>
   <tr>
@@ -171,6 +179,8 @@ table, th, td {
 </table>
 
 ##### 10-frame predictions unrolled
+Unrolled frames to analyze coherence in predictions; both in object distinctions and overall quality.
+
 Input | Predictions | Ground Truth
 
 <img src="./public/1_orig.png" width="100%"> 
