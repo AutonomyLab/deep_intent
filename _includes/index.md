@@ -80,6 +80,33 @@ table, th, td {
 
 </table>
 
+##### 20 frame predictions compared across two models over two epochs of training. Model 1 upsamples 10 input frames to 20 output frames at early stages of the encoder. Model 2 does this in the final stage. 
+
+<table>
+  <tr>
+    <td align="center">Model 1</td>
+    <td align="center">Model 2</td>
+    <td align="center">Model 1</td>
+    <td align="center">Model 2</td>
+  </tr>
+  <tr>
+    <td align="center" colspan="2">Epoch 1</td>
+    <td align="center" colspan="2">Epoch 7</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/model_1_epoch_0_1.gif"></td>
+    <td aligh="center"><img src="./public/model_2_epoch_0_1.gif"></td>
+    <td align="center"><img src="./public/model_1_epoch_6_1.gif"></td>
+    <td aligh="center"><img src="./public/model_2_epoch_6_1.gif"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/model_1_epoch_0_2.gif"></td>
+    <td aligh="center"><img src="./public/model_2_epoch_0_2.gif"></td>
+    <td align="center"><img src="./public/model_1_epoch_6_2.gif"></td>
+    <td aligh="center"><img src="./public/model_2_epoch_6_2.gif"></td>
+  </tr>
+</table>
+
 
 ##### Test results for samples from the KITTI dataset (The network is not trained on this data)
 
