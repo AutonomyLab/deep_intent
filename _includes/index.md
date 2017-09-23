@@ -84,14 +84,14 @@ table, th, td {
 
 <table>
   <tr>
-    <td align="center">Model 1</td>
-    <td align="center">Model 2</td>
-    <td align="center">Model 1</td>
-    <td align="center">Model 2</td>
-  </tr>
-  <tr>
     <td align="center" colspan="2">Epoch 1</td>
     <td align="center" colspan="2">Epoch 7</td>
+  </tr>
+  <tr>
+    <td align="center">Model 1</td>
+    <td align="center">Model 2</td>
+    <td align="center">Model 1</td>
+    <td align="center">Model 2</td>
   </tr>
   <tr>
     <td align="center"><img src="./public/model_1_epoch_0_1.gif"></td>
