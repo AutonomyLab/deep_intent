@@ -16,11 +16,11 @@ table, th, td {
 ##### Examples from the JAAD Dataset
 <table>
   <tr>
-    <td align="center">Input</td>
-    <td align="center">Predictions</td>
+    <td align="center">Input Frames</td>
+    <td align="center">Predicted Future</td>
     <td align="center">Ground Truth</td>
-    <td align="center">Input</td>
-    <td align="center">Predictions</td>
+    <td align="center">Input Frames</td>
+    <td align="center">Predicted Future</td>
     <td align="center">Ground Truth</td>
   </tr>
   <tr>
