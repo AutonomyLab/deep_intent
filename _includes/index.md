@@ -16,6 +16,14 @@ table, th, td {
 ##### Examples from the JAAD Dataset
 <table>
   <tr>
+    <td align="center">Input</td>
+    <td align="center">Predictions</td>
+    <td align="center">Ground Truth</td>
+    <td align="center">Input</td>
+    <td align="center">Predictions</td>
+    <td align="center">Ground Truth</td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/1_orig.gif"></td>
     <td aligh="center"><img src="./public/1_pred.gif"></td>
     <td align="center"><img align="left" src="./public/1_truth.gif"></td>
@@ -27,8 +35,6 @@ table, th, td {
     <td align="center"><img src="./public/3_orig.gif"></td>
     <td aligh="center"><img src="./public/3_pred.gif"></td>
     <td align="center"><img align="left" src="./public/3_truth.gif"></td>
-  </tr>
-  <tr>
     <td align="center"><img src="./public/4_orig.gif"></td>
     <td aligh="center"><img src="./public/4_pred.gif"></td>
     <td align="center"><img align="left" src="./public/4_truth.gif"></td>
@@ -37,8 +43,6 @@ table, th, td {
     <td align="center"><img src="./public/5_orig.gif"></td>
     <td aligh="center"><img src="./public/5_pred.gif"></td>
     <td align="center"><img align="left" src="./public/5_truth.gif"></td>
-  </tr>
-  <tr>
     <td align="center"><img src="./public/6_orig.gif"></td>
     <td aligh="center"><img src="./public/6_pred.gif"></td>
     <td align="center"><img align="left" src="./public/6_truth.gif"></td>
