@@ -3,7 +3,7 @@ permalink:           pretty
 
 # Setup
 title:               DeepIntent
-tagline:             Learning to Model Pedestrian Intent in Autonmous Driving Scenarios
+tagline:             Learning to Model Pedestrian Intent in Autonomous Driving Scenarios
 url:                 http://autonomylab.org
 paginate:            1
 baseurl:             /deep_intent
