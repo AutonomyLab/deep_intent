@@ -18,6 +18,7 @@ from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
+from keras.layers.convolutional import UpSampling3D
 from keras.layers.convolutional_recurrent import ConvLSTM2D
 from keras.layers.merge import multiply
 from keras.layers.merge import concatenate
@@ -99,90 +100,86 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = TimeDistributed(Dropout(0.5))(x)
 
-    # 10x64x64
-    conv_3 = Conv3DTranspose(filters=64,
-                             kernel_size=(3, 5, 5),
-                             padding='same',
-                             strides=(1, 2, 2))(out_2)
-    x = TimeDistributed(BatchNormalization())(conv_3)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_3 = TimeDistributed(Dropout(0.5))(x)
-
-    # Learn alpha_1
-
-    convlstm_1 = ConvLSTM2D(filters=1,
+    convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            name='convlstm_1')(out_3)
+                            recurrent_dropout=0.5,
+                            name='convlstm_1')(out_2)
+    x = TimeDistributed(BatchNormalization())(convlstm_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = UpSampling3D(size=(1, 2, 2))(x)
 
-    # convlstm_2 = ConvLSTM2D(filters=1,
-    #                         kernel_size=(3, 3),
-    #                         dilation_rate=(3, 3),
-    #                         strides=(1, 1),
-    #                         padding='same',
-    #                         return_sequences=True,
-    #                         name='convlstm_2')(convlstm_1)
-    flat_1 = TimeDistributed(Flatten())(convlstm_1)
+    convlstm_2 = ConvLSTM2D(filters=64,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5,
+                            name='convlstm_w')(out_3)
+    x = TimeDistributed(BatchNormalization())(convlstm_2)
+    out_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
 
+    aclstm_1 = ConvLSTM2D(filters=1,
+                          kernel_size=(3, 3),
+                          dilation_rate=(2, 2),
+                          strides=(1, 1),
+                          padding='same',
+                          return_sequences=True,
+                          recurrent_dropout=0.5,
+                          name='aclstm_1')(out_4)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    flat_1 = TimeDistributed(Flatten())(x)
     dense_1 = TimeDistributed(Dense(units=64*64, activation='softmax'))(flat_1)
     x = TimeDistributed(Dropout(0.5))(dense_1)
+    a = Reshape(target_shape=(10, 64, 64, 1))(x)
+
+    # Custom loss layer
+    class CustomLossLayer(Layer):
+        def __init__(self, **kwargs):
+            self.is_placeholder = True
+            super(CustomLossLayer, self).__init__(**kwargs)
+
+        def build(self, input_shape):
+            # Create a trainable weight variable for this layer.
+            super(CustomLossLayer, self).build(input_shape)  # Be sure to call this somewhere!
+
+        def attn_loss(self, a):
+            attn_loss = K.sum(K.flatten(K.square(1 - K.sum(a, axis=1))), axis=-1)
+            return ATTN_COEFF * K.mean(attn_loss)
+
+        def call(self, inputs):
+            x = inputs
+            loss = self.attn_loss(x)
+            self.add_loss(loss, inputs=inputs)
+            # We do use this output.
+            return x
+
+        def compute_output_shape(self, input_shape):
+            return (input_shape[0], 10, 64, 64, 1)
+
+    x = CustomLossLayer()(a)
     x = Flatten()(x)
     x = RepeatVector(n=64)(x)
     x = Permute((2, 1))(x)
     x = Reshape(target_shape=(10, 64, 64, 64))(x)
-    attn_1 = multiply([out_3, x])
+    a_1 = multiply([out_3, x])
+    out_5 = UpSampling3D(size=(1, 2, 2))(a_1)
 
-    convlstm_2 = ConvLSTM2D(filters=1,
+    convlstm_3 = ConvLSTM2D(filters=3,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            name='convlstm_2')(attn_1)
-    flat_2 = TimeDistributed(Flatten())(convlstm_2)
+                            recurrent_dropout=0.5,
+                            name='convlstm_2')(out_5)
+    x = TimeDistributed(BatchNormalization())(convlstm_3)
+    predictions = TimeDistributed(Activation('tanh'))(x)
 
-    dense_2 = TimeDistributed(Dense(units=64*64, activation='softmax'))(flat_2)
-    x = TimeDistributed(Dropout(0.5))(dense_2)
-    x = Flatten()(x)
-    x = RepeatVector(n=64)(x)
-    x = Permute((2, 1))(x)
-    x = Reshape(target_shape=(10, 64, 64, 64))(x)
-    attn_2 = multiply([out_3, x])
-
-    # 10x128x128
-    conv_4 = Conv3DTranspose(filters=3,
-                             kernel_size=(3, 11, 11),
-                             strides=(1, 2, 2),
-                             padding='same')(attn_2)
-    x = TimeDistributed(BatchNormalization())(conv_4)
-    x = TimeDistributed(Activation('tanh'))(x)
-    predictions = TimeDistributed(Dropout(0.5))(x)
-
-    model = Model(inputs=inputs ,outputs=predictions)
+    model = Model(inputs=inputs, outputs=predictions)
 
     return model
-
-# # Custom loss layer
-# class CustomLossLayer(Layer):
-#     def __init__(self, **kwargs):
-#         self.is_placeholder = True
-#         super(CustomLossLayer, self).__init__(**kwargs)
-#
-#     def attn_loss(self, x, x_decoded_mean_squash):
-#         x = K.flatten(x)
-#         x_decoded_mean_squash = K.flatten(x_decoded_mean_squash)
-#         xent_loss = img_rows * img_cols * metrics.binary_crossentropy(x, x_decoded_mean_squash)
-#         kl_loss = - 0.5 * K.mean(1 + z_log_var - K.square(z_mean) - K.exp(z_log_var), axis=-1)
-#         return K.mean(xent_loss + kl_loss)
-#
-#     def call(self, inputs):
-#         x = inputs[0]
-#         x_decoded_mean_squash = inputs[1]
-#         loss = self.vae_loss(x, x_decoded_mean_squash)
-#         self.add_loss(loss, inputs=inputs)
-#         # We don't use this output.
-#         return x
 
 
 def set_trainability(model, trainable):
@@ -430,7 +427,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     def build_intermediate_model(encoder, decoder):
         # convlstm-13, conv3d-25
-        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[29].output)
+        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[21].output)
         # intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
 
         imodel_1 = Sequential()
@@ -496,13 +493,13 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
 
         #------------------------------------------
-        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 64))
+        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
         np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) +'.npy'), a_pred_1)
-        # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
-        # pred_image = (pred_image*100) * 127.5 + 127.5
+        orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
+        pred_image = (pred_image*100) * 127.5 + 127.5
         # y_pred = y_pred * 127.5 + 127.5
         # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) + '.npy'), y_pred)
-        # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
+        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
 
         # a_pred_2 = np.reshape(a_pred_2, newshape=(10, 10, 16, 16, 1))
         # with open('attention_weights.txt', mode='w') as file:

@@ -17,10 +17,12 @@ if hostname == 'baymax':
 else:
     path_var = ''
 
-DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
+# DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
+DATA_DIR = '/home/pratik/data/JAAD_Dataset/resized_imgs_128/train/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'
+TEST_DATA_DIR = '/local_home/JAAD_Dataset/resized_imgs_128/test/'
+# TEST_DATA_DIR = '/home/pratik/data/KITTI_Dataset/resized_imgs_128/test/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -48,7 +50,7 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = False
+PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 30
@@ -68,10 +70,10 @@ lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.0001
+        return 0.001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.000001
+        return 0.00001
     return 0.000001
 

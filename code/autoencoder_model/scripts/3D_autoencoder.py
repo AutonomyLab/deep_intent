@@ -42,7 +42,7 @@ def encoder_model():
                      strides=(1, 4, 4),
                      kernel_size=(3, 11, 11),
                      padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+                     input_shape=(10, 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
@@ -103,7 +103,7 @@ def decoder_model():
     # 10x128x128
     conv_4 = Conv3DTranspose(filters=3,
                              kernel_size=(3, 11, 11),
-                             strides=(1, 2, 2),
+                             strides=(2, 2, 2),
                              padding='same')(x)
     x = TimeDistributed(BatchNormalization())(conv_4)
     x = TimeDistributed(Activation('tanh'))(x)
@@ -148,10 +148,10 @@ def combine_images(X, y, generated_images):
         j = index % width
         image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
 
-    n_frames = X.shape[0] * X.shape[1]
-    orig_frames = np.zeros((n_frames,) + X.shape[2:], dtype=X.dtype)
 
     # Original frames
+    n_frames = X.shape[0] * X.shape[1]
+    orig_frames = np.zeros((n_frames,) + X.shape[2:], dtype=X.dtype)
     frame_index = 0
     for i in range(X.shape[0]):
         for j in range(X.shape[1]):
@@ -169,6 +169,7 @@ def combine_images(X, y, generated_images):
         orig_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
 
     # Ground truth
+    n_frames = y.shape[0] * y.shape[1]
     truth_frames = np.zeros((n_frames,) + y.shape[2:], dtype=y.dtype)
     frame_index = 0
     for i in range(y.shape[0]):
@@ -300,8 +301,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X = load_X(videos_list, index, DATA_DIR)
-            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-            y_train = X[:, int(VIDEO_LENGTH/2) :]
+            # X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            # y_train = X[:, int(VIDEO_LENGTH/2) :]
+
+            # Change made to generate more output per input frame
+            X_train = X[:, 0 : 10]
+            y_train = X[:, 10 :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
@@ -352,6 +357,38 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM)
 
+    for i in range(len(decoder.layers)):
+        print(decoder.layers[i], str(i))
+
+        # exit(0)
+
+    # def build_intermediate_model(encoder, decoder):
+    #     # convlstm-13, conv3d-25
+    #     intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[4].output)
+    #     intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[8].output)
+    #     intermediate_decoder_3 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
+    #
+    #     imodel_1 = Sequential()
+    #     imodel_1.add(encoder)
+    #     imodel_1.add(intermediate_decoder_1)
+    #
+    #     imodel_2 = Sequential()
+    #     imodel_2.add(encoder)
+    #     imodel_2.add(intermediate_decoder_2)
+    #
+    #     imodel_3 = Sequential()
+    #     imodel_3.add(encoder)
+    #     imodel_3.add(intermediate_decoder_3)
+    #
+    #     return imodel_1, imodel_2, imodel_3
+    #
+    # imodel_1, imodel_2 ,imodel_3 = build_intermediate_model(encoder, decoder)
+    # imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
+    #
+    # imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
+    #
+    # imodel_3.compile(loss='mean_squared_error', optimizer=OPTIM)
+
     # Build video progressions
     frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
     videos_list = []
@@ -376,10 +413,13 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     for index in range(NB_ITERATIONS):
         # Test Autoencoder
         X = load_X(videos_list, index, TEST_DATA_DIR)
-        X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
-        y_test = X[:, int(VIDEO_LENGTH / 2):]
+        X_test = X[:, 0:10]
+        y_test = X[:, 10:]
         loss.append(autoencoder.test_on_batch(X_test, y_test))
         y_pred = autoencoder.predict_on_batch(X_test)
+        # conv_1 = imodel_1.predict_on_batch(X_test)
+        # conv_2 = imodel_2.predict_on_batch(X_test)
+        # conv_3 = imodel_3.predict_on_batch(X_test)
 
         arrow = int(index / (NB_ITERATIONS / 40))
         stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
@@ -391,6 +431,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         pred_image = pred_image * 127.5 + 127.5
         orig_image = orig_image * 127.5 + 127.5
         truth_image = truth_image * 127.5 + 127.5
+
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'conv_1_' + str(index) + '.npy'), conv_1)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'conv_2_' + str(index) + '.npy'), conv_2)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'conv_3_' + str(index) + '.npy'), conv_3)
 
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
