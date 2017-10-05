@@ -91,36 +91,6 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    # 10x32x32
-    conv_2 = Conv3DTranspose(filters=128,
-                             kernel_size=(3, 5, 5),
-                             padding='same',
-                             strides=(1, 2, 2))(out_1)
-    x = TimeDistributed(BatchNormalization())(conv_2)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_2 = TimeDistributed(Dropout(0.5))(x)
-
-    convlstm_1 = ConvLSTM2D(filters=64,
-                            kernel_size=(5, 5),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_1')(out_2)
-    x = TimeDistributed(BatchNormalization())(convlstm_1)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_3 = UpSampling3D(size=(1, 2, 2))(x)
-
-    convlstm_2 = ConvLSTM2D(filters=64,
-                            kernel_size=(5, 5),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_w')(out_3)
-    x = TimeDistributed(BatchNormalization())(convlstm_2)
-    out_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-
     aclstm_1 = ConvLSTM2D(filters=1,
                           kernel_size=(3, 3),
                           dilation_rate=(2, 2),
@@ -128,12 +98,12 @@ def decoder_model():
                           padding='same',
                           return_sequences=True,
                           recurrent_dropout=0.5,
-                          name='aclstm_1')(out_4)
+                          name='aclstm_1')(out_1)
     x = TimeDistributed(BatchNormalization())(aclstm_1)
     flat_1 = TimeDistributed(Flatten())(x)
-    dense_1 = TimeDistributed(Dense(units=64*64, activation='softmax'))(flat_1)
+    dense_1 = TimeDistributed(Dense(units=16*16, activation='softmax'))(flat_1)
     x = TimeDistributed(Dropout(0.5))(dense_1)
-    a = Reshape(target_shape=(10, 64, 64, 1))(x)
+    a = Reshape(target_shape=(10, 16, 16, 1))(x)
 
     # Custom loss layer
     class CustomLossLayer(Layer):
@@ -157,24 +127,65 @@ def decoder_model():
             return x
 
         def compute_output_shape(self, input_shape):
-            return (input_shape[0], 10, 64, 64, 1)
+            return (input_shape[0], 10, 16, 16, 1)
 
     x = CustomLossLayer()(a)
     x = Flatten()(x)
     x = RepeatVector(n=64)(x)
     x = Permute((2, 1))(x)
-    x = Reshape(target_shape=(10, 64, 64, 64))(x)
-    a_1 = multiply([out_3, x])
-    out_5 = UpSampling3D(size=(1, 2, 2))(a_1)
+    x = Reshape(target_shape=(10, 16, 16, 64))(x)
+    a_1 = multiply([out_1, x])
 
-    convlstm_3 = ConvLSTM2D(filters=3,
+    # # 10x32x32
+    # conv_2 = Conv3DTranspose(filters=128,
+    #                          kernel_size=(3, 5, 5),
+    #                          padding='same',
+    #                          strides=(1, 2, 2))(out_1)
+    # x = TimeDistributed(BatchNormalization())(conv_2)
+    # x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    # out_2 = TimeDistributed(Dropout(0.5))(x)
+
+    convlstm_1 = ConvLSTM2D(filters=128,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
                             recurrent_dropout=0.5,
-                            name='convlstm_2')(out_5)
+                            name='convlstm_1')(a_1)
+    x = TimeDistributed(BatchNormalization())(convlstm_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = UpSampling3D(size=(1, 2, 2))(x)
+
+    convlstm_2 = ConvLSTM2D(filters=64,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5,
+                            name='convlstm_2')(out_3)
+    x = TimeDistributed(BatchNormalization())(convlstm_2)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = UpSampling3D(size=(1, 2, 2))(x)
+
+    convlstm_3 = ConvLSTM2D(filters=64,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5,
+                            name='convlstm_3')(out_3)
     x = TimeDistributed(BatchNormalization())(convlstm_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_4 = UpSampling3D(size=(1, 2, 2))(x)
+
+    convlstm_4 = ConvLSTM2D(filters=3,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5,
+                            name='convlstm_4')(out_4)
+    x = TimeDistributed(BatchNormalization())(convlstm_4)
     predictions = TimeDistributed(Activation('tanh'))(x)
 
     model = Model(inputs=inputs, outputs=predictions)
@@ -427,7 +438,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     def build_intermediate_model(encoder, decoder):
         # convlstm-13, conv3d-25
-        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[21].output)
+        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
         # intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[12].output)
 
         imodel_1 = Sequential()
@@ -493,7 +504,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
 
         #------------------------------------------
-        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
+        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 16, 16, 1))
         np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) +'.npy'), a_pred_1)
         orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
         pred_image = (pred_image*100) * 127.5 + 127.5
