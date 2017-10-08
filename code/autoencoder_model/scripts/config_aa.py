@@ -6,6 +6,9 @@ from keras.optimizers import SGD
 from keras.optimizers import Adam
 from keras.optimizers import adadelta
 from keras.optimizers import rmsprop
+from keras.layers import Layer
+from keras import backend as K
+K.set_image_dim_ordering('tf')
 import socket
 import os
 
@@ -48,22 +51,26 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = False
+PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
-ATTN_COEFF = 0.1
+ATTN_COEFF = 0
+ADVERSARIAL = True
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 10
-NB_EPOCHS = 100
+NB_EPOCHS_AUTOENCODER = 5
+NB_EPOCHS_AAE = 100
 
-OPTIM = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_G = Adam(lr=0.00001, beta_1=0.5)
+OPTIM_D = SGD(lr=0.00001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step
@@ -77,3 +84,26 @@ def schedule(epoch_idx):
         return 0.00001
     return 0.000001
 
+# Custom loss layer
+class CustomLossLayer(Layer):
+    def __init__(self, **kwargs):
+        self.is_placeholder = True
+        super(CustomLossLayer, self).__init__(**kwargs)
+
+    def build(self, input_shape):
+        # Create a trainable weight variable for this layer.
+        super(CustomLossLayer, self).build(input_shape)  # Be sure to call this somewhere!
+
+    def attn_loss(self, a):
+        attn_loss = K.sum(K.flatten(K.square(1 - K.sum(a, axis=1))), axis=-1)
+        return ATTN_COEFF * K.mean(attn_loss)
+
+    def call(self, inputs):
+        x = inputs
+        loss = self.attn_loss(x)
+        self.add_loss(loss, inputs=inputs)
+        # We do use this output.
+        return x
+
+    def compute_output_shape(self, input_shape):
+        return (input_shape[0], 10, 64, 64, 1)

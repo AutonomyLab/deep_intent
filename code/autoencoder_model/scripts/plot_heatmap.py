@@ -12,7 +12,7 @@ import cv2
 import ast
 from config_aa import *
 
-data = np.load(os.path.join(TEST_RESULTS_DIR, 'attention_weights_2.npy'))
+data = np.load(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1_2.npy'))
 data = data[4]
 # print (data.shape)
 # exit(0)
