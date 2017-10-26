@@ -12,8 +12,8 @@ import cv2
 import ast
 from config_aa import *
 
-data = np.load(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1_2.npy'))
-data = data[4]
+data = np.load(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1.npy'))
+data = data[2]
 # print (data.shape)
 # exit(0)
 # Generate some test data
@@ -29,3 +29,4 @@ for i in range(10):
         # plt.imshow(frame, cmap=cm.gray, interpolation='nearest')
         # plt.cbar_axes[1].colorbar()
         plt.savefig(os.path.join(TEST_RESULTS_DIR, 'plot_' + str(i) + '_' + str(j) + '.png'))
+

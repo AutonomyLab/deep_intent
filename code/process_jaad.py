@@ -9,6 +9,7 @@ from __future__ import print_function
 import cv2
 import hickle as hkl
 import numpy as np
+import xmltodict
 
 from jaad_config import *
 
