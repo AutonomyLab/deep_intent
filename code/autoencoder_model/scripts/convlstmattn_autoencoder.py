@@ -36,15 +36,16 @@ from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Input
 from keras.models import Model
+from custom_layers import AttnLossLayer
 from config_aa import *
+from sys import stdout
 
 import tb_callback
 import lrs_callback
 import argparse
 import math
-import os
 import cv2
-from sys import stdout
+import os
 
 
 def encoder_model():
@@ -97,9 +98,12 @@ def decoder_model():
                     activation='tanh',
                     recurrent_dropout=0.5,
                     return_sequences=True)(flat_1)
-    dense_1 = TimeDistributed(Dense(units=16*16, activation='softmax'))(aclstm_1)
-    a_1 = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
-    x = CustomLossLayer()(a_1)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    dense_1 = TimeDistributed(Dense(units=16*16, activation='softmax'))(x)
+    x = TimeDistributed(BatchNormalization())(dense_1)
+    x = TimeDistributed(Dropout(0.5))(x)
+    a_1 = Reshape(target_shape=(10, 16, 16, 1))(x)
+    x = AttnLossLayer()(a_1)
     dot_1 = multiply([out_1, x])
     # expect_2 = Lambda(expectation)(dot_2)
 
@@ -121,13 +125,16 @@ def decoder_model():
                    recurrent_dropout=0.5)(h_2)
     l2 = TimeDistributed(Flatten())(x)
     in_2 = concatenate([dense_1, l2])
-    aclstm_2 = LSTM(units=16 * 16,
+    aclstm_2 = LSTM(units=32 * 32,
                     activation='tanh',
                     recurrent_dropout=0.5,
                     return_sequences=True)(in_2)
-    dense_2 = TimeDistributed(Dense(units=32 * 32, activation='softmax'))(aclstm_2)
-    a_2 = Reshape(target_shape=(10, 32, 32, 1))(dense_2)
-    x = CustomLossLayer()(a_2)
+    x = TimeDistributed(BatchNormalization())(aclstm_2)
+    dense_2 = TimeDistributed(Dense(units=32 * 32, activation='softmax'))(x)
+    x = TimeDistributed(BatchNormalization())(dense_2)
+    x = TimeDistributed(Dropout(0.5))(x)
+    a_2 = Reshape(target_shape=(10, 32, 32, 1))(x)
+    x = AttnLossLayer()(a_2)
     # x = UpSampling3D(size=(1, 2, 2))(x)
     dot_2 = multiply([out_2, x])
 
@@ -150,17 +157,20 @@ def decoder_model():
                    recurrent_dropout=0.5)(h_3)
     l3 = TimeDistributed(Flatten())(x)
     in_3 = concatenate([dense_2, l3])
-    aclstm_3 = LSTM(units=16 * 16,
+    aclstm_3 = LSTM(units=32 * 32,
                     activation='tanh',
                     recurrent_dropout=0.5,
                     return_sequences=True)(in_3)
-    dense_3 = TimeDistributed(Dense(units=64 * 64, activation='softmax'))(aclstm_3)
-    a_3 = Reshape(target_shape=(10, 64, 64, 1))(dense_3)
-    x = CustomLossLayer()(a_3)
+    x = TimeDistributed(BatchNormalization())(aclstm_3)
+    dense_3 = TimeDistributed(Dense(units=64 * 64, activation='softmax'))(x)
+    x = TimeDistributed(BatchNormalization())(dense_3)
+    x = TimeDistributed(Dropout(0.5))(x)
+    a_3 = Reshape(target_shape=(10, 64, 64, 1))(x)
+    x = AttnLossLayer()(a_3)
     # x = UpSampling3D(size=(1, 4, 4))(x)
     dot_3 = multiply([out_3, x])
 
-    convlstm_4 = ConvLSTM2D(filters=64,
+    convlstm_4 = ConvLSTM2D(filters=32,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
@@ -178,13 +188,16 @@ def decoder_model():
                    recurrent_dropout=0.5)(h_4)
     l4 = TimeDistributed(Flatten())(x)
     in_4 = concatenate([dense_3, l4])
-    aclstm_4 = LSTM(units=16 * 16,
+    aclstm_4 = LSTM(units=32 * 32,
                     activation='tanh',
                     recurrent_dropout=0.5,
                     return_sequences=True)(in_4)
-    dense_4 = TimeDistributed(Dense(units=128 * 128, activation='softmax'))(aclstm_4)
-    a_4 = Reshape(target_shape=(10, 128, 128, 1))(dense_4)
-    x = CustomLossLayer()(a_4)
+    x = TimeDistributed(BatchNormalization())(aclstm_4)
+    dense_4 = TimeDistributed(Dense(units=128 * 128, activation='softmax'))(x)
+    x = TimeDistributed(BatchNormalization())(dense_4)
+    x = TimeDistributed(Dropout(0.5))(x)
+    a_4 = Reshape(target_shape=(10, 128, 128, 1))(x)
+    x = AttnLossLayer()(a_4)
     # x = UpSampling3D(size=(1, 8, 8))(x)
     dot_4 = multiply([out_4, x])
 
@@ -400,22 +413,22 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[8].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[11].output)
     generator_1 = Sequential()
     generator_1.add(encoder)
     generator_1.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[19].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[25].output)
     generator_2 = Sequential()
     generator_2.add(encoder)
     generator_2.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[31].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[40].output)
     generator_3 = Sequential()
     generator_3.add(encoder)
     generator_3.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[43].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[55].output)
     generator_4 = Sequential()
     generator_4.add(encoder)
     generator_4.add(intermediate_decoder)

@@ -9,7 +9,7 @@ from __future__ import print_function
 import cv2
 import hickle as hkl
 import numpy as np
-import xmltodict
+import xmltodict as xmlparser
 
 from jaad_config import *
 
@@ -37,11 +37,29 @@ def process_data():
     for split in splits:
         im_list = []
         source_list = []  # corresponds to recording that image came from
+        annotation_list = []
         for folder in splits[split]:
+            xml_filename = os.path.join(XML_DIR, folder + '.xml')
+            print (xml_filename)
+            with open(xml_filename) as file:
+                xml_file = xmlparser.parse(file.read())
             im_dir = os.path.join(VIDEO_DIR, folder)
             _, _, files = os.walk(im_dir).next()
             im_list += [im_dir + "/" + f for f in sorted(files)]
             source_list += [folder] * len(files)
+            for i in range(1, len(files)+1):
+                for j in range(len(xml_filename['video']['actions']['Driver']['action'])):
+                    if (i >= (round(float(xml_filename['video']['actions']['Driver']['action'][j]['@start_time'])*30)
+                    and i < (round(float(xml_filename['video']['actions']['Driver']['action'][j]['@end_time'])*30)))):
+                        driver_action = str(xml_filename['video']['actions']['Driver']['action'][j]['@id'])
+
+                for j in range(len(xml_filename['video']['actions']['Driver']['action'])):
+                    if (i >= (round(float(xml_filename['video']['actions']['Driver']['action'][j]['@start_time'])*30)
+                    and i < (round(float(xml_filename['video']['actions']['Driver']['action'][j]['@end_time'])*30)))):
+                        driver_action = str(xml_filename['video']['actions']['Driver']['action'][j]['@id'])
+
+                info = str(folder) + ',' + "frame_" + ',' + str(driver_action) + ',' + str(ped_action)
+
 
         print('Creating ' + split + ' data: ' + str(len(im_list)) + ' images')
         X = np.zeros((len(im_list),) + desired_im_sz + (3,), np.uint8)
@@ -49,9 +67,9 @@ def process_data():
             try:
                 im = cv2.imread(im_file, cv2.IMREAD_COLOR)
                 X[i] = process_im(im, im_file, desired_im_sz)
-                # if split=='train':
-                #     # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
-                #     cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i+1) + ".png"), X[i])
+                if split=='train':
+                    # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
+                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i+1) + ".png"), X[i])
                 if split=='test':
                     cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "test/frame_" + str(i+1) + ".png"), X[i])
                 # if split == 'val':
