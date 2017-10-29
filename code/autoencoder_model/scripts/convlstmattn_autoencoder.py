@@ -93,20 +93,20 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
-    flat_1 = TimeDistributed(Flatten())(out_1)
-    aclstm_1 = LSTM(units=16 * 16,
-                    activation='tanh',
-                    recurrent_dropout=0.5,
-                    return_sequences=True)(flat_1)
+    # flat_1 = TimeDistributed(Flatten())(out_1)
+    aclstm_1 = ConvLSTM2D(filters=1,
+                          kernel_size=(16, 16),
+                          padding='same',
+                          strides=(1, 1),
+                          activation='softmax',
+                          recurrent_dropout=0.5,
+                          return_sequences=True)(out_1)
     x = TimeDistributed(BatchNormalization())(aclstm_1)
-    dense_1 = TimeDistributed(Dense(units=16*16, activation='softmax'))(x)
-    x = TimeDistributed(BatchNormalization())(dense_1)
-    x = TimeDistributed(Dropout(0.5))(x)
-    a_1 = Reshape(target_shape=(10, 16, 16, 1))(x)
+    a_1 = TimeDistributed(Dropout(0.5))(x)
     x = AttnLossLayer()(a_1)
     dot_1 = multiply([out_1, x])
-    # expect_2 = Lambda(expectation)(dot_2)
 
+    # 10x32x32
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
                             strides=(1, 1),
@@ -121,24 +121,26 @@ def decoder_model():
                    kernel_size=(5, 5),
                    strides=(1, 1),
                    padding='same',
+                   activation='tanh',
                    return_sequences=True,
-                   recurrent_dropout=0.5)(h_2)
-    l2 = TimeDistributed(Flatten())(x)
-    in_2 = concatenate([dense_1, l2])
-    aclstm_2 = LSTM(units=32 * 32,
-                    activation='tanh',
-                    recurrent_dropout=0.5,
-                    return_sequences=True)(in_2)
+                   recurrent_dropout=0.5)(out_2)
+    x = TimeDistributed(BatchNormalization())(x)
+    h_l2 = TimeDistributed(Dropout(0.5))(x)
+    a1_upsamp = UpSampling3D(size=(1, 2, 2))(a_1)
+    in_2 = concatenate([a1_upsamp, h_l2])
+    aclstm_2 = ConvLSTM2D(filters=1,
+                          kernel_size=(32, 32),
+                          strides=(1, 1),
+                          padding='same',
+                          activation='softmax',
+                          recurrent_dropout=0.5,
+                          return_sequences=True)(in_2)
     x = TimeDistributed(BatchNormalization())(aclstm_2)
-    dense_2 = TimeDistributed(Dense(units=32 * 32, activation='softmax'))(x)
-    x = TimeDistributed(BatchNormalization())(dense_2)
-    x = TimeDistributed(Dropout(0.5))(x)
-    a_2 = Reshape(target_shape=(10, 32, 32, 1))(x)
+    a_2 = TimeDistributed(Dropout(0.5))(x)
     x = AttnLossLayer()(a_2)
-    # x = UpSampling3D(size=(1, 2, 2))(x)
     dot_2 = multiply([out_2, x])
 
-    # 10x32x32
+    # 10x64x64
     convlstm_3 = ConvLSTM2D(filters=128,
                             kernel_size=(5, 5),
                             strides=(1, 1),
@@ -153,23 +155,26 @@ def decoder_model():
                    kernel_size=(5, 5),
                    strides=(1, 1),
                    padding='same',
+                   activation='tanh',
                    return_sequences=True,
-                   recurrent_dropout=0.5)(h_3)
-    l3 = TimeDistributed(Flatten())(x)
-    in_3 = concatenate([dense_2, l3])
-    aclstm_3 = LSTM(units=32 * 32,
-                    activation='tanh',
-                    recurrent_dropout=0.5,
-                    return_sequences=True)(in_3)
+                   recurrent_dropout=0.5)(out_3)
+    x = TimeDistributed(BatchNormalization())(x)
+    h_l3 = TimeDistributed(Dropout(0.5))(x)
+    a2_upsamp = UpSampling3D(size=(1, 2, 2))(a_2)
+    in_3 = concatenate([a2_upsamp, h_l3])
+    aclstm_3 = ConvLSTM2D(filters=1,
+                          kernel_size=(64, 64),
+                          strides=(1, 1),
+                          padding='same',
+                          activation='softmax',
+                          recurrent_dropout=0.5,
+                          return_sequences=True)(in_3)
     x = TimeDistributed(BatchNormalization())(aclstm_3)
-    dense_3 = TimeDistributed(Dense(units=64 * 64, activation='softmax'))(x)
-    x = TimeDistributed(BatchNormalization())(dense_3)
-    x = TimeDistributed(Dropout(0.5))(x)
-    a_3 = Reshape(target_shape=(10, 64, 64, 1))(x)
+    a_3 = TimeDistributed(Dropout(0.5))(x)
     x = AttnLossLayer()(a_3)
-    # x = UpSampling3D(size=(1, 4, 4))(x)
     dot_3 = multiply([out_3, x])
 
+    # 10x128x128
     convlstm_4 = ConvLSTM2D(filters=32,
                             kernel_size=(5, 5),
                             strides=(1, 1),
@@ -184,21 +189,23 @@ def decoder_model():
                    kernel_size=(5, 5),
                    strides=(1, 1),
                    padding='same',
+                   activation='tanh',
                    return_sequences=True,
-                   recurrent_dropout=0.5)(h_4)
-    l4 = TimeDistributed(Flatten())(x)
-    in_4 = concatenate([dense_3, l4])
-    aclstm_4 = LSTM(units=32 * 32,
-                    activation='tanh',
-                    recurrent_dropout=0.5,
-                    return_sequences=True)(in_4)
+                   recurrent_dropout=0.5)(out_4)
+    x = TimeDistributed(BatchNormalization())(x)
+    h_l4 = TimeDistributed(Dropout(0.5))(x)
+    a3_upsamp = UpSampling3D(size=(1, 2, 2))(a_3)
+    in_4 = concatenate([a3_upsamp, h_l4])
+    aclstm_4 = ConvLSTM2D(filters=1,
+                          kernel_size=(128, 128),
+                          strides=(1, 1),
+                          padding='same',
+                          activation='softmax',
+                          recurrent_dropout=0.5,
+                          return_sequences=True)(in_4)
     x = TimeDistributed(BatchNormalization())(aclstm_4)
-    dense_4 = TimeDistributed(Dense(units=128 * 128, activation='softmax'))(x)
-    x = TimeDistributed(BatchNormalization())(dense_4)
-    x = TimeDistributed(Dropout(0.5))(x)
-    a_4 = Reshape(target_shape=(10, 128, 128, 1))(x)
+    a_4 = TimeDistributed(Dropout(0.5))(x)
     x = AttnLossLayer()(a_4)
-    # x = UpSampling3D(size=(1, 8, 8))(x)
     dot_4 = multiply([out_4, x])
 
     convlstm_5 = ConvLSTM2D(filters=3,
@@ -413,22 +420,22 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[11].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[8].output)
     generator_1 = Sequential()
     generator_1.add(encoder)
     generator_1.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[25].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[22].output)
     generator_2 = Sequential()
     generator_2.add(encoder)
     generator_2.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[40].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[36].output)
     generator_3 = Sequential()
     generator_3.add(encoder)
     generator_3.add(intermediate_decoder)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[55].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[50].output)
     generator_4 = Sequential()
     generator_4.add(encoder)
     generator_4.add(intermediate_decoder)

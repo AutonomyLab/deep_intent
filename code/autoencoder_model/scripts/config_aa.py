@@ -57,7 +57,7 @@ SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
-ATTN_COEFF = 0
+ATTN_COEFF = 1
 ADVERSARIAL = False
 
 # -------------------------------------------------
