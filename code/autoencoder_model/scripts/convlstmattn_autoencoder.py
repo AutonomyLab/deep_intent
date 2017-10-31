@@ -31,6 +31,7 @@ from keras.layers.core import Lambda
 from keras.layers.core import Reshape
 from keras.layers.core import Flatten
 from keras.layers.recurrent import LSTM
+from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
@@ -112,8 +113,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_2')(dot_1)
+                            recurrent_dropout=0.5)(dot_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
@@ -146,8 +146,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_4')(dot_2)
+                            recurrent_dropout=0.5)(dot_2)
     x = TimeDistributed(BatchNormalization())(convlstm_3)
     h_3 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
@@ -180,8 +179,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_5')(dot_3)
+                            recurrent_dropout=0.5)(dot_3)
     x = TimeDistributed(BatchNormalization())(convlstm_4)
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
@@ -213,8 +211,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5,
-                            name='convlstm_6')(dot_4)
+                            recurrent_dropout=0.5)(dot_4)
     x = TimeDistributed(BatchNormalization())(convlstm_5)
     predictions = TimeDistributed(Activation('tanh'))(x)
 
@@ -453,6 +450,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    # autoencoder.compile(loss=['mean_squared_error', 'kullback_leibler_divergence'], optimizer=OPTIM_A)
 
     # if ADVERSARIAL:
     #     # aae.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
