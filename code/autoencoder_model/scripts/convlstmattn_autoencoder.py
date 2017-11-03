@@ -35,9 +35,12 @@ from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
+from keras.losses import kullback_leibler_divergence
+from keras.losses import mean_squared_error
 from keras.layers import Input
 from keras.models import Model
 from custom_layers import AttnLossLayer
+from custom_layers import mse_kld_loss
 from config_aa import *
 from sys import stdout
 
@@ -86,28 +89,33 @@ def encoder_model():
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 32))
 
+    # conv_1 = Conv3DTranspose(filters=64,
+    #                          kernel_size=(3, 5, 5),
+    #                          padding='same',
+    #                          strides=(1, 1, 1))(inputs)
+
     # 10x16x16
-    conv_1 = Conv3DTranspose(filters=64,
-                             kernel_size=(3, 5, 5),
-                             padding='same',
-                             strides=(1, 1, 1))(inputs)
-    x = TimeDistributed(BatchNormalization())(conv_1)
+    convlstm_1 = ConvLSTM2D(filters=64,
+                            kernel_size=(5, 5),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(inputs)
+    x = TimeDistributed(BatchNormalization())(convlstm_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
-    # flat_1 = TimeDistributed(Flatten())(out_1)
-    aclstm_1 = ConvLSTM2D(filters=1,
-                          kernel_size=(16, 16),
-                          padding='same',
-                          strides=(1, 1),
-                          activation='softmax',
-                          recurrent_dropout=0.5,
-                          return_sequences=True)(out_1)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
-    a_1 = TimeDistributed(Dropout(0.5))(x)
-    x = AttnLossLayer()(a_1)
-    dot_1 = multiply([out_1, x])
 
-    # 10x32x32
+    flat_1 = TimeDistributed(Flatten())(out_1)
+    aclstm_1 = GRU(units=16 * 16,
+                   activation='tanh',
+                   recurrent_dropout=0.5,
+                   return_sequences=True)(flat_1)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
+    a1 = AttnLossLayer()(a1_reshape)
+    dot_1 = multiply([out_1, a1])
+
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
                             strides=(1, 1),
@@ -117,101 +125,36 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
-    x = ConvLSTM2D(filters=1,
-                   kernel_size=(5, 5),
-                   strides=(1, 1),
-                   padding='same',
-                   activation='tanh',
-                   return_sequences=True,
-                   recurrent_dropout=0.5)(out_2)
-    x = TimeDistributed(BatchNormalization())(x)
-    h_l2 = TimeDistributed(Dropout(0.5))(x)
-    a1_upsamp = UpSampling3D(size=(1, 2, 2))(a_1)
-    in_2 = concatenate([a1_upsamp, h_l2])
-    aclstm_2 = ConvLSTM2D(filters=1,
-                          kernel_size=(32, 32),
-                          strides=(1, 1),
-                          padding='same',
-                          activation='softmax',
-                          recurrent_dropout=0.5,
-                          return_sequences=True)(in_2)
-    x = TimeDistributed(BatchNormalization())(aclstm_2)
-    a_2 = TimeDistributed(Dropout(0.5))(x)
-    x = AttnLossLayer()(a_2)
-    dot_2 = multiply([out_2, x])
 
-    # 10x64x64
+    # 10x32x32
     convlstm_3 = ConvLSTM2D(filters=128,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_2)
+                            recurrent_dropout=0.5)(out_2)
     x = TimeDistributed(BatchNormalization())(convlstm_3)
     h_3 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
-    x = ConvLSTM2D(filters=1,
-                   kernel_size=(5, 5),
-                   strides=(1, 1),
-                   padding='same',
-                   activation='tanh',
-                   return_sequences=True,
-                   recurrent_dropout=0.5)(out_3)
-    x = TimeDistributed(BatchNormalization())(x)
-    h_l3 = TimeDistributed(Dropout(0.5))(x)
-    a2_upsamp = UpSampling3D(size=(1, 2, 2))(a_2)
-    in_3 = concatenate([a2_upsamp, h_l3])
-    aclstm_3 = ConvLSTM2D(filters=1,
-                          kernel_size=(64, 64),
-                          strides=(1, 1),
-                          padding='same',
-                          activation='softmax',
-                          recurrent_dropout=0.5,
-                          return_sequences=True)(in_3)
-    x = TimeDistributed(BatchNormalization())(aclstm_3)
-    a_3 = TimeDistributed(Dropout(0.5))(x)
-    x = AttnLossLayer()(a_3)
-    dot_3 = multiply([out_3, x])
 
-    # 10x128x128
+    # 10x64x64
     convlstm_4 = ConvLSTM2D(filters=32,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_3)
+                            recurrent_dropout=0.5)(out_3)
     x = TimeDistributed(BatchNormalization())(convlstm_4)
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
-    x = ConvLSTM2D(filters=1,
-                   kernel_size=(5, 5),
-                   strides=(1, 1),
-                   padding='same',
-                   activation='tanh',
-                   return_sequences=True,
-                   recurrent_dropout=0.5)(out_4)
-    x = TimeDistributed(BatchNormalization())(x)
-    h_l4 = TimeDistributed(Dropout(0.5))(x)
-    a3_upsamp = UpSampling3D(size=(1, 2, 2))(a_3)
-    in_4 = concatenate([a3_upsamp, h_l4])
-    aclstm_4 = ConvLSTM2D(filters=1,
-                          kernel_size=(128, 128),
-                          strides=(1, 1),
-                          padding='same',
-                          activation='softmax',
-                          recurrent_dropout=0.5,
-                          return_sequences=True)(in_4)
-    x = TimeDistributed(BatchNormalization())(aclstm_4)
-    a_4 = TimeDistributed(Dropout(0.5))(x)
-    x = AttnLossLayer()(a_4)
-    dot_4 = multiply([out_4, x])
 
+    # 10x128x128
     convlstm_5 = ConvLSTM2D(filters=3,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_4)
+                            recurrent_dropout=0.5)(out_4)
     x = TimeDistributed(BatchNormalization())(convlstm_5)
     predictions = TimeDistributed(Activation('tanh'))(x)
 
@@ -221,20 +164,40 @@ def decoder_model():
 
 
 def discriminator_model():
-    inputs = Input(shape=(10, 64, 64, 1))
-    x = TimeDistributed(Flatten())(inputs)
+    inputs = Input(shape=(10, 128, 128, 3))
+    conv_1 = TimeDistributed(Conv2D(filters=32,
+                                    strides=(1, 1),
+                                    padding="same"))(inputs)
+    conv_1 = TimeDistributed(BatchNormalization)(conv_1)
+    conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
+    conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
-    lstm_1 = LSTM(512, return_sequences=True)(x)
-    x = LeakyReLU(alpha=0.2)(lstm_1)
-    x = BatchNormalization(momentum=0.8)(x)
+    conv_2 = TimeDistributed(Conv2D(filters=64,
+                                    strides=(2, 2),
+                                    padding="same"))(conv_1)
+    conv_2 = TimeDistributed(BatchNormalization)(conv_2)
+    conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
+    conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
-    lstm_2 = LSTM(512, return_sequences=True)(x)
-    x = LeakyReLU(alpha=0.2)(lstm_2)
-    x = BatchNormalization(momentum=0.8)(x)
+    conv_3 = TimeDistributed(Conv2D(filters=128,
+                                    strides=(2, 2),
+                                    padding="same"))(conv_2)
+    conv_3 = TimeDistributed(BatchNormalization)(conv_3)
+    conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
+    conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
-    dense_1 = TimeDistributed(Dense(1, activation="sigmoid"))(x)
+    conv_4 = TimeDistributed(Conv2D(filters=128,
+                                    strides=(2, 2),
+                                    padding="same"))(conv_3)
+    conv_4 = TimeDistributed(BatchNormalization)(conv_4)
+    conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
+    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
-    model = Model(inputs=inputs, outputs=dense_1)
+    flat_1 = TimeDistributed(Flatten())(conv_4)
+    dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
+    dense_2 = TimeDistributed(Dense(units=1, activation='sigmoid'))(dense_1)
+
+    model = Model(inputs=inputs, outputs=dense_2)
 
     return model
 
@@ -325,13 +288,13 @@ def combine_images(X, y, generated_images):
 def load_weights(weights_file, model):
     model.load_weights(weights_file)
 
-
-def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
+def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
+# def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
         print (encoder.summary())
         print (decoder.summary())
         print (autoencoder.summary())
-        # print (discriminator.summary())
+        print (discriminator.summary())
 
         # exit(0)
 
@@ -350,15 +313,15 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
         with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
             json_file.write(model_json)
 
-        # model_json = discriminator.to_json()
-        # with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
-        #     json_file.write(model_json)
+        model_json = discriminator.to_json()
+        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+            json_file.write(model_json)
 
         if PLOT_MODEL:
             plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
             plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
             plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
-            # plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+            plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")
@@ -366,9 +329,9 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if DEC_WEIGHTS != "None":
         print ("Pre-loading decoder with weights...")
         load_weights(DEC_WEIGHTS, decoder)
-    # if DIS_WEIGHTS != "None":
-    #     print("Pre-loading decoder with weights...")
-    #     load_weights(DIS_WEIGHTS, discriminator)
+    if DIS_WEIGHTS != "None":
+        print("Pre-loading decoder with weights...")
+        load_weights(DIS_WEIGHTS, discriminator)
 
 
 def load_X(videos_list, index, data_dir):
@@ -417,45 +380,36 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[8].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
     generator_1 = Sequential()
     generator_1.add(encoder)
     generator_1.add(intermediate_decoder)
-
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[22].output)
-    generator_2 = Sequential()
-    generator_2.add(encoder)
-    generator_2.add(intermediate_decoder)
-
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[36].output)
-    generator_3 = Sequential()
-    generator_3.add(encoder)
-    generator_3.add(intermediate_decoder)
-
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[50].output)
-    generator_4 = Sequential()
-    generator_4.add(encoder)
-    generator_4.add(intermediate_decoder)
-
     # discriminator = discriminator_model()
     # aae = aae_model(generator, discriminator)
 
     generator_1.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    generator_2.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    generator_3.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    generator_4.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+    # generator_2.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+    # generator_3.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+    # generator_4.compile(loss='mean_squared_error', optimizer=OPTIM_G)
 
     autoencoder = autoencoder_model(encoder, decoder)
 
-    run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
+    if ADVERSARIAL:
+        discriminator = discriminator_model()
+        aae = aae_model(autoencoder, discriminator)
+        aae.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
+        set_trainability(discriminator, True)
+        discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
 
-    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
-    # autoencoder.compile(loss=['mean_squared_error', 'kullback_leibler_divergence'], optimizer=OPTIM_A)
+    # autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    # run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
+    run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
 
-    # if ADVERSARIAL:
-    #     # aae.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
-    #     set_trainability(discriminator, True)
-    #     discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
+    aae.compile(loss='binary_crossentropy', optimizer=OPTIM_A)
+    set_trainability(discriminator, True)
+    discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
+    autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
+
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
@@ -513,19 +467,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
 
         # Save model weights per epoch to file
         predicted_attn_1 = generator_1.predict(X_train, verbose=0)
-        predicted_attn_2 = generator_2.predict(X_train, verbose=0)
-        predicted_attn_3 = generator_3.predict(X_train, verbose=0)
-        predicted_attn_4 = generator_4.predict(X_train, verbose=0)
+        # predicted_attn_2 = generator_2.predict(X_train, verbose=0)
+        # predicted_attn_3 = generator_3.predict(X_train, verbose=0)
+        # predicted_attn_4 = generator_4.predict(X_train, verbose=0)
 
         a_pred_1 = np.reshape(predicted_attn_1, newshape=(10, 10, 16, 16, 1))
-        a_pred_2 = np.reshape(predicted_attn_2, newshape=(10, 10, 32, 32, 1))
-        a_pred_3 = np.reshape(predicted_attn_3, newshape=(10, 10, 64, 64, 1))
-        a_pred_4 = np.reshape(predicted_attn_4, newshape=(10, 10, 128, 128, 1))
+        # a_pred_2 = np.reshape(predicted_attn_2, newshape=(10, 10, 32, 32, 1))
+        # a_pred_3 = np.reshape(predicted_attn_3, newshape=(10, 10, 64, 64, 1))
+        # a_pred_4 = np.reshape(predicted_attn_4, newshape=(10, 10, 128, 128, 1))
 
         np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred_1)
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen2_' + str(epoch) + '.npy'), a_pred_2)
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen3_' + str(epoch) + '.npy'), a_pred_3)
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen4_' + str(epoch) + '.npy'), a_pred_4)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen2_' + str(epoch) + '.npy'), a_pred_2)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen3_' + str(epoch) + '.npy'), a_pred_3)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen4_' + str(epoch) + '.npy'), a_pred_4)
 
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)

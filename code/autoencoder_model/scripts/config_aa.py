@@ -20,10 +20,10 @@ if hostname == 'baymax':
 else:
     path_var = ''
 
-DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/resized_imgs_128/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -58,7 +58,9 @@ VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
 ATTN_COEFF = 1
+KL_COEFF = 0
 ADVERSARIAL = False
+BUF_SIZE = 10
 
 # -------------------------------------------------
 # Network configuration:

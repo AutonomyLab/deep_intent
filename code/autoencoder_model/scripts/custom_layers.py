@@ -40,6 +40,15 @@ def broadcast_output_shape(input_shape):
 def expectation(x):
     return K.sum(K.sum(x, axis=-2), axis=-2)
 
+def mse_kld_loss(y_pred, y_true):
+    mse_loss = K.mean(K.square(y_pred - y_true), axis=-1)
+
+    y_true = K.clip(y_true, K.epsilon(), 1)
+    y_pred = K.clip(y_pred, K.epsilon(), 1)
+    kld_loss = K.sum(y_true * K.log(y_true / y_pred), axis=-1)
+
+    return mse_loss + (KL_COEFF*kld_loss)
+
 # def expectation_output_shape(input_shape):
 #     return input_shape[0:3] + (128,)
 
