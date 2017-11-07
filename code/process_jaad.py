@@ -13,7 +13,7 @@ import xmltodict as xmlparser
 
 from jaad_config import *
 
-desired_im_sz = (128, 128)
+desired_im_sz = (256, 256)
 
 # Recordings used for validation and testing.
 val_recordings = ['video_0027', 'video_0028', 'video_0029', 'video_0030', 'video_0031', 'video_0032']
@@ -109,14 +109,14 @@ def process_data():
             except IOError as e:
                 print (e)
 
-        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_128' + '.hkl'))
-        hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_128' + '.hkl'))
-        hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_128' + '.hkl'))
+        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_256' + '.hkl'))
+        hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_256' + '.hkl'))
+        hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_256' + '.hkl'))
 
 
 # resize image
 def process_im(im, im_file, desired_sz):
-    im = cv2.resize(im, desired_im_sz, interpolation=cv2.INTER_AREA)
+    im = cv2.resize(im, desired_im_sz, interpolation=cv2.INTER_CUBIC)
     return im
 
 if __name__ == '__main__':

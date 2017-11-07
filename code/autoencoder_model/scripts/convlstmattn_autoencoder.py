@@ -9,6 +9,7 @@ from tensorflow.python.pywrap_tensorflow import do_quantize_training_on_graphdef
 np.random.seed(2 ** 10)
 from keras import backend as K
 K.set_image_dim_ordering('tf')
+from keras import regularizers
 from keras.layers import Dropout
 from keras.models import Sequential
 from keras.layers.core import Activation
@@ -41,6 +42,7 @@ from keras.layers import Input
 from keras.models import Model
 from custom_layers import AttnLossLayer
 from custom_layers import mse_kld_loss
+from experience_memory import ExperienceMemory
 from config_aa import *
 from sys import stdout
 
@@ -143,7 +145,8 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_3)
+                            recurrent_dropout=0.5,
+                            kernel_regularizer=regularizers.l1(0.001))(out_3)
     x = TimeDistributed(BatchNormalization())(convlstm_4)
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
@@ -154,7 +157,8 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_4)
+                            recurrent_dropout=0.5,
+                            kernel_regularizer=regularizers.l1(0.001))(out_4)
     x = TimeDistributed(BatchNormalization())(convlstm_5)
     predictions = TimeDistributed(Activation('tanh'))(x)
 
@@ -166,30 +170,34 @@ def decoder_model():
 def discriminator_model():
     inputs = Input(shape=(10, 128, 128, 3))
     conv_1 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(5, 5),
                                     strides=(1, 1),
                                     padding="same"))(inputs)
-    conv_1 = TimeDistributed(BatchNormalization)(conv_1)
+    # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
     conv_2 = TimeDistributed(Conv2D(filters=64,
+                                    kernel_size=(5, 5),
                                     strides=(2, 2),
                                     padding="same"))(conv_1)
-    conv_2 = TimeDistributed(BatchNormalization)(conv_2)
+    conv_2 = TimeDistributed(BatchNormalization())(conv_2)
     conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
     conv_3 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(5, 5),
                                     strides=(2, 2),
                                     padding="same"))(conv_2)
-    conv_3 = TimeDistributed(BatchNormalization)(conv_3)
+    conv_3 = TimeDistributed(BatchNormalization())(conv_3)
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
     conv_4 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(5, 5),
                                     strides=(2, 2),
                                     padding="same"))(conv_3)
-    conv_4 = TimeDistributed(BatchNormalization)(conv_4)
+    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
@@ -294,7 +302,8 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
         print (encoder.summary())
         print (decoder.summary())
         print (autoencoder.summary())
-        print (discriminator.summary())
+        if ADVERSARIAL:
+            print (discriminator.summary())
 
         # exit(0)
 
@@ -313,15 +322,17 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
         with open(os.path.join(MODEL_DIR, "autoencoder.json"), "w") as json_file:
             json_file.write(model_json)
 
-        model_json = discriminator.to_json()
-        with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
-            json_file.write(model_json)
+        if ADVERSARIAL:
+            model_json = discriminator.to_json()
+            with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+                json_file.write(model_json)
 
         if PLOT_MODEL:
             plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
             plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
             plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
-            plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+            if ADVERSARIAL:
+                plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")
@@ -329,9 +340,10 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
     if DEC_WEIGHTS != "None":
         print ("Pre-loading decoder with weights...")
         load_weights(DEC_WEIGHTS, decoder)
-    if DIS_WEIGHTS != "None":
-        print("Pre-loading decoder with weights...")
-        load_weights(DIS_WEIGHTS, discriminator)
+    if ADVERSARIAL:
+        if DIS_WEIGHTS != "None":
+            print("Pre-loading decoder with weights...")
+            load_weights(DIS_WEIGHTS, discriminator)
 
 
 def load_X(videos_list, index, data_dir):
@@ -381,16 +393,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     decoder = decoder_model()
 
     intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
-    generator_1 = Sequential()
-    generator_1.add(encoder)
-    generator_1.add(intermediate_decoder)
-    # discriminator = discriminator_model()
-    # aae = aae_model(generator, discriminator)
-
-    generator_1.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    # generator_2.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    # generator_3.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-    # generator_4.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+    mask_gen = Sequential()
+    mask_gen.add(encoder)
+    mask_gen.add(intermediate_decoder)
+    mask_gen.compile(loss='mean_squared_error', optimizer=OPTIM_G)
 
     autoencoder = autoencoder_model(encoder, decoder)
 
@@ -400,14 +406,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
         aae.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
         set_trainability(discriminator, True)
         discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
+        run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
+    else:
+        run_utilities(encoder, decoder, autoencoder, 'None', ENC_WEIGHTS, DEC_WEIGHTS, 'None')
 
-    # autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
-    # run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
-    run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
-
-    aae.compile(loss='binary_crossentropy', optimizer=OPTIM_A)
-    set_trainability(discriminator, True)
-    discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
     autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
 
 
@@ -465,32 +467,23 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
 
         print("\nAvg loss: " + str(avg_loss))
 
-        # Save model weights per epoch to file
-        predicted_attn_1 = generator_1.predict(X_train, verbose=0)
-        # predicted_attn_2 = generator_2.predict(X_train, verbose=0)
-        # predicted_attn_3 = generator_3.predict(X_train, verbose=0)
-        # predicted_attn_4 = generator_4.predict(X_train, verbose=0)
-
+        # Save predicted mask per epoch
+        predicted_attn_1 = mask_gen.predict(X_train, verbose=0)
         a_pred_1 = np.reshape(predicted_attn_1, newshape=(10, 10, 16, 16, 1))
-        # a_pred_2 = np.reshape(predicted_attn_2, newshape=(10, 10, 32, 32, 1))
-        # a_pred_3 = np.reshape(predicted_attn_3, newshape=(10, 10, 64, 64, 1))
-        # a_pred_4 = np.reshape(predicted_attn_4, newshape=(10, 10, 128, 128, 1))
-
         np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred_1)
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen2_' + str(epoch) + '.npy'), a_pred_2)
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen3_' + str(epoch) + '.npy'), a_pred_3)
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen4_' + str(epoch) + '.npy'), a_pred_4)
 
+        # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
     # Train AAE
     if ADVERSARIAL:
+        exp_memory = ExperienceMemory(memory_length=100)
         for epoch in range(NB_EPOCHS_AAE):
             print("\n\nEpoch ", epoch)
             g_loss = []
             d_loss = []
-            a_loss = []
+            # a_loss = []
 
             # # Set learning rate every epoch
             # LRS.on_epoch_begin(epoch=epoch)
@@ -503,14 +496,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
                 X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
                 y_train = X[:, int(VIDEO_LENGTH/2) :]
 
-                # Generate fake labels
-                generated_attn = generator.predict(X_train, verbose=0)
-                # Sample from prior
-                sampled_attn = np.random.normal(size=(BATCH_SIZE, 10*64*64*1), loc=0.5, scale=0.125)
-                sampled_attn = np.reshape(sampled_attn, newshape=(BATCH_SIZE, 10, 64, 64, 1))
+                future_images = autoencoder.predict(X_train, verbose=0)
+                trainable_fakes = exp_memory.get_trainable_fakes(current_gens=future_images, exp_window_size=5)
 
-                # Train Discriminator
-                X = np.concatenate((sampled_attn, generated_attn), axis=0)
+                # Train Discriminator on future images (y_train, not X_train)
+                X = np.concatenate((y_train, trainable_fakes))
                 y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.int),
                                     np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.int)), axis=0)
                 d_loss.append(discriminator.train_on_batch(X, y))
@@ -521,12 +511,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
                 g_loss.append(aae.train_on_batch(X_train, y))
                 set_trainability(discriminator, True)
 
-                # Train Autoencoder
-                a_loss.append(autoencoder.train_on_batch(X_train, y_train))
+                # # Train Autoencoder
+                # a_loss.append(autoencoder.train_on_batch(X_train, y_train))
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "a_loss: " + str(a_loss[len(a_loss)-1]) + "  " +
                              "g_loss: " + str(g_loss[len(g_loss) - 1]) + "  " +
                              "d_loss: " + str(d_loss[len(d_loss) - 1]) +
                              "\t    [" + "{0}>".format("="*(arrow)))
@@ -544,25 +533,22 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
                     cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_truth.png"), truth_image)
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_pred.png"), pred_image)
 
-                predicted_attn = generator.predict(X_train, verbose=0)
-                a_pred = np.reshape(predicted_attn, newshape=(10, 10, 64, 64, 1))
-                np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_aae_' + str(epoch) + '.npy'), a_pred)
-                orig_image, truth_image, pred_image = combine_images(X_train, y_train, predicted_attn)
-                pred_attn = pred_image * 127.5 + 127.5
-                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_attn.png"), pred_attn)
+                predicted_attn_1 = mask_gen.predict(X_train, verbose=0)
+                a_pred_1 = np.reshape(predicted_attn_1, newshape=(10, 10, 16, 16, 1))
+                np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred_1)
 
             # then after each epoch/iteration
-            avg_a_loss = sum(a_loss) / len(a_loss)
+            # avg_a_loss = sum(a_loss) / len(a_loss)
             avg_g_loss = sum(g_loss) / len(g_loss)
             avg_d_loss = sum(d_loss) / len(d_loss)
-            logs = {'a_loss': avg_a_loss, 'g_loss': avg_g_loss, 'd_loss': avg_d_loss}
+            logs = {'g_loss': avg_g_loss, 'd_loss': avg_d_loss}
             TC.on_epoch_end(epoch, logs)
 
             # Log the losses
             with open(os.path.join(LOG_DIR, 'losses_aae.json'), 'a') as log_file:
-                log_file.write("{\"epoch\":%d, \"d_loss\":%f};\n" % (epoch, avg_loss))
+                log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};\n" % (epoch, avg_g_loss, avg_d_loss))
 
-            print("\nAvg a_loss: " + str(avg_a_loss) + "  Avg g_loss: " + str(avg_g_loss) + "  Avg d_loss: " + str(avg_d_loss))
+            print("\nAvg g_loss: " + str(avg_g_loss) + "  Avg d_loss: " + str(avg_d_loss))
 
             # Save model weights per epoch to file
             encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_aae_epoch_'+str(epoch)+'.h5'), True)
