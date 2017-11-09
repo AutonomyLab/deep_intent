@@ -28,9 +28,9 @@ def plot_heatmap(attn_layer, epoch, vid_num):
                 frame = np.reshape(frame, data.shape[1:3])
 
                 plt.clf()
-                plt.imshow(frame, cmap='hot', interpolation='nearest')
-                # plt.colorbar()
+                plt.imshow(frame, cmap='binary', interpolation='nearest')
                 # plt.imshow(frame, cmap=cm.gray, interpolation='nearest')
+                plt.colorbar()
                 # plt.cbar_axes[1].colorbar()
                 plt.savefig(os.path.join(TEST_RESULTS_DIR, 'plot_' + gen_name + '_' + str(i) + '_' + str(j) + '.png'))
 
