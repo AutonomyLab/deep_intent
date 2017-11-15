@@ -60,7 +60,7 @@ VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
 ATTN_COEFF = 1
-KL_COEFF = 0
+KL_COEFF = 1
 CLASSIFIER = True
 BUF_SIZE = 10
 
@@ -73,10 +73,10 @@ NB_EPOCHS_AUTOENCODER = 0
 NB_EPOCHS_CLASS = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
-OPTIM_G = Adam(lr=0.001, beta_1=0.5)
-OPTIM_C = Adam(lr=0.00001, beta_1=0.5)
-# OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
-OPTIM_D = SGD(lr=0.000001, momentum=0.5, nesterov=True)
+OPTIM_C = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
+# OPTIM_D = SGD(lr=0.00001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step

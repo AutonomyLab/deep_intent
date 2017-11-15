@@ -207,7 +207,7 @@ def classifier_model():
 
     flat_1 = TimeDistributed(Flatten())(conv_4)
     dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
-    dense_2 = TimeDistributed(Dense(units=5, activation='sigmoid'))(dense_1)
+    dense_2 = TimeDistributed(Dense(units=6, activation='sigmoid'))(dense_1)
 
     model = Model(inputs=inputs, outputs=dense_2)
 
@@ -613,7 +613,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 y_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                 y_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                val_a_loss.append(autoencoder.train_on_batch(X_train, y_imgs))
+                val_a_loss.append(autoencoder.test_on_batch(X_train, y_imgs))
                 val_c_loss.append(action_predictor.test_on_batch(X_train, y_classes))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))

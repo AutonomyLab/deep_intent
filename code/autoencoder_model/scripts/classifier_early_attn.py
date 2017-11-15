@@ -155,8 +155,7 @@ def decoder_model():
                             return_sequences=True,
                             recurrent_dropout=0.5,
                             kernel_regularizer=regularizers.l1(0.001))(out_4)
-    x = TimeDistributed(BatchNormalization())(convlstm_5)
-    predictions = TimeDistributed(Activation('tanh'))(x)
+    predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
 
     model = Model(inputs=inputs, outputs=predictions)
 
@@ -165,45 +164,95 @@ def decoder_model():
 
 def classifier_model():
     inputs = Input(shape=(10, 128, 128, 3))
-    conv_1 = TimeDistributed(Conv2D(filters=32,
-                                    kernel_size=(5, 5),
-                                    strides=(2, 2),
-                                    padding="same"))(inputs)
+    conv_1 = ConvLSTM2D(filters=32,
+                        kernel_size=(5, 5),
+                        strides=(2, 2),
+                        padding="same",
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(inputs)
     # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
-    conv_2 = TimeDistributed(Conv2D(filters=64,
-                                    kernel_size=(5, 5),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_1)
+    conv_2 = ConvLSTM2D(filters=64,
+                        kernel_size=(5, 5),
+                        strides=(2, 2),
+                        padding="same",
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(conv_1)
     conv_2 = TimeDistributed(BatchNormalization())(conv_2)
     conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
-    conv_3 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(5, 5),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_2)
+    conv_3 = ConvLSTM2D(filters=128,
+                        kernel_size=(5, 5),
+                        strides=(2, 2),
+                        padding="same",
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(conv_2)
     conv_3 = TimeDistributed(BatchNormalization())(conv_3)
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
-    conv_4 = TimeDistributed(Conv2D(filters=256,
-                                    kernel_size=(5, 5),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_3)
+    conv_4 = ConvLSTM2D(filters=256,
+                        kernel_size=(5, 5),
+                        strides=(2, 2),
+                        padding="same",
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(conv_3)
     conv_4 = TimeDistributed(BatchNormalization())(conv_4)
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
     flat_1 = TimeDistributed(Flatten())(conv_4)
     dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
-    dense_2 = TimeDistributed(Dense(units=5, activation='sigmoid'))(dense_1)
+    dense_2 = TimeDistributed(Dense(units=6, activation='sigmoid'))(dense_1)
 
     model = Model(inputs=inputs, outputs=dense_2)
 
     return model
+
+
+    # inputs = Input(shape=(10, 128, 128, 3))
+    # conv_1 = TimeDistributed(Conv2D(filters=32,
+    #                                 kernel_size=(5, 5),
+    #                                 strides=(2, 2),
+    #                                 padding="same"))(inputs)
+    # # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
+    # conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
+    # conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
+    #
+    # conv_2 = TimeDistributed(Conv2D(filters=64,
+    #                                 kernel_size=(5, 5),
+    #                                 strides=(2, 2),
+    #                                 padding="same"))(conv_1)
+    # conv_2 = TimeDistributed(BatchNormalization())(conv_2)
+    # conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
+    # conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
+    #
+    # conv_3 = TimeDistributed(Conv2D(filters=128,
+    #                                 kernel_size=(5, 5),
+    #                                 strides=(2, 2),
+    #                                 padding="same"))(conv_2)
+    # conv_3 = TimeDistributed(BatchNormalization())(conv_3)
+    # conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
+    # conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
+    #
+    # conv_4 = TimeDistributed(Conv2D(filters=256,
+    #                                 kernel_size=(5, 5),
+    #                                 strides=(2, 2),
+    #                                 padding="same"))(conv_3)
+    # conv_4 = TimeDistributed(BatchNormalization())(conv_4)
+    # conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
+    # conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
+    #
+    # flat_1 = TimeDistributed(Flatten())(conv_4)
+    # dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
+    # dense_2 = TimeDistributed(Dense(units=6, activation='sigmoid'))(dense_1)
+    #
+    # model = Model(inputs=inputs, outputs=dense_2)
+    #
+    # return model
 
 
 def set_trainability(model, trainable):
@@ -220,16 +269,17 @@ def autoencoder_model(encoder, decoder):
 
 
 def action_model(autoencoder, classifier):
-    model = Sequential()
-    model.add(autoencoder)
-    # set_trainability(discriminator, False)
-    model.add(classifier)
+    # model = Sequential()
+    # model.add(autoencoder)
+    # set_trainability(classifier, False)
+    # model.add(classifier)
 
-    # inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
-    # images = autoencoder(inputs)
-    # predictions = classifier(images)
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
+    images = autoencoder(inputs)
+    set_trainability(classifier, False)
+    predictions = classifier(images)
 
-    # model = Model(inputs=inputs, outputs=[images, predictions])
+    model = Model(inputs=inputs, outputs=[images, predictions])
 
     return model
 
@@ -401,7 +451,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         videos_list = np.random.permutation(videos_list)
 
     # Load labesl into categorical 1-hot vectors
-    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
+    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
     print ("Loading annotations...")
     action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
     action_nums = []
@@ -457,13 +507,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     classifier = classifier_model()
     action_predictor = action_model(autoencoder, classifier)
-    # action_predictor.compile(loss=['mse', 'categorical_crossentropy'], optimizer=OPTIM_C, metrics=['accuracy'])
-    action_predictor.compile(loss=['categorical_crossentropy'], optimizer=OPTIM_C, metrics=['accuracy'])
+    action_predictor.compile(loss=['mae', 'categorical_crossentropy'], optimizer=OPTIM_G, metrics=['accuracy'])
+    # action_predictor.compile(loss='categorical_crossentropy', optimizer=OPTIM_C, metrics=['accuracy'])
+    set_trainability(classifier, True)
+    classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
     run_utilities(encoder, decoder, action_predictor, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
     print (action_predictor.summary())
 
     autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
-
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
@@ -473,6 +524,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
     LRS.set_model(autoencoder)
+
 
     print ("Beginning Training...")
     # Begin Training
@@ -552,6 +604,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     # Train AAE
     if CLASSIFIER:
         print ("Training Classifier...")
+        # Setup fake labels
+        y_fake_classes = []
+        for k in range(BATCH_SIZE):
+            class_nums = (len(actions) - 1) * np.ones(shape=(int(VIDEO_LENGTH / 2), 1), dtype=np.float32)
+            y_fake_classes.append(to_categorical(class_nums, len(actions)))
+
+        y_fake_classes = np.asarray(y_fake_classes)
+
         for epoch in range(NB_EPOCHS_CLASS):
             print("\n\nEpoch ", epoch)
             c_loss = []
@@ -563,30 +623,40 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             # LRS.on_epoch_begin(epoch=epoch)
             lr = K.get_value(autoencoder.optimizer.lr)
             print ("Learning rate: " + str(lr))
+            print ("a_loss_metrics: " + str(action_predictor.metrics_names))
+            print ("c_loss_metrics: " + str(classifier.metrics_names))
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
                 X, y = load_X_y(videos_list, index, DATA_DIR, action_cats)
                 X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-                y_classes = y[:, 0 : int(VIDEO_LENGTH/2)]
-                y_imgs = X[:, int(VIDEO_LENGTH/2) :]
+                y_true_imgs = X[:, int(VIDEO_LENGTH/2) :]
+                y_true_classes = y[:, 0 : int(VIDEO_LENGTH/2)]
                 # y_train = [y_imgs, y_classes]
 
-                a_loss.append(autoencoder.train_on_batch(X_train, y_imgs))
-                c_loss.append(action_predictor.train_on_batch(X_train, y_classes))
+                # Train classifier
+                y_fake_imgs = autoencoder.predict(X_train, verbose=0)
+
+                X = np.concatenate((y_true_imgs, y_fake_imgs), axis=0)
+                y = np.concatenate((y_true_classes, y_fake_classes), axis=0)
+                c_loss.append(classifier.train_on_batch(X, y))
+
+                # Train action_predictor
+                set_trainability(classifier, False)
+                a_loss.append(action_predictor.train_on_batch(X_train, [y_true_imgs, y_true_classes]))
+                set_trainability(classifier, True)
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "a_loss: " + str(a_loss[len(a_loss) - 1]) + "  " +
-                             "c_loss: " + str(c_loss[len(c_loss) - 1][0]) + "  " +
-                             "acc: " + str(c_loss[len(c_loss) - 1][1]) +
+                             "a_loss: " + str(a_loss[len(a_loss) - 1][0]) + "  " +
+                             "c_loss: " + str(c_loss[len(c_loss) - 1]) + "  " +
                              "\t    [" + "{0}>".format("="*(arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
                 predicted_images = autoencoder.predict(X_train, verbose=0)
-                orig_image, truth_image, pred_image = combine_images(X_train, y_imgs, predicted_images)
+                orig_image, truth_image, pred_image = combine_images(X_train, y_true_imgs, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
@@ -604,14 +674,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 y_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                 y_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                val_a_loss.append(autoencoder.train_on_batch(X_train, y_imgs))
-                val_c_loss.append(action_predictor.test_on_batch(X_train, y_classes))
+                val_c_loss.append(classifier.test_on_batch(X_train, y_classes))
+                val_a_loss.append(action_predictor.test_on_batch(X_train, [y_imgs, y_classes]))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                             "val_a_loss: " + str(val_a_loss[len(val_a_loss) - 1]) + "  " +
-                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1][0]) + "  " +
-                             "val_acc: " + str(c_loss[len(c_loss) - 1][1]))
+                             "val_a_loss: " + str(val_a_loss[len(val_a_loss) - 1][0]) + "  " +
+                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1]) )
                 stdout.flush()
 
 
@@ -619,29 +688,37 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             a_pred = np.reshape(predicted_attn, newshape=(10, 10, 16, 16, 1))
             np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
 
-            # predicted_attn = mask_gen_2.predict(X_train, verbose=0)
-            # a_pred = np.reshape(predicted_attn, newshape=(10, 10, 128, 128, 1))
-            # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_cla_gen2_' + str(epoch) + '.npy'), a_pred)
-
             # then after each epoch/iteration
-            avg_c_loss = sum(np.asarray(c_loss))[0] / len(c_loss)
-            avg_val_c_loss = sum(np.asarray(val_c_loss))[0] / len(val_c_loss)
-            avg_val_c_acc = sum(np.asarray(val_c_loss))[1] / len(val_c_loss)
-            avg_a_loss = sum(a_loss) / len(a_loss)
-            avg_val_a_loss = sum(val_a_loss) / len(val_a_loss)
-            logs = {'c_loss': avg_c_loss, 'val_c_loss': avg_val_c_loss, 'val_c_acc': avg_val_c_acc,
-                    'a_loss': avg_a_loss, 'val_a_loss': avg_val_a_loss}
+            avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
+            avg_val_c_loss = np.mean(np.asarray(val_c_loss, dtype=np.float32), axis=0)
+            avg_a_loss = np.mean(np.asarray(a_loss, dtype=np.float32), axis=0)
+            avg_val_a_loss = np.mean(np.asarray(val_a_loss, dtype=np.float32), axis=0)
+
+            loss_values = np.asarray(avg_c_loss.tolist() + avg_val_c_loss.tolist() \
+                          + avg_a_loss.tolist() + avg_val_a_loss.tolist(), dtype=np.float32)
+            c_loss_keys = ['c_' + metric for metric in classifier.metrics_names]
+            a_loss_keys = ['a_' + metric for metric in action_predictor.metrics_names]
+            val_c_loss_keys = ['c_val_' + metric for metric in classifier.metrics_names]
+            val_a_loss_keys = ['a_val_' + metric for metric in action_predictor.metrics_names]
+
+            loss_keys = c_loss_keys + val_c_loss_keys + \
+                        a_loss_keys + val_a_loss_keys
+            logs = dict(zip(loss_keys, loss_values))
+
+            # logs = {'c_loss': avg_c_loss[0], 'val_c_loss': avg_val_c_loss[0],
+            #         'a_loss': avg_a_loss[0], 'val_a_loss': avg_val_a_loss[0]}
+            # print (str(logs))
+            # print(type(logs['a_loss']))
             TC.on_epoch_end(epoch, logs)
 
             # Log the losses
             with open(os.path.join(LOG_DIR, 'losses_aae.json'), 'a') as log_file:
-                log_file.write("{\"epoch\":%d, \"c_loss\":%f};\n" % (epoch, avg_c_loss))
+                log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
 
             print("\nAvg c_loss: " + str(avg_c_loss) +
-                  " val_c_loss: " + str(avg_val_c_loss) +
-                  " val_c_acc: " + str(avg_val_c_acc) +
-                  " a_loss: " + str(avg_a_loss) +
-                  " val_a_loss: " + str(avg_val_a_loss))
+                  " Avg val_c_loss: " + str(avg_val_c_loss) +
+                  "\nAvg a_loss: " + str(avg_a_loss[0]) +
+                  " Avg val_a_loss: " + str(avg_val_a_loss[0]))
 
             # Save model weights per epoch to file
             encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_'+str(epoch)+'.h5'), True)

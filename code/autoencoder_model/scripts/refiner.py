@@ -91,11 +91,6 @@ def encoder_model():
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 32))
 
-    # conv_1 = Conv3DTranspose(filters=64,
-    #                          kernel_size=(3, 5, 5),
-    #                          padding='same',
-    #                          strides=(1, 1, 1))(inputs)
-
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
@@ -167,18 +162,19 @@ def decoder_model():
     return model
 
 
-def discriminator_model():
+def refiner_g_model():
     inputs = Input(shape=(10, 128, 128, 3))
+    enc_inputs = Input(shape=(10, 128, 128, 32))
     conv_1 = TimeDistributed(Conv2D(filters=32,
-                                    kernel_size=(5, 5),
-                                    strides=(1, 1),
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
                                     padding="same"))(inputs)
-    # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
+    conv_1 = TimeDistributed(BatchNormalization())(conv_1)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
     conv_2 = TimeDistributed(Conv2D(filters=64,
-                                    kernel_size=(5, 5),
+                                    kernel_size=(3, 3),
                                     strides=(2, 2),
                                     padding="same"))(conv_1)
     conv_2 = TimeDistributed(BatchNormalization())(conv_2)
@@ -186,7 +182,7 @@ def discriminator_model():
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
     conv_3 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(5, 5),
+                                    kernel_size=(3, 3),
                                     strides=(2, 2),
                                     padding="same"))(conv_2)
     conv_3 = TimeDistributed(BatchNormalization())(conv_3)
@@ -194,6 +190,42 @@ def discriminator_model():
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
     conv_4 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(enc_inputs)
+    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
+    conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
+    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
+
+    enc_2 = concatenate([conv_3, conv_4])
+    model = Model(inputs=inputs, outputs=enc_2)
+
+    inputs = Input(shape=(10, 128, 128, 128))
+    conv_1 = TimeDistributed(Conv2DTranspose(filters=128,
+                                             kernel_size=(3, 3),
+                                             strides=(1, 1),
+                                             padding="same"))(inputs)
+    # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
+    conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
+    conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
+
+    conv_2 = TimeDistributed(Conv2D(filters=64,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_1)
+    conv_2 = TimeDistributed(BatchNormalization())(conv_2)
+    conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
+    conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
+
+    conv_3 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(5, 5),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_2)
+    conv_3 = TimeDistributed(BatchNormalization())(conv_3)
+    conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
+    conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
+
+    conv_4 = TimeDistributed(Conv2D(filters=16,
                                     kernel_size=(5, 5),
                                     strides=(2, 2),
                                     padding="same"))(conv_3)
@@ -201,13 +233,19 @@ def discriminator_model():
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
-    flat_1 = TimeDistributed(Flatten())(conv_4)
-    dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
-    dense_2 = TimeDistributed(Dense(units=1, activation='sigmoid'))(dense_1)
+    conv_5 = TimeDistributed(Conv2D(filters=3,
+                                    kernel_size=(5, 5),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_4)
+    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
+    conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
+    conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
 
-    model = Model(inputs=inputs, outputs=dense_2)
+    model = Model(inputs=inputs, outputs=conv_5)
 
     return model
+
+def refiner_d_model():
 
 
 def set_trainability(model, trainable):
