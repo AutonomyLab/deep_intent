@@ -44,7 +44,7 @@ from keras.models import Model
 from custom_layers import AttnLossLayer
 from custom_layers import mse_kld_loss
 from experience_memory import ExperienceMemory
-from config_ca import *
+from config_rec import *
 from sys import stdout
 
 import tb_callback
@@ -59,29 +59,51 @@ def encoder_model():
     model = Sequential()
 
     # 10x128x128
-    model.add(Conv3D(filters=128,
-                     strides=(1, 4, 4),
-                     kernel_size=(3, 11, 11),
-                     padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+    # model.add(Conv3D(filters=128,
+    #                  strides=(1, 4, 4),
+    #                  kernel_size=(3, 11, 11),
+    #                  padding='same',
+    #                  input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+    model.add(ConvLSTM2D(filters=128,
+                         kernel_size=(7, 7),
+                         strides=(4, 4),
+                         padding='same',
+                         return_sequences=True,
+                         recurrent_dropout=0.5,
+                         kernel_regularizer=regularizers.l1(0.001),
+                         input_shape=(int(VIDEO_LENGTH / 2), 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x32x32
-    model.add(Conv3D(filters=64,
-                     strides=(1, 2, 2),
-                     kernel_size=(3, 5, 5),
-                     padding='same'))
+    # model.add(Conv3D(filters=64,
+    #                  strides=(1, 2, 2),
+    #                  kernel_size=(3, 5, 5),
+    #                  padding='same'))
+    model.add(ConvLSTM2D(filters=64,
+                         kernel_size=(5, 5),
+                         strides=(2, 2),
+                         padding='same',
+                         return_sequences=True,
+                         recurrent_dropout=0.5,
+                         kernel_regularizer=regularizers.l1(0.001)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x16x16
-    model.add(Conv3D(filters=32,
-                     strides=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
-                     padding='same'))
+    # model.add(Conv3D(filters=32,
+    #                  strides=(1, 1, 1),
+    #                  kernel_size=(3, 5, 5),
+    #                  padding='same'))
+    model.add(ConvLSTM2D(filters=32,
+                         kernel_size=(3, 3),
+                         strides=(1, 1),
+                         padding='same',
+                         return_sequences=True,
+                         recurrent_dropout=0.5,
+                         kernel_regularizer=regularizers.l1(0.001)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
@@ -98,28 +120,19 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(inputs)
+                            recurrent_dropout=0.5,
+                            kernel_regularizer=regularizers.l1(0.001))(inputs)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
-
-    flat_1 = TimeDistributed(Flatten())(out_1)
-    aclstm_1 = GRU(units=16 * 16,
-                   activation='tanh',
-                   recurrent_dropout=0.5,
-                   return_sequences=True)(flat_1)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
-    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
-    a1 = AttnLossLayer()(a1_reshape)
-    dot_1 = multiply([out_1, a1])
 
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_1)
+                            recurrent_dropout=0.5,
+                            kernel_regularizer=regularizers.l1(0.001))(out_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
@@ -130,7 +143,8 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_2)
+                            recurrent_dropout=0.5,
+                            kernel_regularizer=regularizers.l1(0.001))(out_2)
     x = TimeDistributed(BatchNormalization())(convlstm_3)
     h_3 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
@@ -155,8 +169,7 @@ def decoder_model():
                             return_sequences=True,
                             recurrent_dropout=0.5,
                             kernel_regularizer=regularizers.l1(0.001))(out_4)
-    x = TimeDistributed(BatchNormalization())(convlstm_5)
-    predictions = TimeDistributed(Activation('tanh'))(x)
+    predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
 
     model = Model(inputs=inputs, outputs=predictions)
 
@@ -166,41 +179,44 @@ def decoder_model():
 def classifier_model():
     inputs = Input(shape=(10, 128, 128, 3))
     conv_1 = ConvLSTM2D(filters=32,
-                        kernel_size=(5, 5),
+                        kernel_size=(3, 3),
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5)(inputs)
-    # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
+                        recurrent_dropout=0.5,
+                        kernel_regularizer=regularizers.l1(0.001))(inputs)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
     conv_2 = ConvLSTM2D(filters=64,
-                        kernel_size=(5, 5),
+                        kernel_size=(3, 3),
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5)(conv_1)
+                        recurrent_dropout=0.5,
+                        kernel_regularizer=regularizers.l1(0.001))(conv_1)
     conv_2 = TimeDistributed(BatchNormalization())(conv_2)
     conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
     conv_3 = ConvLSTM2D(filters=128,
-                        kernel_size=(5, 5),
+                        kernel_size=(3, 3),
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5)(conv_2)
+                        recurrent_dropout=0.5,
+                        kernel_regularizer=regularizers.l1(0.001))(conv_2)
     conv_3 = TimeDistributed(BatchNormalization())(conv_3)
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
     conv_4 = ConvLSTM2D(filters=256,
-                        kernel_size=(5, 5),
+                        kernel_size=(3, 3),
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5)(conv_3)
+                        recurrent_dropout=0.5,
+                        kernel_regularizer=regularizers.l1(0.001))(conv_3)
     conv_4 = TimeDistributed(BatchNormalization())(conv_4)
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
@@ -228,16 +244,12 @@ def autoencoder_model(encoder, decoder):
 
 
 def action_model(autoencoder, classifier):
-    model = Sequential()
-    model.add(autoencoder)
-    # set_trainability(discriminator, False)
-    model.add(classifier)
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
+    images = autoencoder(inputs)
+    set_trainability(classifier, False)
+    predictions = classifier(images)
 
-    # inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
-    # images = autoencoder(inputs)
-    # predictions = classifier(images)
-
-    # model = Model(inputs=inputs, outputs=[images, predictions])
+    model = Model(inputs=inputs, outputs=[images, predictions])
 
     return model
 
@@ -310,10 +322,14 @@ def load_weights(weights_file, model):
 def run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 # def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
+        print ("Encoder:")
         print (encoder.summary())
+        print ("Decoder:")
         print (decoder.summary())
+        print ("Autoencoder:")
         print (autoencoder.summary())
         if CLASSIFIER:
+            print("Classifier:")
             print (classifier.summary())
 
         # exit(0)
@@ -409,7 +425,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         videos_list = np.random.permutation(videos_list)
 
     # Load labesl into categorical 1-hot vectors
-    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
+    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
     print ("Loading annotations...")
     action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
     action_nums = []
@@ -455,33 +471,32 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     mask_gen_1.add(intermediate_decoder)
     mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_G)
 
-    # intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[30].output)
-    # mask_gen_2 = Sequential()
-    # mask_gen_2.add(encoder)
-    # mask_gen_2.add(intermediate_decoder)
-    # mask_gen_2.compile(loss='mean_squared_error', optimizer=OPTIM_G)
-
     autoencoder = autoencoder_model(encoder, decoder)
 
     classifier = classifier_model()
     action_predictor = action_model(autoencoder, classifier)
-    # action_predictor.compile(loss=['mse', 'categorical_crossentropy'], optimizer=OPTIM_C, metrics=['accuracy'])
-    action_predictor.compile(loss=['categorical_crossentropy'], optimizer=OPTIM_C, metrics=['accuracy'])
-    run_utilities(encoder, decoder, action_predictor, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
-    print (action_predictor.summary())
+    action_predictor.compile(loss=['mae', 'categorical_crossentropy'],
+                             loss_weights=LOSS_WEIGHTS,
+                             optimizer=OPTIM_G,
+                             metrics=['accuracy'])
+
+    set_trainability(classifier, True)
+    classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
+    run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
 
     autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
 
-    NB_ITERATIONS = int(n_videos / BATCH_SIZE)
+    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
-    NB_VAL_ITERATIONS = int(n_val_videos / BATCH_SIZE)
+    NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
     LRS.set_model(autoencoder)
 
-    print("Beginning Training...")
+
+    print ("Beginning Training...")
     # Begin Training
     for epoch in range(NB_EPOCHS_AUTOENCODER):
         print("\n\nEpoch ", epoch)
@@ -491,19 +506,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Set learning rate every epoch
         LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
-        print("Learning rate: " + str(lr))
+        print ("Learning rate: " + str(lr))
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X, y = load_X_y(videos_list, index, DATA_DIR, [])
-            X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-            y_train = X[:, int(VIDEO_LENGTH / 2):]
+            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
-            stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                         "loss: " + str(loss[len(loss) - 1]) +
-                         "\t    [" + "{0}>".format("=" * (arrow)))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
+                         "loss: " + str(loss[len(loss)-1]) +
+                         "\t    [" + "{0}>".format("="*(arrow)))
             stdout.flush()
 
         if SAVE_GENERATED_IMAGES:
@@ -513,7 +528,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             pred_image = pred_image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
             truth_image = truth_image * 127.5 + 127.5
-            if epoch == 0:
+            if epoch == 0 :
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_image)
@@ -521,20 +536,20 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):
             X, y = load_X_y(val_videos_list, index, DATA_DIR, [])
-            X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-            y_train = X[:, int(VIDEO_LENGTH / 2):]
+            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            y_train = X[:, int(VIDEO_LENGTH/2) :]
             val_loss.append(autoencoder.test_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))
-            stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                         "val_loss: " + str(val_loss[len(val_loss) - 1]) +
-                         "\t    [" + "{0}>".format("=" * (arrow)))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS-1) + "  " +
+                         "val_loss: " + str(val_loss[len(val_loss)-1]) +
+                         "\t    [" + "{0}>".format("="*(arrow)))
             stdout.flush()
 
         # then after each epoch/iteration
-        avg_loss = sum(loss) / len(loss)
+        avg_loss = sum(loss)/len(loss)
         avg_val_loss = sum(val_loss) / len(val_loss)
-        logs = {'loss': avg_loss, 'val_loss': avg_val_loss}
+        logs = {'loss': avg_loss, 'val_loss' : avg_val_loss}
         TC.on_epoch_end(epoch, logs)
 
         # Log the losses
@@ -558,7 +573,15 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Train AAE
     if CLASSIFIER:
-        print("Training Classifier...")
+        print ("Training Classifier...")
+        # Setup fake labels
+        y_fake_classes = []
+        for k in range(BATCH_SIZE):
+            class_nums = (len(actions) - 1) * np.ones(shape=(int(VIDEO_LENGTH / 2), 1), dtype=np.float32)
+            y_fake_classes.append(to_categorical(class_nums, len(actions)))
+
+        y_fake_classes = np.asarray(y_fake_classes)
+
         for epoch in range(NB_EPOCHS_CLASS):
             print("\n\nEpoch ", epoch)
             c_loss = []
@@ -569,90 +592,120 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             # # Set learning rate every epoch
             # LRS.on_epoch_begin(epoch=epoch)
             lr = K.get_value(autoencoder.optimizer.lr)
-            print("Learning rate: " + str(lr))
+            print ("Learning rate: " + str(lr))
+            print ("a_loss_metrics: " + str(action_predictor.metrics_names))
+            print ("c_loss_metrics: " + str(classifier.metrics_names))
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
                 X, y = load_X_y(videos_list, index, DATA_DIR, action_cats)
-                X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-                y_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
-                y_imgs = X[:, int(VIDEO_LENGTH / 2):]
-                # y_train = [y_imgs, y_classes]
+                X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+                y_true_imgs = X[:, int(VIDEO_LENGTH/2) :]
+                y_true_classes = y[:, int(VIDEO_LENGTH/2) :]
 
-                a_loss.append(autoencoder.train_on_batch(X_train, y_imgs))
-                c_loss.append(action_predictor.train_on_batch(X_train, y_classes))
+                # Train classifier
+                y_fake_imgs = autoencoder.predict(X_train, verbose=0)
+
+                X = np.concatenate((y_true_imgs, y_fake_imgs), axis=0)
+                y = np.concatenate((y_true_classes, y_fake_classes), axis=0)
+                c_loss.append(classifier.train_on_batch(X, y))
+
+                # Train action_predictor
+                set_trainability(classifier, False)
+                a_loss.append(action_predictor.train_on_batch(X_train, [y_true_imgs, y_true_classes]))
+                set_trainability(classifier, True)
 
                 arrow = int(index / (NB_ITERATIONS / 30))
-                stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                             "a_loss: " + str(a_loss[len(a_loss) - 1]) + "  " +
-                             "c_loss: " + str(c_loss[len(c_loss) - 1][0]) + "  " +
-                             "acc: " + str(c_loss[len(c_loss) - 1][1]) +
-                             "\t    [" + "{0}>".format("=" * (arrow)))
+                stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
+                             "a_loss: " + str(a_loss[len(a_loss) - 1][0]) + "  " +
+                             "c_loss: " + str(c_loss[len(c_loss) - 1]) + "  " +
+                             "\t    [" + "{0}>".format("="*(arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
-                predicted_images = autoencoder.predict(X_train, verbose=0)
-                orig_image, truth_image, pred_image = combine_images(X_train, y_imgs, predicted_images)
+                predicted_images, predicted_classes = action_predictor.predict(X_train, verbose=0)
+                orig_image, truth_image, pred_image = combine_images(X_train, y_true_imgs, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
-                if epoch == 0:
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_orig.png"),
-                                orig_image)
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_truth.png"),
-                                truth_image)
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                if epoch == 0 :
+                    y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
+                    # Add labels as text to the image
+                    for k in range(BATCH_SIZE):
+                        for j in range(int(VIDEO_LENGTH/2)):
+                            class_num_past = np.argmax(y_orig_classes[k, j])
+                            class_num_futr = np.argmax(y_true_classes[k, j])
+                            cv2.putText(orig_image, actions[class_num_past],
+                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                            cv2.putText(truth_image, actions[class_num_futr],
+                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                                             "_cla_orig.png"), orig_image)
+                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                                             "_cla_truth.png"), truth_image)
+
+                # Add labels as text to the image
+                for k in range(BATCH_SIZE):
+                    for j in range(int(VIDEO_LENGTH / 2)):
+                        class_num = np.argmax(predicted_classes[k, j])
+                        cv2.putText(pred_image, actions[class_num],
+                                    (2 + j * (128), 120 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"), pred_image)
 
             # Run over validation data
-            print('')
+            print ('')
             for index in range(NB_VAL_ITERATIONS):
-                # y_train = [y_imgs, y_classes]
                 X, y = load_X_y(val_videos_list, index, DATA_DIR, val_action_cats)
                 X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
                 y_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                 y_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                val_a_loss.append(autoencoder.test_on_batch(X_train, y_imgs))
-                val_c_loss.append(action_predictor.test_on_batch(X_train, y_classes))
+                val_c_loss.append(classifier.test_on_batch(X_train, y_classes))
+                val_a_loss.append(action_predictor.test_on_batch(X_train, [y_imgs, y_classes]))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                             "val_a_loss: " + str(val_a_loss[len(val_a_loss) - 1]) + "  " +
-                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1][0]) + "  " +
-                             "val_acc: " + str(c_loss[len(c_loss) - 1][1]))
+                             "val_a_loss: " + str(val_a_loss[len(val_a_loss) - 1][0]) + "  " +
+                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1]) )
                 stdout.flush()
+
 
             predicted_attn = mask_gen_1.predict(X_train, verbose=0)
             a_pred = np.reshape(predicted_attn, newshape=(10, 10, 16, 16, 1))
-            np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
-
-            # predicted_attn = mask_gen_2.predict(X_train, verbose=0)
-            # a_pred = np.reshape(predicted_attn, newshape=(10, 10, 128, 128, 1))
-            # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_cla_gen2_' + str(epoch) + '.npy'), a_pred)
+            np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
 
             # then after each epoch/iteration
-            avg_c_loss = sum(np.asarray(c_loss))[0] / len(c_loss)
-            avg_val_c_loss = sum(np.asarray(val_c_loss))[0] / len(val_c_loss)
-            avg_val_c_acc = sum(np.asarray(val_c_loss))[1] / len(val_c_loss)
-            avg_a_loss = sum(a_loss) / len(a_loss)
-            avg_val_a_loss = sum(val_a_loss) / len(val_a_loss)
-            logs = {'c_loss': avg_c_loss, 'val_c_loss': avg_val_c_loss, 'val_c_acc': avg_val_c_acc,
-                    'a_loss': avg_a_loss, 'val_a_loss': avg_val_a_loss}
+            avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
+            avg_val_c_loss = np.mean(np.asarray(val_c_loss, dtype=np.float32), axis=0)
+            avg_a_loss = np.mean(np.asarray(a_loss, dtype=np.float32), axis=0)
+            avg_val_a_loss = np.mean(np.asarray(val_a_loss, dtype=np.float32), axis=0)
+
+            loss_values = np.asarray(avg_c_loss.tolist() + avg_val_c_loss.tolist() \
+                          + avg_a_loss.tolist() + avg_val_a_loss.tolist(), dtype=np.float32)
+            c_loss_keys = ['c_' + metric for metric in classifier.metrics_names]
+            a_loss_keys = ['a_' + metric for metric in action_predictor.metrics_names]
+            val_c_loss_keys = ['c_val_' + metric for metric in classifier.metrics_names]
+            val_a_loss_keys = ['a_val_' + metric for metric in action_predictor.metrics_names]
+
+            loss_keys = c_loss_keys + val_c_loss_keys + \
+                        a_loss_keys + val_a_loss_keys
+            logs = dict(zip(loss_keys, loss_values))
+
             TC.on_epoch_end(epoch, logs)
 
             # Log the losses
             with open(os.path.join(LOG_DIR, 'losses_aae.json'), 'a') as log_file:
-                log_file.write("{\"epoch\":%d, \"c_loss\":%f};\n" % (epoch, avg_c_loss))
+                log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
 
             print("\nAvg c_loss: " + str(avg_c_loss) +
-                  " val_c_loss: " + str(avg_val_c_loss) +
-                  " val_c_acc: " + str(avg_val_c_acc) +
-                  " a_loss: " + str(avg_a_loss) +
-                  " val_a_loss: " + str(avg_val_a_loss))
+                  " Avg val_c_loss: " + str(avg_val_c_loss) +
+                  "\nAvg a_loss: " + str(avg_a_loss[0]) +
+                  " Avg val_a_loss: " + str(avg_val_a_loss[0]))
 
             # Save model weights per epoch to file
-            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_' + str(epoch) + '.h5'), True)
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_'+str(epoch)+'.h5'), True)
             decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_cla_epoch_' + str(epoch) + '.h5'), True)
             classifier.save_weights(os.path.join(CHECKPOINT_DIR, 'classifier_cla_epoch_' + str(epoch) + '.h5'), True)
 

@@ -23,6 +23,8 @@ else:
 DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
+HD_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_256/train/'
+
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 
 MODEL_DIR = './../' + path_var + 'models'
@@ -67,13 +69,13 @@ BUF_SIZE = 10
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 0
+NB_EPOCHS_AUTOENCODER = 10
 NB_EPOCHS_AAE = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
-# OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
-OPTIM_D = SGD(lr=0.000001, momentum=0.5, nesterov=True)
+OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
+# OPTIM_D = SGD(lr=0.000001, momentum=0.5, nesterov=True)
 # OPTIM = rmsprop(lr=0.00001)
 
 lr_schedule = [10, 20, 30]  # epoch_step

@@ -102,23 +102,12 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    flat_1 = TimeDistributed(Flatten())(out_1)
-    aclstm_1 = GRU(units=16 * 16,
-                   activation='tanh',
-                   recurrent_dropout=0.5,
-                   return_sequences=True)(flat_1)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
-    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
-    a1 = AttnLossLayer()(a1_reshape)
-    dot_1 = multiply([out_1, a1])
-
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_1)
+                            recurrent_dropout=0.5)(out_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
@@ -198,13 +187,59 @@ def refiner_g_model():
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
     enc_2 = concatenate([conv_3, conv_4])
-    model = Model(inputs=inputs, outputs=enc_2)
 
-    inputs = Input(shape=(10, 128, 128, 128))
-    conv_1 = TimeDistributed(Conv2DTranspose(filters=128,
+    # Decoder stage 2
+    conv_5 = TimeDistributed(Conv2DTranspose(filters=128,
                                              kernel_size=(3, 3),
                                              strides=(1, 1),
-                                             padding="same"))(inputs)
+                                             padding="same"))(enc_2)
+    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
+    conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
+    conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
+
+    conv_6 = TimeDistributed(Conv2DTranspose(filters=64,
+                                             kernel_size=(3, 3),
+                                             strides=(2, 2),
+                                             padding="same"))(conv_5)
+    conv_6 = TimeDistributed(BatchNormalization())(conv_6)
+    conv_6 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_6)
+    conv_6 = TimeDistributed(Dropout(0.5))(conv_6)
+
+    conv_7 = TimeDistributed(Conv2DTranspose(filters=32,
+                                             kernel_size=(5, 5),
+                                             strides=(2, 2),
+                                             padding="same"))(conv_6)
+    conv_7 = TimeDistributed(BatchNormalization())(conv_7)
+    conv_7 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_7)
+    conv_7 = TimeDistributed(Dropout(0.5))(conv_7)
+
+    conv_8 = TimeDistributed(Conv2DTranspose(filters=16,
+                                             kernel_size=(5, 5),
+                                             strides=(2, 2),
+                                             padding="same"))(conv_7)
+    conv_8 = TimeDistributed(BatchNormalization())(conv_8)
+    conv_8 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_8)
+    conv_8 = TimeDistributed(Dropout(0.5))(conv_8)
+
+    conv_9 = TimeDistributed(Conv2DTranspose(filters=3,
+                                             kernel_size=(5, 5),
+                                             strides=(2, 2),
+                                             padding="same"))(conv_8)
+    # conv_5 = TimeDistributed(BatchNormalization())(conv_5)
+    conv_9 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_9)
+    conv_9 = TimeDistributed(Dropout(0.5))(conv_9)
+
+    model = Model(inputs=inputs, outputs=conv_9)
+
+    return model
+
+def refiner_d_model():
+
+    inputs = Input(shape=(10, 256, 256, 3))
+    conv_1 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(inputs)
     # conv_1 = TimeDistributed(BatchNormalization())(conv_1)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
@@ -217,35 +252,29 @@ def refiner_g_model():
     conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
 
-    conv_3 = TimeDistributed(Conv2D(filters=32,
-                                    kernel_size=(5, 5),
+    conv_3 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
                                     strides=(2, 2),
                                     padding="same"))(conv_2)
     conv_3 = TimeDistributed(BatchNormalization())(conv_3)
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
-    conv_4 = TimeDistributed(Conv2D(filters=16,
-                                    kernel_size=(5, 5),
+    conv_4 = TimeDistributed(Conv2D(filters=256,
+                                    kernel_size=(3, 3),
                                     strides=(2, 2),
                                     padding="same"))(conv_3)
     conv_4 = TimeDistributed(BatchNormalization())(conv_4)
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
-    conv_5 = TimeDistributed(Conv2D(filters=3,
-                                    kernel_size=(5, 5),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_4)
-    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
-    conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
-    conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
+    flat_1 = TimeDistributed(Flatten())(conv_4)
+    dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
+    dense_2 = TimeDistributed(Dense(units=1, activation='sigmoid'))(dense_1)
 
-    model = Model(inputs=inputs, outputs=conv_5)
+    model = Model(inputs=inputs, outputs=dense_2)
 
     return model
-
-def refiner_d_model():
 
 
 def set_trainability(model, trainable):
@@ -261,8 +290,10 @@ def autoencoder_model(encoder, decoder):
     return model
 
 
-def aae_model(generator, discriminator):
+def gan_model(autoencoder, generator, discriminator):
     model = Sequential()
+    set_trainability(autoencoder, False)
+    model.add(autoencoder)
     model.add(generator)
     set_trainability(discriminator, False)
     model.add(discriminator)
@@ -334,15 +365,17 @@ def combine_images(X, y, generated_images):
 def load_weights(weights_file, model):
     model.load_weights(weights_file)
 
-def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
+def run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
+                  ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
 # def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
         print (encoder.summary())
         print (decoder.summary())
         print (autoencoder.summary())
         if ADVERSARIAL:
+            print (generator.summary())
             print (discriminator.summary())
-
+            print (gan.summary())
         # exit(0)
 
     # Save model to file
@@ -361,8 +394,16 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
             json_file.write(model_json)
 
         if ADVERSARIAL:
+            model_json = generator.to_json()
+            with open(os.path.join(MODEL_DIR, "generator.json"), "w") as json_file:
+                json_file.write(model_json)
+
             model_json = discriminator.to_json()
             with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+                json_file.write(model_json)
+
+            model_json = gan.to_json()
+            with open(os.path.join(MODEL_DIR, "gan.json"), "w") as json_file:
                 json_file.write(model_json)
 
         if PLOT_MODEL:
@@ -370,7 +411,9 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
             plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
             plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
             if ADVERSARIAL:
+                plot_model(generator, to_file=os.path.join(MODEL_DIR, 'generator.png'), show_shapes=True)
                 plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+                plot_model(gan, to_file=os.path.join(MODEL_DIR, 'gan.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")
@@ -379,13 +422,16 @@ def run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC
         print ("Pre-loading decoder with weights...")
         load_weights(DEC_WEIGHTS, decoder)
     if ADVERSARIAL:
+        if GEN_WEIGHTS != "None":
+            print("Pre-loading generator with weights...")
+            load_weights(GEN_WEIGHTS, generator)
         if DIS_WEIGHTS != "None":
-            print("Pre-loading decoder with weights...")
+            print("Pre-loading discriminator with weights...")
             load_weights(DIS_WEIGHTS, discriminator)
 
 
-def load_X(videos_list, index, data_dir):
-    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X(videos_list, index, data_dir, img_size):
+    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + img_size)
     for i in range(BATCH_SIZE):
         for j in range(VIDEO_LENGTH):
             filename = "frame_" + str(videos_list[(index*BATCH_SIZE + i), j]) + ".png"
@@ -400,7 +446,7 @@ def load_X(videos_list, index, data_dir):
     return X
 
 
-def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
+def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
@@ -421,6 +467,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     videos_list = np.asarray(videos_list, dtype=np.int32)
     n_videos = videos_list.shape[0]
 
+    # if ADVERSARIAL:
+    #     # Build video progressions
+    #     print("Loading stage 2 data definitions...")
+    #     frames_source_hd = hkl.load(os.path.join(DATA_DIR, 'sources_train_256.hkl'))
+    #     videos_list_hd = []
+    #     start_frame_index_hd = 1
+    #     end_frame_index_hd = VIDEO_LENGTH + 1
+    #     while (end_frame_index_hd <= len(frames_source_hd)):
+    #         frame_list_hd = frames_source_hd[start_frame_index_hd:end_frame_index_hd]
+    #         if (len(set(frame_list_hd)) == 1):
+    #             videos_list_hd.append(range(start_frame_index_hd, end_frame_index_hd))
+    #             start_frame_index_hd = start_frame_index_hd + 1
+    #             end_frame_index = end_frame_index + 1
+    #         else:
+    #             start_frame_index = end_frame_index - 1
+    #             end_frame_index = start_frame_index + VIDEO_LENGTH
+    #
+    #     videos_list = np.asarray(videos_list, dtype=np.int32)
+    #     n_videos = videos_list.shape[0]
+
     if SHUFFLE:
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
@@ -439,17 +505,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
     autoencoder = autoencoder_model(encoder, decoder)
 
     if ADVERSARIAL:
-        discriminator = discriminator_model()
-        aae = aae_model(autoencoder, discriminator)
-        aae.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
+        generator = refiner_g_model()
+        discriminator = refiner_d_model()
+        gan = gan_model(autoencoder, generator, discriminator)
+        gan.compile(loss='binary_crossentropy', optimizer=OPTIM_G)
         set_trainability(discriminator, True)
         discriminator.compile(loss='binary_crossentropy', optimizer=OPTIM_D)
-        run_utilities(encoder, decoder, autoencoder, discriminator, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS)
+        run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
+                      ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS)
     else:
-        run_utilities(encoder, decoder, autoencoder, 'None', ENC_WEIGHTS, DEC_WEIGHTS, 'None')
+        run_utilities(encoder, decoder, autoencoder, 'None', 'None', 'None',
+                      ENC_WEIGHTS, DEC_WEIGHTS, 'None', 'None')
 
     autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
-
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
@@ -471,7 +539,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = load_X(videos_list, index, DATA_DIR)
+            X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
@@ -530,9 +598,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
-                X = load_X(videos_list, index, DATA_DIR)
+                X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
+                X_hd = load_X(videos_list, index, HD_DATA_DIR, (256, 256, 3))
                 X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-                y_train = X[:, int(VIDEO_LENGTH/2) :]
+                y_train = X_hd[:, int(VIDEO_LENGTH/2) :]
 
                 future_images = autoencoder.predict(X_train, verbose=0)
                 trainable_fakes = exp_memory.get_trainable_fakes(current_gens=future_images, exp_window_size=5)
@@ -546,7 +615,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, DIS_WEIGHTS):
                 # Train AAE
                 set_trainability(discriminator, False)
                 y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.int)
-                g_loss.append(aae.train_on_batch(X_train, y))
+                g_loss.append(gan.train_on_batch(X_train, y))
                 set_trainability(discriminator, True)
 
                 # # Train Autoencoder
