@@ -14,6 +14,10 @@ import os
 hostname = socket.gethostname()
 if hostname == 'baymax':
     path_var = 'baymax/'
+elif hostname == 'walle':
+    path_var = 'walle/'
+elif hostname == 'zhora':
+    path_var = 'zhora/'
 else:
     path_var = ''
 
@@ -89,5 +93,4 @@ def schedule(epoch_idx):
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.00001
     return 0.000001
-
 

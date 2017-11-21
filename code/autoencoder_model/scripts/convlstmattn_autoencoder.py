@@ -79,7 +79,7 @@ def encoder_model():
     # 10x16x16
     model.add(Conv3D(filters=32,
                      strides=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
+                     kernel_size=(3, 3, 3),
                      padding='same'))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
@@ -145,8 +145,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5,
-                            kernel_regularizer=regularizers.l1(0.001))(out_3)
+                            recurrent_dropout=0.5)(out_3)
     x = TimeDistributed(BatchNormalization())(convlstm_4)
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)

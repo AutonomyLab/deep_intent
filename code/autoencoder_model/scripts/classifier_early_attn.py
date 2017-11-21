@@ -4,7 +4,6 @@ from __future__ import print_function
 
 import hickle as hkl
 import numpy as np
-from tensorflow.python.pywrap_tensorflow import do_quantize_training_on_graphdef
 
 np.random.seed(2 ** 10)
 from keras import backend as K
@@ -44,7 +43,7 @@ from keras.models import Model
 from custom_layers import AttnLossLayer
 from custom_layers import mse_kld_loss
 from experience_memory import ExperienceMemory
-from config_ca import *
+from config_cea import *
 from sys import stdout
 
 import tb_callback
@@ -308,10 +307,14 @@ def load_weights(weights_file, model):
 def run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 # def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
+        print ("Encoder:")
         print (encoder.summary())
+        print ("Decoder:")
         print (decoder.summary())
+        print ("Autoencoder:")
         print (autoencoder.summary())
         if CLASSIFIER:
+            print("Classifier:")
             print (classifier.summary())
 
         # exit(0)
@@ -355,44 +358,67 @@ def run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WE
             load_weights(CLA_WEIGHTS, classifier)
 
 
-def load_X_y(videos_list, index, data_dir, action_cats):
-    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X_y(videos_list, index, frames, action_cats):
+    # X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+    X = []
     y = []
     for i in range(BATCH_SIZE):
-        y_per_vid = []
-        for j in range(VIDEO_LENGTH):
-            frame_number = (videos_list[(index*BATCH_SIZE + i), j])
-            filename = "frame_" + str(frame_number) + ".png"
-            im_file = os.path.join(data_dir, filename)
-            try:
-                frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
-            except AttributeError as e:
-                print (im_file)
-                print (e)
-            if (len(action_cats) != 0):
-                try:
-                    y_per_vid.append(action_cats[frame_number - 1])
-                except IndexError as e:
-                    print (frame_number)
-                    print (e)
+        # y_per_vid = []
+        start_index = videos_list[(index*BATCH_SIZE + i), 0]
+        end_index = videos_list[(index*BATCH_SIZE + i), 1]
+        X.append(frames[start_index:end_index])
         if (len(action_cats) != 0):
-            y.append(y_per_vid)
-    return X, np.asarray(y)
+            y.append(action_cats[start_index:end_index])
+        # for j in range(VIDEO_LENGTH):
+        #     frame_number = (videos_list[(index*BATCH_SIZE + i), j])
+        #     filename = "frame_" + str(frame_number) + ".png"
+        #     im_file = os.path.join(data_dir, filename)
+        #     try:
+        #         frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+        #         X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+        #     except AttributeError as e:
+        #         print (im_file)
+        #         print (e)
+        #     if (len(action_cats) != 0):
+        #         try:
+        #             y_per_vid.append(action_cats[frame_number - 1])
+        #         except IndexError as e:
+        #             print (frame_number)
+        #             print (e)
+        # if (len(action_cats) != 0):
+        #     y.append(y_per_vid)
+    X = np.asarray(X)
+    y = np.asarray(y)
+    return X,y
 
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
+    frames_source = frames_source[:: 2]
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+
+    j = 1
+    for i in range(1, len(frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
+            j = j + 2
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
     # Build video progressions
     videos_list = []
-    start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
+    start_frame_index = 0
+    end_frame_index = VIDEO_LENGTH
     while (end_frame_index <= len(frames_source)):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
-            videos_list.append(range(start_frame_index, end_frame_index))
+            videos_list.append((start_frame_index, end_frame_index))
             start_frame_index = start_frame_index + 1
             end_frame_index = end_frame_index + 1
         else:
@@ -414,17 +440,33 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     for i in range(len(action_classes)):
         action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
         action_nums.append(actions.index(str(action_dict['Driver'])))
-    action_cats = to_categorical(action_nums, len(actions))
+    action_nums = action_nums[::2]
+    action_cats = np.asarray(to_categorical(action_nums, len(actions)))
 
     # Setup validation
     val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
+    val_frames_source = val_frames_source[:: 2]
+    val_frames = np.zeros(shape=((len(val_frames_source),) + IMG_SIZE))
+
+    j = 1
+    for i in range(1, len(val_frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            val_frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            val_frames[i] = (val_frame.astype(np.float32) - 127.5) / 127.5
+            j = j + 2
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
     val_videos_list = []
-    start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
+    start_frame_index = 0
+    end_frame_index = VIDEO_LENGTH
     while (end_frame_index <= len(val_frames_source)):
         val_frame_list = val_frames_source[start_frame_index:end_frame_index]
         if (len(set(val_frame_list)) == 1):
-            val_videos_list.append(range(start_frame_index, end_frame_index))
+            val_videos_list.append((start_frame_index, end_frame_index))
             start_frame_index = start_frame_index + VIDEO_LENGTH
             end_frame_index = end_frame_index + VIDEO_LENGTH
         else:
@@ -440,6 +482,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     for i in range(len(val_action_classes)):
         val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
         val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
+    val_action_nums = val_action_nums[::2]
     val_action_cats = to_categorical(val_action_nums, len(actions))
 
     # Build the Spatio-temporal Autoencoder
@@ -464,8 +507,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     set_trainability(classifier, True)
     classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
-    run_utilities(encoder, decoder, action_predictor, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
-    print (action_predictor.summary())
+    run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
 
     autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
 
@@ -493,7 +535,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X, y = load_X_y(videos_list, index, DATA_DIR, [])
+            X, y = load_X_y(videos_list, index, frames, [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
@@ -518,7 +560,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):
-            X, y = load_X_y(val_videos_list, index, DATA_DIR, [])
+            X, y = load_X_y(val_videos_list, index, val_frames, [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             val_loss.append(autoencoder.test_on_batch(X_train, y_train))
@@ -548,11 +590,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Save predicted mask per epoch
         predicted_attn = mask_gen_1.predict(X_train, verbose=0)
         a_pred = np.reshape(predicted_attn, newshape=(10, 10, 16, 16, 1))
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred)
+        np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred)
 
         # predicted_attn = mask_gen_2.predict(X_train, verbose=0)
         # a_pred = np.reshape(predicted_attn, newshape=(10, 10, 128, 128, 1))
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen2_' + str(epoch) + '.npy'), a_pred)
+        # np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_gen2_' + str(epoch) + '.npy'), a_pred)
 
     # Train AAE
     if CLASSIFIER:
@@ -581,7 +623,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
-                X, y = load_X_y(videos_list, index, DATA_DIR, action_cats)
+                X, y = load_X_y(videos_list, index, frames, action_cats)
                 X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
                 y_true_imgs = X[:, int(VIDEO_LENGTH/2) :]
                 y_true_classes = y[:, int(VIDEO_LENGTH/2) :]
