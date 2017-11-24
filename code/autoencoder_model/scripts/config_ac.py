@@ -38,6 +38,10 @@ GEN_IMAGES_DIR = './../' + path_var + 'generated_images'
 if not os.path.exists(GEN_IMAGES_DIR):
     os.mkdir(GEN_IMAGES_DIR)
 
+CLA_GEN_IMAGES_DIR = GEN_IMAGES_DIR + '/cla_gen/'
+if not os.path.exists(CLA_GEN_IMAGES_DIR):
+    os.mkdir(CLA_GEN_IMAGES_DIR)
+
 ATTN_WEIGHTS_DIR = './../' + path_var + 'attn_weights'
 if not os.path.exists(ATTN_WEIGHTS_DIR):
     os.mkdir(ATTN_WEIGHTS_DIR)
@@ -62,8 +66,9 @@ SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
-ATTN_COEFF = 1
-KL_COEFF = 1
+ATTN_COEFF = 0
+# KL coeff damages learning
+KL_COEFF = 0
 CLASSIFIER = True
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
@@ -73,12 +78,12 @@ LOSS_WEIGHTS = [1, 1]
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 20
+NB_EPOCHS_AUTOENCODER = 0
 NB_EPOCHS_CLASS = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
-OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
+OPTIM_D = Adam(lr=0.000001, beta_1=0.5)
 # OPTIM_D = SGD(lr=0.00001, momentum=0.5, nesterov=True)
 
 lr_schedule = [10, 20, 30]  # epoch_step

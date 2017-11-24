@@ -77,7 +77,7 @@ def encoder_model():
     model.add(TimeDistributed(Dropout(0.5)))
 
     # 10x16x16
-    model.add(Conv3D(filters=32,
+    model.add(Conv3D(filters=64,
                      strides=(1, 1, 1),
                      kernel_size=(3, 3, 3),
                      padding='same'))
@@ -89,11 +89,11 @@ def encoder_model():
 
 
 def decoder_model():
-    inputs = Input(shape=(10, 16, 16, 32))
+    inputs = Input(shape=(10, 16, 16, 64))
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
-                            kernel_size=(5, 5),
+                            kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
@@ -114,7 +114,7 @@ def decoder_model():
     dot_1 = multiply([out_1, a1])
 
     convlstm_2 = ConvLSTM2D(filters=64,
-                            kernel_size=(5, 5),
+                            kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
@@ -125,7 +125,7 @@ def decoder_model():
 
     # 10x32x32
     convlstm_3 = ConvLSTM2D(filters=128,
-                            kernel_size=(5, 5),
+                            kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
@@ -136,7 +136,7 @@ def decoder_model():
 
     # 10x64x64
     convlstm_4 = ConvLSTM2D(filters=32,
-                            kernel_size=(5, 5),
+                            kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
@@ -147,7 +147,7 @@ def decoder_model():
 
     # 10x128x128
     convlstm_5 = ConvLSTM2D(filters=3,
-                            kernel_size=(5, 5),
+                            kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
@@ -166,8 +166,7 @@ def classifier_model():
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5,
-                        kernel_regularizer=regularizers.l1(0.001))(inputs)
+                        recurrent_dropout=0.5)(inputs)
     conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
     conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
 
@@ -176,8 +175,7 @@ def classifier_model():
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5,
-                        kernel_regularizer=regularizers.l1(0.001))(conv_1)
+                        recurrent_dropout=0.5)(conv_1)
     conv_2 = TimeDistributed(BatchNormalization())(conv_2)
     conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
     conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
@@ -187,8 +185,7 @@ def classifier_model():
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5,
-                        kernel_regularizer=regularizers.l1(0.001))(conv_2)
+                        recurrent_dropout=0.5)(conv_2)
     conv_3 = TimeDistributed(BatchNormalization())(conv_3)
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
@@ -198,8 +195,7 @@ def classifier_model():
                         strides=(2, 2),
                         padding="same",
                         return_sequences=True,
-                        recurrent_dropout=0.5,
-                        kernel_regularizer=regularizers.l1(0.001))(conv_3)
+                        recurrent_dropout=0.5)(conv_3)
     conv_4 = TimeDistributed(BatchNormalization())(conv_4)
     conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
@@ -226,9 +222,11 @@ def autoencoder_model(encoder, decoder):
     return model
 
 
-def action_model(autoencoder, classifier):
+def action_model(encoder, decoder, classifier):
     inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
-    images = autoencoder(inputs)
+    set_trainability(encoder, False)
+    z = encoder(inputs)
+    images = decoder(z)
     set_trainability(classifier, False)
     predictions = classifier(images)
 
@@ -394,7 +392,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
-    frames_source = frames_source[:: 2]
+    # frames_source = frames_source[:: 2]
     frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
 
     j = 1
@@ -404,7 +402,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
             frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
-            j = j + 2
+            # j = j + 2
+            j = j + 1
         except AttributeError as e:
             print(im_file)
             print(e)
@@ -438,22 +437,23 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     for i in range(len(action_classes)):
         action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
         action_nums.append(actions.index(str(action_dict['Driver'])))
-    action_nums = action_nums[::2]
+    # action_nums = action_nums[::2]
     action_cats = np.asarray(to_categorical(action_nums, len(actions)))
 
     # Setup validation
     val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
-    val_frames_source = val_frames_source[:: 2]
+    # val_frames_source = val_frames_source[:: 2]
     val_frames = np.zeros(shape=((len(val_frames_source),) + IMG_SIZE))
 
     j = 1
     for i in range(1, len(val_frames_source)):
         filename = "frame_" + str(j) + ".png"
-        im_file = os.path.join(DATA_DIR, filename)
+        im_file = os.path.join(VAL_DATA_DIR, filename)
         try:
             val_frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
             val_frames[i] = (val_frame.astype(np.float32) - 127.5) / 127.5
-            j = j + 2
+            # j = j + 2
+            j = j + 1
         except AttributeError as e:
             print(im_file)
             print(e)
@@ -480,7 +480,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     for i in range(len(val_action_classes)):
         val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
         val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
-    val_action_nums = val_action_nums[::2]
+    # val_action_nums = val_action_nums[::2]
     val_action_cats = to_categorical(val_action_nums, len(actions))
 
     # Build the Spatio-temporal Autoencoder
@@ -497,7 +497,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     autoencoder = autoencoder_model(encoder, decoder)
 
     classifier = classifier_model()
-    action_predictor = action_model(autoencoder, classifier)
+    action_predictor = action_model(encoder, decoder, classifier)
     action_predictor.compile(loss=['mae', 'categorical_crossentropy'],
                              loss_weights=LOSS_WEIGHTS,
                              optimizer=OPTIM_G,
@@ -507,7 +507,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
     run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
 
-    autoencoder.compile(loss=mse_kld_loss, optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    print (action_predictor.summary())
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
@@ -640,7 +641,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "a_loss: " + str(a_loss[len(a_loss) - 1][0]) + "  " +
+                             "a_loss: " + str([a_loss[len(a_loss) - 1][j]] for j in [0, -1]) + "  " +
                              "c_loss: " + str(c_loss[len(c_loss) - 1]) + "  " +
                              "\t    [" + "{0}>".format("="*(arrow)))
                 stdout.flush()
@@ -664,9 +665,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                         (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
                             cv2.putText(truth_image, actions[class_num_futr],
                                         (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_truth.png"), truth_image)
 
                 # Add labels as text to the image
@@ -675,12 +676,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                         class_num = np.argmax(predicted_classes[k, j])
                         cv2.putText(pred_image, actions[class_num],
                                     (2 + j * (128), 120 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"), pred_image)
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"), pred_image)
 
             # Run over validation data
             print ('')
             for index in range(NB_VAL_ITERATIONS):
-                X, y = load_X_y(val_videos_list, index, DATA_DIR, val_action_cats)
+                X, y = load_X_y(val_videos_list, index, val_frames, val_action_cats)
                 X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
                 y_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                 y_imgs = X[:, int(VIDEO_LENGTH / 2):]
