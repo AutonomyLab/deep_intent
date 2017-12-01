@@ -54,6 +54,10 @@ TF_LOG_DIR = './../' + path_var + 'tf_logs'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
+TF_LOG_CLA_DIR = './../' + path_var + 'tf_cla_logs'
+if not os.path.exists(TF_LOG_CLA_DIR):
+    os.mkdir(TF_LOG_CLA_DIR)
+
 TEST_RESULTS_DIR = './../' + path_var + 'test_results'
 if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
@@ -72,6 +76,8 @@ KL_COEFF = 0
 CLASSIFIER = True
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
+A_TRAIN_RATIO = 1
+C_TRAIN_RATIO = 1
 
 # -------------------------------------------------
 # Network configuration:
