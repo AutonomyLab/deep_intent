@@ -72,16 +72,14 @@ SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
-VIS_ATTN = True
-ATTN_COEFF = 0
-KL_COEFF = 0
-ADVERSARIAL = True
+ADVERSARIAL = False
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration.")
+print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 10
 NB_EPOCHS_AUTOENCODER = 20

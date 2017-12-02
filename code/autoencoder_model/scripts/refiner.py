@@ -460,6 +460,7 @@ def load_X(videos_list, index, data_dir, img_size):
 
     return X
 
+
 def load_X_y(videos_list, index, frames, action_cats):
     # X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
     X = []
@@ -594,6 +595,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     if ADVERSARIAL:
         generator = refiner_g_model()
@@ -613,8 +615,6 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     else:
         run_utilities(encoder, decoder, autoencoder, 'None', 'None', 'None',
                       ENC_WEIGHTS, DEC_WEIGHTS, 'None', 'None')
-
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
