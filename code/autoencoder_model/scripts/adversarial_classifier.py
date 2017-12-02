@@ -558,8 +558,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
     print (action_predictor.summary())
 
-    # NB_ITERATIONS = int(n_videos/BATCH_SIZE)
-    NB_ITERATIONS = 1
+    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
+    # NB_ITERATIONS = 1
     NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback

@@ -17,8 +17,10 @@ import os
 hostname = socket.gethostname()
 if hostname == 'baymax':
     path_var = 'baymax/'
+elif hostname == 'walle':
+    path_var = 'walle/'
 else:
-    path_var = ''
+    path_var = 'zhora/'
 
 DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
@@ -79,7 +81,7 @@ LOSS_WEIGHTS = [1, 1]
 
 # -------------------------------------------------
 # Network configuration:
-print ("Loading network/training configuration...")
+print ("Loading network/training configuration.")
 
 BATCH_SIZE = 10
 NB_EPOCHS_AUTOENCODER = 20

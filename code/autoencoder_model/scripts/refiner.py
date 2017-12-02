@@ -98,19 +98,29 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    #10x16x16
-    convlstm_2 = ConvLSTM2D(filters=128,
+    flat_1 = TimeDistributed(Flatten())(out_1)
+    aclstm_1 = GRU(units=16 * 16,
+                   activation='tanh',
+                   recurrent_dropout=0.5,
+                   return_sequences=True)(flat_1)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
+    # a1 = AttnLossLayer()(a1_reshape)
+    dot_1 = multiply([out_1, a1_reshape])
+
+    convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_1)
+                            recurrent_dropout=0.5)(dot_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
 
     # 10x32x32
-    convlstm_3 = ConvLSTM2D(filters=64,
+    convlstm_3 = ConvLSTM2D(filters=128,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -172,21 +182,21 @@ def refiner_g_model():
     conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
     conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
 
-    conv_4 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(enc_inputs)
-    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
-    conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
-    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
-
-    enc_2 = concatenate([conv_3, conv_4])
+    # conv_4 = TimeDistributed(Conv2D(filters=128,
+    #                                 kernel_size=(3, 3),
+    #                                 strides=(2, 2),
+    #                                 padding="same"))(enc_inputs)
+    # conv_4 = TimeDistributed(BatchNormalization())(conv_4)
+    # conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
+    # conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
+    #
+    # enc_2 = concatenate([conv_3, conv_4])
 
     # Decoder stage 2
     conv_5 = TimeDistributed(Conv2DTranspose(filters=128,
                                              kernel_size=(3, 3),
                                              strides=(1, 1),
-                                             padding="same"))(enc_2)
+                                             padding="same"))(conv_3)
     conv_5 = TimeDistributed(BatchNormalization())(conv_5)
     conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
     conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
@@ -450,19 +460,84 @@ def load_X(videos_list, index, data_dir, img_size):
 
     return X
 
+def load_X_y(videos_list, index, frames, action_cats):
+    # X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+    X = []
+    y = []
+    for i in range(BATCH_SIZE):
+        # y_per_vid = []
+        start_index = videos_list[(index*BATCH_SIZE + i), 0]
+        end_index = videos_list[(index*BATCH_SIZE + i), 1]
+        X.append(frames[start_index:end_index])
+        if (len(action_cats) != 0):
+            y.append(action_cats[start_index:end_index])
+        # for j in range(VIDEO_LENGTH):
+        #     frame_number = (videos_list[(index*BATCH_SIZE + i), j])
+        #     filename = "frame_" + str(frame_number) + ".png"
+        #     im_file = os.path.join(data_dir, filename)
+        #     try:
+        #         frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+        #         X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+        #     except AttributeError as e:
+        #         print (im_file)
+        #         print (e)
+        #     if (len(action_cats) != 0):
+        #         try:
+        #             y_per_vid.append(action_cats[frame_number - 1])
+        #         except IndexError as e:
+        #             print (frame_number)
+        #             print (e)
+        # if (len(action_cats) != 0):
+        #     y.append(y_per_vid)
+    X = np.asarray(X)
+    y = np.asarray(y)
+    return X,y
+
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
+    # # Build video progressions
+    # videos_list = []
+    # start_frame_index = 1
+    # end_frame_index = VIDEO_LENGTH + 1
+    # while (end_frame_index <= len(frames_source)):
+    #     frame_list = frames_source[start_frame_index:end_frame_index]
+    #     if (len(set(frame_list)) == 1):
+    #         videos_list.append(range(start_frame_index, end_frame_index))
+    #         start_frame_index = start_frame_index + 1
+    #         end_frame_index = end_frame_index + 1
+    #     else:
+    #         start_frame_index = end_frame_index - 1
+    #         end_frame_index = start_frame_index + VIDEO_LENGTH
+    #
+    # videos_list = np.asarray(videos_list, dtype=np.int32)
+    # n_videos = videos_list.shape[0]
+
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+
+    j = 1
+    for i in range(1, len(frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
+            # j = j + 2
+            j = j + 1
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
     # Build video progressions
     videos_list = []
-    start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
+    start_frame_index = 0
+    end_frame_index = VIDEO_LENGTH
     while (end_frame_index <= len(frames_source)):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
-            videos_list.append(range(start_frame_index, end_frame_index))
+            videos_list.append((start_frame_index, end_frame_index))
             start_frame_index = start_frame_index + 1
             end_frame_index = end_frame_index + 1
         else:
@@ -565,13 +640,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
+            # X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
+            X, y = load_X_y(videos_list, index, frames, [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
-            stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
                          "loss: " + str(loss[len(loss)-1]) +
                          "\t    [" + "{0}>".format("="*(arrow)))
             stdout.flush()
@@ -855,6 +931,7 @@ def get_args():
     parser.add_argument("--mode", type=str)
     parser.add_argument("--enc_weights", type=str, default="None")
     parser.add_argument("--dec_weights", type=str, default="None")
+    parser.add_argument("--gen_weights", type=str, default="None")
     parser.add_argument("--dis_weights", type=str, default="None")
     parser.add_argument("--batch_size", type=int, default=BATCH_SIZE)
     parser.add_argument("--nice", dest="nice", action="store_true")
@@ -869,6 +946,7 @@ if __name__ == "__main__":
         train(BATCH_SIZE=args.batch_size,
               ENC_WEIGHTS=args.enc_weights,
               DEC_WEIGHTS=args.dec_weights,
+              GEN_WEIGHTS=args.gen_weights,
               DIS_WEIGHTS=args.dis_weights)
 
     if args.mode == "test":

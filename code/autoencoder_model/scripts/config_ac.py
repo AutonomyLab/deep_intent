@@ -84,7 +84,7 @@ C_TRAIN_RATIO = 1
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 0
+NB_EPOCHS_AUTOENCODER = 10
 NB_EPOCHS_CLASS = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
