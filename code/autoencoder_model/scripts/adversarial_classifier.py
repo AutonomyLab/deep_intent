@@ -265,14 +265,14 @@ def autoencoder_model(encoder, decoder):
 
 
 def action_model(encoder, decoder, classifier):
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
+    input = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
     set_trainability(encoder, False)
-    z = encoder(inputs)
+    z = encoder(input)
     images = decoder(z)
     set_trainability(classifier, False)
     predictions = classifier(images)
 
-    model = Model(inputs=inputs, outputs=[images, predictions])
+    model = Model(inputs=input, outputs=[images, predictions])
     # model = Model(inputs=inputs, outputs=predictions)
 
     return model
@@ -632,7 +632,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         print("\nAvg loss: " + str(avg_loss) + " Avg val loss: " + str(avg_val_loss))
 
         # Save model weights per epoch to file
-        encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+        encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'e`oder_epoch_' + str(epoch) + '.h5'), True)
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
         # Save predicted mask per epoch

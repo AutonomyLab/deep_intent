@@ -27,6 +27,8 @@ HD_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_256/train/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
+
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -47,6 +49,10 @@ TF_LOG_DIR = './../' + path_var + 'tf_logs'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
+TF_LOG_GAN_DIR = './../' + path_var + 'tf_gan_logs'
+if not os.path.exists(TF_LOG_GAN_DIR):
+    os.mkdir(TF_LOG_GAN_DIR)
+
 TEST_RESULTS_DIR = './../' + path_var + 'test_results'
 if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
@@ -63,6 +69,7 @@ ATTN_COEFF = 0
 KL_COEFF = 0
 ADVERSARIAL = True
 BUF_SIZE = 10
+LOSS_WEIGHTS = [1, 1]
 
 # -------------------------------------------------
 # Network configuration:

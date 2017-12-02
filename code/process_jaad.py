@@ -13,7 +13,7 @@ import xmltodict as xmlparser
 
 from jaad_config import *
 
-desired_im_sz = (256, 256)
+desired_im_sz = (128, 128)
 
 # Recordings used for validation and testing.
 val_recordings = ['video_0027', 'video_0028', 'video_0029', 'video_0030', 'video_0031', 'video_0032']
@@ -60,7 +60,7 @@ def process_data():
             for i in range(1, len(files)+1):
                 actions = ""
                 for num, subject in enumerate(subjects):
-                    action = "unknown"
+                    action = ""
                     num_actions = len(xml_file['video']['actions'][subject]['action'])
                     # print (type(xml_file['video']['actions'][subject]['action']))
                     if (type(xml_file['video']['actions'][subject]['action'] )is list):
@@ -70,7 +70,7 @@ def process_data():
                             #        (round(float(xml_file['video']['actions'][subject]['action'][j]['@end_time']) * 30)))
                             if ((i >= (round(float(xml_file['video']['actions'][subject]['action'][j]['@start_time'])*30)))
                                 and (i <= (round(float(xml_file['video']['actions'][subject]['action'][j]['@end_time'])*30)))):
-                                    action = str(xml_file['video']['actions'][subject]['action'][j]['@id'])
+                                    action = action + "," + str(xml_file['video']['actions'][subject]['action'][j]['@id'])
                     else:
                         # print(subject, i, str(xml_file['video']['actions'][subject]['action']['@id']))
                         # print((round(float(xml_file['video']['actions'][subject]['action']['@start_time']) * 30)),
@@ -79,10 +79,12 @@ def process_data():
                         round(float(xml_file['video']['actions'][subject]['action']['@start_time']) * 30)))
                             and (i <= (
                             round(float(xml_file['video']['actions'][subject]['action']['@end_time']) * 30)))):
-                            action = str(xml_file['video']['actions'][subject]['action']['@id'])
+                            action = action + "," + str(xml_file['video']['actions'][subject]['action']['@id'])
 
 
                     # print (action)
+                    if(len(action) ==  0):
+                        action = "unknown"
                     actions = actions + str(subject) + ':' + action + (", " if (num<len(subjects)-1) else "")
 
                 info = str(folder) + ', ' + "frame_" + str(frame_number) + ', ' + actions
@@ -109,9 +111,9 @@ def process_data():
             except IOError as e:
                 print (e)
 
-        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_256' + '.hkl'))
-        hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_256' + '.hkl'))
-        hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_256' + '.hkl'))
+        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_128' + '.hkl'))
+        hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_128' + '.hkl'))
+        hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_128' + '.hkl'))
 
 
 # resize image

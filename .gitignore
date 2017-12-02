@@ -11,6 +11,8 @@ code/autoencoder_model/zhora/logs/*
 code/autoencoder_model/zhora/checkpoints/*
 code/autoencoder_model/scripts/*.pyc
 code/autoencoder_model/zhora/tf_logs/*
+code/autoencoder_model/zhora/tf_cla_logs/*
+code/autoencoder_model/zhora/tf_gan_logs/*
 code/autoencoder_model/zhora/attn_weights/*
 code/autoencoder_model/zhora/gifs/*
 code/autoencoder_model/zhora/test_results/*
