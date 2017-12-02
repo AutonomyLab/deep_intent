@@ -36,8 +36,6 @@ from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
-from keras.losses import kullback_leibler_divergence
-from keras.losses import mean_squared_error
 from keras.layers import Input
 from keras.models import Model
 from experience_memory import ExperienceMemory
@@ -297,12 +295,12 @@ def gan_model(autoencoder, generator, discriminator):
 
     input = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
     set_trainability(autoencoder, False)
-    y_1 = autoencoder(input)
-    y_2 = generator(y_1)
+    y128 = autoencoder(input)
+    y256 = generator(y128)
     set_trainability(discriminator, False)
-    reality = discriminator(y_2)
+    reality = discriminator(y256)
 
-    model = Model(inputs=input, outputs=[y_2, reality])
+    model = Model(inputs=input, outputs=[y256, reality])
 
     return model
 
@@ -526,6 +524,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
         generator = refiner_g_model()
         discriminator = refiner_d_model()
         gan = gan_model(autoencoder, generator, discriminator)
+        generator.compile(loss='binary_crossentropy', optimizer='sgd')
         gan.compile(loss=['mae', 'binary_crossentropy'],
                     loss_weights=LOSS_WEIGHTS,
                     optimizer=OPTIM_G,
@@ -620,8 +619,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
 
     # Train AAE
     if ADVERSARIAL:
+        print ("Training Stage II.")
         exp_memory = ExperienceMemory(memory_length=100)
-        for epoch in range(NB_EPOCHS_AAE):
+        for epoch in range(NB_EPOCHS_GAN):
             print("\n\nEpoch ", epoch)
             g_loss = []
             val_g_loss = []
@@ -640,22 +640,24 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
                 # Train Autoencoder
                 X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
                 X_hd = load_X(videos_list, index, HD_DATA_DIR, (256, 256, 3))
-                X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-                y_train = X_hd[:, int(VIDEO_LENGTH/2) :]
+                X128 = X[:, 0 : int(VIDEO_LENGTH/2)]
+                Y128 = autoencoder.predict(X128, verbose=0)
+                X256_real = X_hd[:, int(VIDEO_LENGTH/2) :]
+                X256_fake = generator.predict(Y128, verbose=0)
 
-                future_images = gan.predict(X_train, verbose=0)
-                trainable_fakes = exp_memory.get_trainable_fakes(current_gens=future_images, exp_window_size=4)
+                trainable_fakes = exp_memory.get_trainable_fakes(current_gens=X256_fake, exp_window_size=4)
 
                 # Train Discriminator on future images (y_train, not X_train)
-                X = np.concatenate((y_train, trainable_fakes))
-                y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.int),
-                                    np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.int)), axis=0)
+                X = np.concatenate((X256_real, trainable_fakes))
+                y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32),
+                                    np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)), axis=0)
                 d_loss.append(discriminator.train_on_batch(X, y))
 
                 # Train AAE
                 set_trainability(discriminator, False)
-                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.int)
-                g_loss.append(gan.train_on_batch(X_train, y))
+                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                X128_fake = autoencoder.predict(X128, verbose=0)
+                g_loss.append(gan.train_on_batch(X128_fake, [X256_real, y]))
                 set_trainability(discriminator, True)
 
                 # # Train Autoencoder
@@ -663,44 +665,84 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "g_loss: " + str(g_loss[len(g_loss) - 1]) + "  " +
+                             "g_loss: " + str([g_loss[len(g_loss) - 1][j] for j in [0, -1]]) + "  " +
                              "d_loss: " + str(d_loss[len(d_loss) - 1]) +
                              "\t    [" + "{0}>".format("="*(arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
-                predicted_images = autoencoder.predict(X_train, verbose=0)
-                orig_image, truth_image, pred_image = combine_images(X_train, y_train, predicted_images)
+                predicted_images = generator.predict(X_train, verbose=0)
+                orig_image, truth_image, pred_image = combine_images(X128_fake, X256_real, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
                 if epoch == 0 :
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_orig.png"), orig_image)
-                    cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_truth.png"), truth_image)
-                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_aae_pred.png"), pred_image)
+                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_gan_orig.png"), orig_image)
+                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_gan_truth.png"), truth_image)
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_gan_pred.png"), pred_image)
 
-                predicted_attn_1 = mask_gen.predict(X_train, verbose=0)
-                a_pred_1 = np.reshape(predicted_attn_1, newshape=(10, 10, 16, 16, 1))
-                np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred_1)
+            # Run over validation data
+            print('')
+            for index in range(NB_VAL_ITERATIONS):
+                X = load_X(val_videos_list, index, VAL_DATA_DIR, (128, 128, 3))
+                X_hd = load_X(val_videos_list, index, VAL_HD_DATA_DIR, (256, 256, 3))
+                X128_val = X[:, 0: int(VIDEO_LENGTH / 2)]
+                Y128_val = autoencoder.predict(X128, verbose=0)
+                X256_real_val = X_hd[:, int(VIDEO_LENGTH / 2):]
+                X256_fake_val = generator.predict(Y128_val, verbose=0)
+
+                X = np.concatenate((X256_real_val, X256_fake_val))
+                y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32),
+                                    np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)), axis=0)
+                val_d_loss.append(discriminator.test_on_batch(X256_fake_val, X256_real_val))
+
+                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                val_g_loss.append(gan.test_on_batch(X128_val, [X256_real_val, y]))
+
+                arrow = int(index / (NB_VAL_ITERATIONS / 40))
+                stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
+                             "val_g_loss: " + str([val_g_loss[len(val_g_loss) - 1][j] for j in [0, -1]]) + "  " +
+                             "val_d_loss: " + str(val_d_loss[len(val_d_loss) - 1]))
+                stdout.flush()
 
             # then after each epoch/iteration
-            # avg_a_loss = sum(a_loss) / len(a_loss)
-            avg_g_loss = sum(g_loss) / len(g_loss)
-            avg_d_loss = sum(d_loss) / len(d_loss)
-            logs = {'g_loss': avg_g_loss, 'd_loss': avg_d_loss}
-            TC.on_epoch_end(epoch, logs)
+            avg_d_loss = np.mean(np.asarray(d_loss, dtype=np.float32), axis=0)
+            avg_val_d_loss = np.mean(np.asarray(val_d_loss, dtype=np.float32), axis=0)
+            avg_g_loss = np.mean(np.asarray(g_loss, dtype=np.float32), axis=0)
+            avg_val_g_loss = np.mean(np.asarray(val_g_loss, dtype=np.float32), axis=0)
+
+            loss_values = np.asarray(avg_d_loss.tolist() + avg_val_d_loss.tolist() \
+                                     + avg_g_loss.tolist() + avg_val_g_loss.tolist(), dtype=np.float32)
+            d_loss_keys = ['d_' + metric for metric in discriminator.metrics_names]
+            g_loss_keys = ['g_' + metric for metric in gan.metrics_names]
+            val_d_loss_keys = ['d_val_' + metric for metric in discriminator.metrics_names]
+            val_g_loss_keys = ['g_val_' + metric for metric in gan.metrics_names]
+
+            loss_keys = d_loss_keys + val_d_loss_keys + \
+                        g_loss_keys + val_g_loss_keys
+            logs = dict(zip(loss_keys, loss_values))
+
+            TC_gan.on_epoch_end(epoch, logs)
 
             # Log the losses
-            with open(os.path.join(LOG_DIR, 'losses_aae.json'), 'a') as log_file:
-                log_file.write("{\"epoch\":%d, \"g_loss\":%f, \"d_loss\":%f};\n" % (epoch, avg_g_loss, avg_d_loss))
+            with open(os.path.join(LOG_DIR, 'losses_gan.json'), 'a') as log_file:
+                log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
 
-            print("\nAvg g_loss: " + str(avg_g_loss) + "  Avg d_loss: " + str(avg_d_loss))
+            print("\nAvg d_loss: " + str(avg_d_loss) +
+                  " Avg val_d_loss: " + str(avg_val_d_loss) +
+                  "\nAvg g_loss: " + str([avg_g_loss[len(avg_g_loss) - 1][j] for j in [0, -1]]) +
+                  " Avg val_g_loss: " + str([avg_val_g_loss[len(avg_val_g_loss) - 1][j] for j in [0, -1]]))
 
             # Save model weights per epoch to file
-            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_aae_epoch_'+str(epoch)+'.h5'), True)
-            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_aae_epoch_' + str(epoch) + '.h5'), True)
-            discriminator.save_weights(os.path.join(CHECKPOINT_DIR, 'discriminator_aae_epoch_' + str(epoch) + '.h5'), True)
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_gan_epoch_'+str(epoch)+'.h5'), True)
+            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_gan_epoch_' + str(epoch) + '.h5'), True)
+            generator.save_weights(os.path.join(CHECKPOINT_DIR,
+                                                    'generator_gan_epoch_' +
+                                                    str(epoch) + '.h5'), True)
+            discriminator.save_weights(os.path.join(CHECKPOINT_DIR,
+                                                    'discriminator_gan_epoch_' +
+                                                    str(epoch) + '.h5'), True)
 
     # End TensorBoard Callback
     TC.on_train_end('_')

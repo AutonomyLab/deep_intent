@@ -25,9 +25,11 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 
 HD_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_256/train/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
-
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
+
+VAL_HD_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_256/val/'
+
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -40,6 +42,10 @@ if not os.path.exists(CHECKPOINT_DIR):
 GEN_IMAGES_DIR = './../' + path_var + 'generated_images'
 if not os.path.exists(GEN_IMAGES_DIR):
     os.mkdir(GEN_IMAGES_DIR)
+
+CLA_GEN_IMAGES_DIR = GEN_IMAGES_DIR + '/cla_gen/'
+if not os.path.exists(CLA_GEN_IMAGES_DIR):
+    os.mkdir(CLA_GEN_IMAGES_DIR)
 
 LOG_DIR = './../' + path_var + 'logs'
 if not os.path.exists(LOG_DIR):
@@ -76,8 +82,8 @@ LOSS_WEIGHTS = [1, 1]
 print ("Loading network/training configuration...")
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 10
-NB_EPOCHS_AAE = 100
+NB_EPOCHS_AUTOENCODER = 20
+NB_EPOCHS_GAN = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
