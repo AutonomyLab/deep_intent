@@ -16,6 +16,8 @@ if hostname == 'baymax':
     path_var = 'baymax/'
 elif hostname == 'walle':
     path_var = 'walle/'
+elif hostname == 'bender':
+    path_var = 'bender/'
 else:
     path_var = 'zhora/'
 
@@ -67,13 +69,13 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 20
+VIDEO_LENGTH = 30
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
 # KL coeff damages learning
 KL_COEFF = 0
-CLASSIFIER = True
+CLASSIFIER = False
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
 A_TRAIN_RATIO = 1
@@ -82,10 +84,11 @@ C_TRAIN_RATIO = 1
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
+print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 10
-NB_EPOCHS_CLASS = 100
+NB_EPOCHS_AUTOENCODER = 30
+NB_EPOCHS_CLASS = 0
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)

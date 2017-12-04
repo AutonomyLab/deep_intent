@@ -38,8 +38,9 @@ from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Input
 from keras.models import Model
+from custom_layers import AttnLossLayer
 from experience_memory import ExperienceMemory
-from config_refiner import *
+from config_nmta import *
 from sys import stdout
 
 import tb_callback
@@ -58,7 +59,7 @@ def encoder_model():
                      strides=(1, 4, 4),
                      kernel_size=(3, 11, 11),
                      padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+                     input_shape=(10, 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
@@ -87,23 +88,37 @@ def encoder_model():
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 64))
 
+    h0 = UpSampling3D(size=(2, 1, 1))(inputs)
+
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(inputs)
+                            recurrent_dropout=0.5)(h0)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
+
+    flat_1 = TimeDistributed(Flatten())(out_1)
+    aclstm_1 = GRU(units=16 * 16,
+                   activation='tanh',
+                   recurrent_dropout=0.5,
+                   return_sequences=True)(flat_1)
+    x = TimeDistributed(BatchNormalization())(
+        aclstm_1)
+    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(VIDEO_LENGTH-10, 16, 16, 1))(dense_1)
+    a1 = AttnLossLayer()(a1_reshape)
+    dot_1 = multiply([out_1, a1])
 
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_1)
+                            recurrent_dropout=0.5)(dot_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
@@ -346,6 +361,7 @@ def combine_images(X, y, generated_images):
         orig_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
 
     # Ground truth
+    n_frames = y.shape[0] * y.shape[1]
     truth_frames = np.zeros((n_frames,) + y.shape[2:], dtype=y.dtype)
     frame_index = 0
     for i in range(y.shape[0]):
@@ -546,8 +562,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
-            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-            y_train = X[:, int(VIDEO_LENGTH/2) :]
+            X_train = X[:, 0 : 10]
+            y_train = X[:, 10 :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
@@ -571,8 +587,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):
             X = load_X(val_videos_list, index, VAL_DATA_DIR, (128, 128, 3))
-            X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-            y_train = X[:, int(VIDEO_LENGTH / 2):]
+            X_train = X[:, 0: 10]
+            y_train = X[:, 10:]
             val_loss.append(autoencoder.test_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))

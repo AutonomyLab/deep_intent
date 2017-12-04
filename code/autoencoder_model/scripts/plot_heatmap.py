@@ -11,14 +11,14 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import cv2
 import ast
-from config_aa import *
+from config_ac import *
 
 def plot_heatmap(attn_layer, epoch, vid_num):
     print (attn_layer)
     for i in attn_layer:
         gen = i
         gen_name = 'gen' + str(gen)
-        data = np.load(os.path.join(TEST_RESULTS_DIR, 'attention_weights_cla_' + gen_name + '_' + str(epoch) + '.npy'))
+        data = np.load('./../zhora/history/attention_weights_' + gen_name + '_' + str(epoch) + '.npy')
         data = data[vid_num]
         for i in range(10):
             for j in range(data.shape[-1]):

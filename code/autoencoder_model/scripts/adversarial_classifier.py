@@ -62,7 +62,7 @@ def encoder_model():
                      strides=(1, 4, 4),
                      kernel_size=(3, 11, 11),
                      padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+                     input_shape=(10, 128, 128, 3)))
     model.add(TimeDistributed(BatchNormalization()))
     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
     model.add(TimeDistributed(Dropout(0.5)))
@@ -91,13 +91,15 @@ def encoder_model():
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 64))
 
+    h0 = UpSampling3D(size=(2, 1, 1))(inputs)
+
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(inputs)
+                            recurrent_dropout=0.5)(h0)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
@@ -107,9 +109,10 @@ def decoder_model():
                    activation='tanh',
                    recurrent_dropout=0.5,
                    return_sequences=True)(flat_1)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    x = TimeDistributed(BatchNormalization())(
+        aclstm_1)
     dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
+    a1_reshape = Reshape(target_shape=(VIDEO_LENGTH-10, 16, 16, 1))(dense_1)
     a1 = AttnLossLayer()(a1_reshape)
     dot_1 = multiply([out_1, a1])
 
@@ -135,7 +138,7 @@ def decoder_model():
     out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
 
     # 10x64x64
-    convlstm_4 = ConvLSTM2D(filters=32,
+    convlstm_4 = ConvLSTM2D(filters=16,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -473,16 +476,17 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
 
-    # Load labesl into categorical 1-hot vectors
-    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
-    print ("Loading annotations...")
-    action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
-    action_nums = []
-    for i in range(len(action_classes)):
-        action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
-        action_nums.append(actions.index(str(action_dict['Driver'])))
-    # action_nums = action_nums[::2]
-    action_cats = np.asarray(to_categorical(action_nums, len(actions)))
+    if CLASSIFIER:
+        # Load labesl into categorical 1-hot vectors
+        actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
+        print ("Loading annotations...")
+        action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
+        action_nums = []
+        for i in range(len(action_classes)):
+            action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
+            action_nums.append(actions.index(str(action_dict['Driver'])))
+        # action_nums = action_nums[::2]
+        action_cats = np.asarray(to_categorical(action_nums, len(actions)))
 
     # Setup validation
     val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
@@ -518,14 +522,15 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     val_videos_list = np.asarray(val_videos_list, dtype=np.int32)
     n_val_videos = val_videos_list.shape[0]
 
-    # Load val labesl into categorical 1-hot vectors
-    val_action_classes = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
-    val_action_nums = []
-    for i in range(len(val_action_classes)):
-        val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
-        val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
-    # val_action_nums = val_action_nums[::2]
-    val_action_cats = to_categorical(val_action_nums, len(actions))
+    if CLASSIFIER:
+        # Load val labesl into categorical 1-hot vectors
+        val_action_classes = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
+        val_action_nums = []
+        for i in range(len(val_action_classes)):
+            val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
+            val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
+        # val_action_nums = val_action_nums[::2]
+        val_action_cats = to_categorical(val_action_nums, len(actions))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models...")
@@ -540,23 +545,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     autoencoder = autoencoder_model(encoder, decoder)
 
-    # classifier = classifier_model()
-    classifier = conv_classifier_model()
-    action_predictor = action_model(encoder, decoder, classifier)
-    action_predictor.compile(loss=['mse', 'categorical_crossentropy'],
-                             loss_weights=LOSS_WEIGHTS,
-                             optimizer=OPTIM_G,
-                             metrics=['accuracy'])
-    # action_predictor.compile(loss='categorical_crossentropy',
-    #                          optimizer=OPTIM_G,
-    #                          metrics=['accuracy'])
+    if CLASSIFIER:
+        # classifier = classifier_model()
+        classifier = conv_classifier_model()
+        action_predictor = action_model(encoder, decoder, classifier)
+        action_predictor.compile(loss=['mse', 'categorical_crossentropy'],
+                                 loss_weights=LOSS_WEIGHTS,
+                                 optimizer=OPTIM_G,
+                                 metrics=['accuracy'])
+        # action_predictor.compile(loss='categorical_crossentropy',
+        #                          optimizer=OPTIM_G,
+        #                          metrics=['accuracy'])
 
-    set_trainability(classifier, True)
-    classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
-    run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
+        set_trainability(classifier, True)
+        classifier.compile(loss='categorical_crossentropy', metrics=['accuracy'], optimizer=OPTIM_D)
+        run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
+        print (action_predictor.summary())
+
+    run_utilities(encoder, decoder, autoencoder, "None", ENC_WEIGHTS, DEC_WEIGHTS, "None")
 
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
-    print (action_predictor.summary())
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
@@ -584,8 +592,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
             X, y = load_X_y(videos_list, index, frames, [])
-            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-            y_train = X[:, int(VIDEO_LENGTH/2) :]
+            X_train = X[:, 0 : 10]
+            y_train = X[:, 10 :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_ITERATIONS / 40))
@@ -609,8 +617,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):
             X, y = load_X_y(val_videos_list, index, val_frames, [])
-            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-            y_train = X[:, int(VIDEO_LENGTH/2) :]
+            X_train = X[:, 0 : 10]
+            y_train = X[:, 10 :]
             val_loss.append(autoencoder.test_on_batch(X_train, y_train))
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))
