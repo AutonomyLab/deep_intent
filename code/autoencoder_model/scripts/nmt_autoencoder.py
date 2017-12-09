@@ -32,6 +32,7 @@ from keras.layers.core import Lambda
 from keras.layers.core import Reshape
 from keras.layers.core import Flatten
 from keras.layers.recurrent import LSTM
+from keras.initializers import zero
 from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
@@ -87,27 +88,37 @@ def encoder_model():
 
 def decoder_model():
     inputs = Input(shape=(10, 16, 16, 64))
-
     h0 = UpSampling3D(size=(2, 1, 1))(inputs)
 
+    def get_zeros(x):
+        zero = K.zeros_like(x)
+        return zero
+
+    z1 = Lambda(get_zeros)(h0)
+    h0_cat = concatenate([h0, z1])
+
     # 10x16x16
+    clstm_input = Input(shape=(20, 16, 16, 128))
     convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(h0)
+                            recurrent_dropout=0.5)(clstm_input)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_1 = TimeDistributed(Dropout(0.5))(x)
+    convlstm_1_out = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    clstm = Model(inputs=clstm_input, outputs=convlstm_1_out)
+
+    h0_out = clstm(h0_cat)
+    in_0 = concatenate([h0, h0_out])
+    out_1 = clstm(in_0)
 
     flat_1 = TimeDistributed(Flatten())(out_1)
     aclstm_1 = GRU(units=16 * 16,
                    activation='tanh',
                    recurrent_dropout=0.5,
                    return_sequences=True)(flat_1)
-    x = TimeDistributed(BatchNormalization())(
-        aclstm_1)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
     dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
     a1_reshape = Reshape(target_shape=(VIDEO_LENGTH-10, 16, 16, 1))(dense_1)
     a1 = AttnLossLayer()(a1_reshape)
@@ -516,6 +527,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     autoencoder = autoencoder_model(encoder, decoder)
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[11].output)
+    mask_gen_1 = Sequential()
+    mask_gen_1.add(encoder)
+    mask_gen_1.add(intermediate_decoder)
+    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+
     if ADVERSARIAL:
         generator = refiner_g_model()
         discriminator = refiner_d_model()
@@ -540,6 +557,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 5
     NB_VAL_ITERATIONS = int(n_val_videos / BATCH_SIZE)
+
+    # for i in range(len(decoder.layers)):
+    #     print (decoder.layers[i], str(i))
+    #
+    # exit(0)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -612,6 +634,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
         # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
         decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+
+        predicted_attn = mask_gen_1.predict(X_train, verbose=0)
+        a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, VIDEO_LENGTH-10, 16, 16, 1))
+        np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
 
     # Train AAE
     if ADVERSARIAL:

@@ -70,7 +70,11 @@ def process_data():
                             #        (round(float(xml_file['video']['actions'][subject]['action'][j]['@end_time']) * 30)))
                             if ((i >= (round(float(xml_file['video']['actions'][subject]['action'][j]['@start_time'])*30)))
                                 and (i <= (round(float(xml_file['video']['actions'][subject]['action'][j]['@end_time'])*30)))):
-                                    action = action + "," + str(xml_file['video']['actions'][subject]['action'][j]['@id'])
+                                    if (len(action)==0):
+                                        action = action + str(xml_file['video']['actions'][subject]['action'][j]['@id'])
+                                    else:
+                                        action = action + ',' + str(xml_file['video']['actions'][subject]['action'][j]['@id'])
+
                     else:
                         # print(subject, i, str(xml_file['video']['actions'][subject]['action']['@id']))
                         # print((round(float(xml_file['video']['actions'][subject]['action']['@start_time']) * 30)),
@@ -79,7 +83,10 @@ def process_data():
                         round(float(xml_file['video']['actions'][subject]['action']['@start_time']) * 30)))
                             and (i <= (
                             round(float(xml_file['video']['actions'][subject]['action']['@end_time']) * 30)))):
-                            action = action + "," + str(xml_file['video']['actions'][subject]['action']['@id'])
+                            if (len(action)==0):
+                                action = action + str(xml_file['video']['actions'][subject]['action']['@id'])
+                            else:
+                                action = action + "," + str(xml_file['video']['actions'][subject]['action']['@id'])
 
 
                     # print (action)
@@ -91,28 +98,28 @@ def process_data():
                 frame_number = frame_number + 1
                 annotation_list.append(info)
                 # print (info)
-
-        print('Creating ' + split + ' data: ' + str(len(im_list)) + ' images')
-        X = np.zeros((len(im_list),) + desired_im_sz + (3,), np.uint8)
-        for i, im_file in enumerate(im_list):
-            try:
-                im = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                X[i] = process_im(im, im_file, desired_im_sz)
-                if split=='train':
-                    # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
-                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i+1) + ".png"), X[i])
-                if split=='test':
-                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "test/frame_" + str(i+1) + ".png"), X[i])
-                if split == 'val':
-                    cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "val/frame_" + str(i+1) + ".png"), X[i])
-            except cv2.error as e:
-                print("Image file being processed: ", im_file)
-                print (e)
-            except IOError as e:
-                print (e)
-
-        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_128' + '.hkl'))
-        hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_128' + '.hkl'))
+        #
+        # print('Creating ' + split + ' data: ' + str(len(im_list)) + ' images')
+        # X = np.zeros((len(im_list),) + desired_im_sz + (3,), np.uint8)
+        # for i, im_file in enumerate(im_list):
+        #     try:
+        #         im = cv2.imread(im_file, cv2.IMREAD_COLOR)
+        #         X[i] = process_im(im, im_file, desired_im_sz)
+        #         if split=='train':
+        #             # cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, im_file[len(im_file) - 14:len(im_file)]), X[i])
+        #             cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "train/frame_" + str(i+1) + ".png"), X[i])
+        #         if split=='test':
+        #             cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "test/frame_" + str(i+1) + ".png"), X[i])
+        #         if split == 'val':
+        #             cv2.imwrite(os.path.join(RESIZED_IMGS_DIR, "val/frame_" + str(i+1) + ".png"), X[i])
+        #     except cv2.error as e:
+        #         print("Image file being processed: ", im_file)
+        #         print (e)
+        #     except IOError as e:
+        #         print (e)
+        #
+        # hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_128' + '.hkl'))
+        # hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_128' + '.hkl'))
         hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_128' + '.hkl'))
 
 

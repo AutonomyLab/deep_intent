@@ -41,9 +41,8 @@ from keras.losses import mean_squared_error
 from keras.layers import Input
 from keras.models import Model
 from custom_layers import AttnLossLayer
-from custom_layers import mse_kld_loss
 from experience_memory import ExperienceMemory
-from config_ac import *
+from config_classifier import *
 from sys import stdout
 
 import tb_callback
@@ -202,10 +201,12 @@ def classifier_model():
     conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
 
     flat_1 = TimeDistributed(Flatten())(conv_4)
-    dense_1 = TimeDistributed(Dense(units=1024, activation='tanh'))(flat_1)
-    dense_2 = TimeDistributed(Dense(units=5, activation='softmax'))(dense_1)
+    dense_1 = TimeDistributed(Dense(units=512, activation='tanh'))(flat_1)
+    dense_1 = TimeDistributed(Dropout(0.5))(dense_1)
+    dense_2 = TimeDistributed(Dense(units=len(driver_actions), activation='sigmoid'))(dense_1)
+    dense_3 = TimeDistributed(Dense(units=len(ped_actions), activation='sigmoid'))(dense_1)
 
-    model = Model(inputs=inputs, outputs=dense_2)
+    model = Model(inputs=inputs, outputs=[dense_2, dense_3])
 
     return model
 
@@ -250,18 +251,64 @@ def conv_classifier_model():
     flat_1 = TimeDistributed(Flatten())(conv_4)
     dense_1 = TimeDistributed(Dense(units=512, activation='tanh'))(flat_1)
     dense_1 = TimeDistributed(Dropout(0.5))(dense_1)
-    dense_2 = TimeDistributed(Dense(units=5, activation='softmax'))(dense_1)
+    dense_2 = TimeDistributed(Dense(units=len(joint_action_set), activation='softmax'))(dense_1)
 
     model = Model(inputs=inputs, outputs=dense_2)
 
     return model
 
 
+def lstm_classifier():
+    inputs = Input(shape=(10, 128, 128, 3))
+
+    conv_1 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(5, 5),
+                                    strides=(2, 2),
+                                    padding="same"))(inputs)
+    conv_1 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_1)
+    conv_1 = TimeDistributed(Dropout(0.5))(conv_1)
+
+    conv_2 = TimeDistributed(Conv2D(filters=64,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_1)
+    conv_2 = TimeDistributed(BatchNormalization())(conv_2)
+    conv_2 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_2)
+    conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
+
+    conv_3 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_2)
+    conv_3 = TimeDistributed(BatchNormalization())(conv_3)
+    conv_3 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_3)
+    conv_3 = TimeDistributed(Dropout(0.5))(conv_3)
+
+    flat_1 = TimeDistributed(Flatten())(conv_3)
+    lstm_1 = LSTM(units=256,
+                  return_sequences=True,
+                  recurrent_dropout=0.5)(flat_1)
+    lstm_1 = TimeDistributed(BatchNormalization())(lstm_1)
+    lstm_1 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_1)
+
+    lstm_2 = LSTM(units=256,
+                  return_sequences=True,
+                  recurrent_dropout=0.5)(lstm_1)
+    lstm_2 = TimeDistributed(BatchNormalization())(lstm_2)
+    lstm_2 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_2)
+
+    dense_1 = TimeDistributed(Dense(units=len(driver_actions), activation='sigmoid'))(lstm_2)
+    dense_2 = TimeDistributed(Dense(units=len(ped_actions), activation='sigmoid'))(lstm_2)
+
+    model = Model(inputs=inputs, outputs=[dense_1, dense_2])
+
+    return model
+
 def shuffled_conv_classifier_model():
     inputs = Input(shape=(128, 128, 3))
     conv_1 = Conv2D(filters=32,
-                    kernel_size=(3, 3),
-                    strides=(1, 1),
+                    kernel_size=(5, 5),
+                    strides=(2, 2),
                     padding="same",
                     kernel_regularizer=regularizers.l2())(inputs)
     conv_1 = LeakyReLU(alpha=0.2)(conv_1)
@@ -327,6 +374,19 @@ def action_model(encoder, decoder, classifier):
 
     # model = Model(inputs=inputs, outputs=[images, predictions])
     model = Model(inputs=inputs, outputs=predictions)
+
+    return model
+
+
+def stacked_classifier_model(encoder, decoder, classifier):
+    input = Input(shape=(VIDEO_LENGTH-10, 128, 128, 3))
+    set_trainability(encoder, False)
+    z = encoder(input)
+    set_trainability(decoder, False)
+    future = decoder(z)
+    actions = classifier(future)
+
+    model = Model(inputs=input, outputs=actions)
 
     return model
 
@@ -447,15 +507,17 @@ def run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WE
         load_weights(DEC_WEIGHTS, decoder)
     if CLASSIFIER:
         if CLA_WEIGHTS != "None":
-            print("Pre-loading decoder with weights.")
+            print("Pre-loading classifier with weights.")
             load_weights(CLA_WEIGHTS, classifier)
 
 
-def load_X_y(videos_list, index, data_dir, action_cats):
+def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
     X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
-    y = []
+    y1 = []
+    y2 = []
     for i in range(BATCH_SIZE):
-        y_per_vid = []
+        y1_per_vid = []
+        y2_per_vid = []
         for j in range(VIDEO_LENGTH):
             frame_number = (videos_list[(index*BATCH_SIZE + i), j])
             filename = "frame_" + str(frame_number) + ".png"
@@ -466,20 +528,85 @@ def load_X_y(videos_list, index, data_dir, action_cats):
             except AttributeError as e:
                 print (im_file)
                 print (e)
-            if (len(action_cats) != 0):
+            if (len(driver_action_cats) != 0):
                 try:
-                    y_per_vid.append(action_cats[frame_number - 1])
+                    y1_per_vid.append(driver_action_cats[frame_number - 1])
                 except IndexError as e:
                     print (frame_number)
                     print (e)
-        if (len(action_cats) != 0):
-            y.append(y_per_vid)
-    return X, np.asarray(y)
+            if (len(ped_action_cats) != 0):
+                try:
+                    y2_per_vid.append(ped_action_cats[frame_number - 1])
+                except IndexError as e:
+                    print(frame_number)
+                    print(e)
+        if (len(driver_action_cats) != 0):
+            y1.append(y1_per_vid)
+        if (len(ped_action_cats) != 0):
+            y2.append(y2_per_vid)
+    return X, np.asarray(y1), np.asarray(y2)
 
-def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
-    print("Loading data definitions.")
-    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
+def get_action_classes(action_labels):
+    # Load labesl into categorical 1-hot vectors
+    print("Loading annotations.")
+    driver_action_class = []
+    ped_action_class = []
+    action_class = []
+    for i in range(len(action_labels)):
+        action_dict = dict(ele.split(':') for ele in action_labels[i].split(', ')[2:])
+        ped_action_per_frame = []
+        if ',' in action_dict['Driver']:
+            driver_action_nums = driver_actions.index(action_dict['Driver'].split(',')[0])
+            encoded_driver_action = to_categorical(driver_action_nums, len(joint_action_set))
+            driver_action_class.append(encoded_driver_action.T)
+        else:
+            driver_action_nums = driver_actions.index(action_dict['Driver'])
+            encoded_driver_action = to_categorical(driver_action_nums, len(joint_action_set))
+            driver_action_class.append(encoded_driver_action.T)
+        a = action_dict.values()[0:(len(action_dict.values()) - 1)]
+        a_clean = []
+        for j in range(len(a)):
+            if ',' in a[j]:
+                splits = a[j].split(',')
+                for k in range(len(splits)):
+                    a_clean.append(splits[k])
+            else:
+                a_clean.append(a[j])
+        ped_action_per_frame = list(set(a_clean))
+        encoded_ped_action = np.zeros(shape=(1, len(joint_action_set)), dtype=np.float32)
+        # print (ped_action_per_frame)
+        for action in ped_action_per_frame:
+            # Offset ped action from driver action
+            ped_action = ped_actions.index(action) + 5
+            # Add all unique categorical one-hot vectors
+            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(joint_action_set))
+
+        ped_action_class.append(encoded_ped_action.T)
+        action_class.append((encoded_driver_action + encoded_ped_action).T)
+
+    driver_action_class = np.asarray(driver_action_class)
+    driver_action_class = np.reshape(driver_action_class, newshape=(driver_action_class.shape[0:2]))
+    ped_action_class = np.asarray(ped_action_class)
+    ped_action_class = np.reshape(ped_action_class, newshape=(ped_action_class.shape[0:2]))
+    action_class = np.asarray(action_class)
+    action_class = np.reshape(action_class, newshape=(action_class.shape[0:2]))
+
+    # print (driver_action_class.shape)
+    # print (ped_action_class.shape)
+    # print (action_class.shape)
+    # print (np.where(driver_action_class > 1))
+    # print (np.where(ped_action_class > 1))
+    # print (np.where(action_class>1))
+    # print (driver_action_class[0])
+    # print (ped_action_class[0])
+    # print (action_class[0])
+    # exit(0)
+
+    return driver_action_class, ped_action_class
+
+
+def get_video_lists(frames_source, stride):
     # Build video progressions
     videos_list = []
     start_frame_index = 1
@@ -488,60 +615,43 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
             videos_list.append(range(start_frame_index, end_frame_index))
-            start_frame_index = start_frame_index + 1
-            end_frame_index = end_frame_index + 1
+            start_frame_index = start_frame_index + stride
+            end_frame_index = end_frame_index + stride
         else:
             start_frame_index = end_frame_index - 1
             end_frame_index = start_frame_index + VIDEO_LENGTH
 
     videos_list = np.asarray(videos_list, dtype=np.int32)
-    n_videos = videos_list.shape[0]
+
+    return np.asarray(videos_list)
+
+
+def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
+    print("Loading data definitions.")
+    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
+    videos_list = get_video_lists(frames_source=frames_source, stride=1)
 
     if SHUFFLE:
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
 
-    # Load labesl into categorical 1-hot vectors
-    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
-    print("Loading annotations.")
-    action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
-    action_nums = []
-    for i in range(len(action_classes)):
-        action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
-        action_nums.append(actions.index(str(action_dict['Driver'])))
-    action_cats = to_categorical(action_nums, len(actions))
+    # Load actions from annotations
+    action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
+    driver_action_classes, ped_action_classes = get_action_classes(action_labels=action_labels)
 
     # Setup validation
     val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
-    val_videos_list = []
-    start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
-    while (end_frame_index <= len(val_frames_source)):
-        val_frame_list = val_frames_source[start_frame_index:end_frame_index]
-        if (len(set(val_frame_list)) == 1):
-            val_videos_list.append(range(start_frame_index, end_frame_index))
-            start_frame_index = start_frame_index + VIDEO_LENGTH
-            end_frame_index = end_frame_index + VIDEO_LENGTH
-        else:
-            start_frame_index = end_frame_index - 1
-            end_frame_index = start_frame_index + VIDEO_LENGTH
-
-    val_videos_list = np.asarray(val_videos_list, dtype=np.int32)
-    n_val_videos = val_videos_list.shape[0]
-
-    # Load val labesl into categorical 1-hot vectors
-    val_action_classes = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
-    val_action_nums = []
-    for i in range(len(val_action_classes)):
-        val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
-        val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
-    val_action_cats = to_categorical(val_action_nums, len(actions))
+    val_videos_list = get_video_lists(frames_source=val_frames_source, stride=VIDEO_LENGTH)
+    # Load val action annotations
+    val_action_labels = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
+    val_driver_action_classes, val_ped_action_classes = get_action_classes(val_action_labels)
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
     encoder = encoder_model()
     decoder = decoder_model()
 
+    # Build attention layer output
     intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
     mask_gen_1 = Sequential()
     mask_gen_1.add(encoder)
@@ -549,21 +659,23 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_G)
 
     autoencoder = autoencoder_model(encoder, decoder)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
-    # classifier = classifier_model()
-    # classifier = conv_classifier_model()
-    classifier = shuffled_conv_classifier_model()
-    # action_predictor = action_model(encoder, decoder, classifier)
-    # action_predictor.compile(loss='categorical_crossentropy',
-    #                          optimizer=OPTIM_G,
-    #                          metrics=['accuracy'])
+    # Build stacked classifier
+    classifier = classifier_model()
+    classifier.compile(loss=["categorical_crossentropy", "categorical_crossenropy"],
+                             optimizer=OPTIM_C, metrics=['accuracy'])
+    sclassifier = stacked_classifier_model(encoder, decoder, classifier)
+    sclassifier.compile(loss=["categorical_crossentropy", "categorical_crossenropy"],
+                              optimizer=OPTIM_C,
+                              metrics=['accuracy'])
 
     run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
 
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
-    classifier.compile(loss="categorical_crossentropy", optimizer=OPTIM_G, metrics=['accuracy'])
-    # print (action_predictor.summary())
+    print (sclassifier.summary())
 
+    n_videos = videos_list.shape[0]
+    n_val_videos = val_videos_list.shape[0]
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
     NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
@@ -589,7 +701,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X, y = load_X_y(videos_list, index, DATA_DIR, [])
+            X, y1, y2 = load_X_y(videos_list, index, DATA_DIR, [], [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
@@ -614,7 +726,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):
-            X, y = load_X_y(val_videos_list, index, VAL_DATA_DIR, [])
+            X, y1, y2 = load_X_y(val_videos_list, index, VAL_DATA_DIR, [], [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             val_loss.append(autoencoder.test_on_batch(X_train, y_train))
@@ -648,157 +760,148 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Train AAE
     if CLASSIFIER:
-        # exp_memory = ExperienceMemory(memory_length=100)
-        print ("Training Classifier.")
-        # Setup fake labels
+        print("Training Classifier...")
         for epoch in range(NB_EPOCHS_CLASS):
             print("\n\nEpoch ", epoch)
-            a_loss = []
-            val_a_loss = []
+            c_loss = []
+            val_c_loss = []
 
             # # Set learning rate every epoch
             # LRS.on_epoch_begin(epoch=epoch)
             lr = K.get_value(autoencoder.optimizer.lr)
-            print ("Learning rate: " + str(lr))
-            # print ("a_loss_metrics: " + str(action_predictor.metrics_names))
-            print ("a_loss_metrics: " + str(classifier.metrics_names))
+            print("Learning rate: " + str(lr))
+            print("c_loss_metrics: " + str(classifier.metrics_names))
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
-                X, y = load_X_y(videos_list, index, DATA_DIR, action_cats)
-                X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
-                y_true_imgs = X[:, int(VIDEO_LENGTH/2) :]
-                y_true_classes = y[:, int(VIDEO_LENGTH/2) :]
-                predicted_images = autoencoder.predict(X_train)
-                X_train_shuffled = np.reshape(predicted_images,
-                                              newshape=((BATCH_SIZE*(int(VIDEO_LENGTH/2)),) + X_train.shape[2:]))
-                y_classes_shuffled = np.reshape(y_true_classes,
-                                              newshape=((BATCH_SIZE*(int(VIDEO_LENGTH/2)),)
-                                                        + y_true_classes.shape[2:]))
-                c = list(zip(X_train_shuffled, y_classes_shuffled))
-                random.shuffle(c)
-                X_train_shuffled, y_classes_shuffled = list(zip(*c))
-                X_train_shuffled = np.asarray(X_train_shuffled)
-                y_classes_shuffled = np.asarray(y_classes_shuffled)
+                X, y1, y2 = load_X_y(videos_list, index, DATA_DIR, driver_action_classes, ped_action_classes)
+                X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
+                y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+                y1_true_classes = y1[:, int(VIDEO_LENGTH / 2):]
+                y2_true_classes = y2[:, int(VIDEO_LENGTH / 2):]
 
-                a_loss.append(classifier.train_on_batch(X_train_shuffled, y_classes_shuffled))
+                c_loss.append(sclassifier.train_on_batch(X_train, [y1_true_classes, y2_true_classes]))
 
                 arrow = int(index / (NB_ITERATIONS / 30))
-                stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "a_loss: " + str(a_loss[len(a_loss) - 1]) + "  " +
-                             "\t    [" + "{0}>".format("="*(arrow)))
+                stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
+                             "c_loss: " + str(c_loss[len(c_loss) - 1]) + "  " +
+                             "\t    [" + "{0}>".format("=" * (arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
-                predicted_images = np.reshape(X_train_shuffled, newshape=(10, 10, 128, 128, 3))
-                predicted_classes = classifier.predict(X_train_shuffled, verbose=0)
+                predicted_images = autoencoder.predict(X_train)
+                driver_pred_classes, ped_pred_classes = sclassifier.predict(X_train, verbose=0)
                 orig_image, truth_image, pred_image = combine_images(X_train, y_true_imgs, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
                 font = cv2.FONT_HERSHEY_SIMPLEX
-                if epoch == 0 :
+                if epoch == 0:
                     y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                     # Add labels as text to the image
                     for k in range(BATCH_SIZE):
-                        for j in range(int(VIDEO_LENGTH/2)):
-                            class_num_past = np.argmax(y_orig_classes[k, j])
-                            class_num_futr = np.argmax(y_true_classes[k, j])
-                            cv2.putText(orig_image, actions[class_num_past],
-                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                            cv2.putText(truth_image, actions[class_num_futr],
-                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                        for j in range(int(VIDEO_LENGTH / 2)):
+                            topk_past = np.argpartition(-y_orig_classes[k, j], 2)
+                            top2_past = -topk_past[:2]
+                            topk_futr = np.argpartition(-y_true_classes[k, j], 2)
+                            top2_futr = -topk_futr[:2]
+                            for l in range(len(top2_past)):
+                                class_num_past = int(top2_past[l])
+                                class_num_futr = int(top2_futr[l])
+                                cv2.putText(orig_image, formatted_joint_action_set[class_num_past],
+                                            (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                                cv2.putText(truth_image, formatted_joint_action_set[class_num_futr],
+                                            (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_truth.png"), truth_image)
 
                 # Add labels as text to the image
-                predicted_classes = np.reshape(predicted_classes, newshape=(10, 10, 5))
-                y_classes_shuffled = np.reshape(y_classes_shuffled, newshape=(10, 10, 5))
                 for k in range(BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH / 2)):
-                        class_num = np.argmax(predicted_classes[k, j])
-                        class_num_futr = np.argmax(y_classes_shuffled[k, j])
-                        cv2.putText(pred_image, actions[class_num],
-                                    (2 + j * (128), 120 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                        cv2.putText(pred_image, actions[class_num_futr],
-                                    (2 + j * (128), 105 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"), pred_image)
+                        topk_pred = np.argpartition(-predicted_classes[k, j], 2)
+                        top2_pred = -topk_pred[:2]
+                        for l in range(len(top2_pred)):
+                            class_num = int(top2_pred[l])
+                            cv2.putText(pred_image, formatted_joint_action_set[class_num],
+                                        (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"),
+                            pred_image)
 
             # Run over validation data
-            print ('')
+            print('')
             for index in range(NB_VAL_ITERATIONS):
-                X, y = load_X_y(val_videos_list, index, VAL_DATA_DIR, val_action_cats)
-                X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-                y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+                X, y1, y2 = load_X_y(val_videos_list, index, VAL_DATA_DIR, val_driver_action_classes, val_ped_action_classes)
+                X_val = X[:, 0: int(VIDEO_LENGTH / 2)]
                 y_true_classes = y[:, int(VIDEO_LENGTH / 2):]
-                predicted_images = autoencoder.predict(X_train)
-                X_train_unwrapped = np.reshape(predicted_images,
-                                              newshape=((BATCH_SIZE * (int(VIDEO_LENGTH / 2)),)
-                                                        + X_train.shape[2:]))
-                y_classes_unwrapped = np.reshape(y_true_classes,
-                                                newshape=((BATCH_SIZE * (int(VIDEO_LENGTH / 2)),)
-                                                          + y_true_classes.shape[2:]))
-                val_a_loss.append(classifier.test_on_batch(X_train_unwrapped, y_classes_unwrapped))
+                y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+
+                val_c_loss.append(sclassifier.test_on_batch(X_val, y_true_classes))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                             "val_a_loss: " + str(val_a_loss[len(val_a_loss) - 1]) )
+                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1]))
                 stdout.flush()
 
-            if SAVE_GENERATED_IMAGES:
-                # Save generated images to file
-                predicted_images = autoencoder.predict(X_train)
-                predicted_classes = classifier.predict(X_train_unwrapped, verbose=0)
-                orig_image, truth_image, pred_image = combine_images(X_train, y_true_imgs, predicted_images)
-                pred_image = pred_image * 127.5 + 127.5
-                orig_image = orig_image * 127.5 + 127.5
-                truth_image = truth_image * 127.5 + 127.5
-                font = cv2.FONT_HERSHEY_SIMPLEX
-                if epoch == 0 :
-                    y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
-                    # Add labels as text to the image
-                    for k in range(BATCH_SIZE):
-                        for j in range(int(VIDEO_LENGTH/2)):
-                            class_num_past = np.argmax(y_orig_classes[k, j])
-                            class_num_futr = np.argmax(y_true_classes[k, j])
-                            cv2.putText(orig_image, actions[class_num_past],
-                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                            cv2.putText(truth_image, actions[class_num_futr],
-                                        (2 + j*(128), 120 + k*128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
-                                             "_cla_val_orig.png"), orig_image)
-                    cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
-                                             "_cla_val_truth.png"), truth_image)
-
-                predicted_classes = np.reshape(predicted_classes, newshape=(10, 10, 5))
+            # Save generated images to file
+            predicted_images = autoencoder.predict(X_val)
+            predicted_classes = sclassifier.predict(X_train, verbose=0)
+            orig_image, truth_image, pred_image = combine_images(X_val, y_true_imgs, predicted_images)
+            pred_image = pred_image * 127.5 + 127.5
+            orig_image = orig_image * 127.5 + 127.5
+            truth_image = truth_image * 127.5 + 127.5
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            if epoch == 0:
+                y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH / 2)):
-                        class_num = np.argmax(predicted_classes[k, j])
-                        class_num_futr = np.argmax(y_true_classes[k, j])
-                        cv2.putText(pred_image, actions[class_num],
-                                    (2 + j * (128), 120 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                        cv2.putText(pred_image, "true:" + actions[class_num_futr],
-                                    (2 + j * (128), 105 + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_val_pred.png"), pred_image)
+                        topk_past = np.argpartition(-y_orig_classes[k, j], 2)
+                        top2_past = -topk_past[:2]
+                        topk_futr = np.argpartition(-y_true_classes[k, j], 2)
+                        top2_futr = -topk_futr[:2]
+                        for l in range(len(top2_past)):
+                            class_num_past = int(top2_past[l])
+                            class_num_futr = int(top2_futr[l])
+                            cv2.putText(orig_image, formatted_joint_action_set[class_num_past],
+                                        (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                            cv2.putText(truth_image, formatted_joint_action_set[class_num_futr],
+                                        (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                                         "_cla_val_orig.png"), orig_image)
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
+                                         "_cla_val_truth.png"), truth_image)
 
+            # Add labels as text to the image
+            for k in range(BATCH_SIZE):
+                for j in range(int(VIDEO_LENGTH / 2)):
+                    topk_pred = np.argpartition(-predicted_classes[k, j], 2)
+                    top2_pred = -topk_pred[:2]
+                    for l in range(len(top2_pred)):
+                        class_num = int(top2_pred[l])
+                        cv2.putText(pred_image, formatted_joint_action_set[class_num],
+                                    (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+            cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_val_pred.png"),
+                        pred_image)
 
             predicted_attn = mask_gen_1.predict(X_train, verbose=0)
-            a_pred = np.reshape(predicted_attn, newshape=(10, 10, 16, 16, 1))
+            a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, VIDEO_LENGTH-10, 16, 16, 1))
             np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
 
             # then after each epoch/iteration
-            avg_a_loss = np.mean(np.asarray(a_loss, dtype=np.float32), axis=0)
-            avg_val_a_loss = np.mean(np.asarray(val_a_loss, dtype=np.float32), axis=0)
+            avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
+            avg_val_c_loss = np.mean(np.asarray(val_c_loss, dtype=np.float32), axis=0)
 
-            loss_values = np.asarray(avg_a_loss.tolist() + avg_val_a_loss.tolist(), dtype=np.float32)
-            a_loss_keys = ['a_' + metric for metric in classifier.metrics_names]
-            val_a_loss_keys = ['a_val_' + metric for metric in classifier.metrics_names]
+            loss_values = np.asarray(avg_c_loss.tolist() + avg_val_c_loss.tolist(), dtype=np.float32)
+            c_loss_keys = ['c_' + metric for metric in classifier.metrics_names]
+            val_c_loss_keys = ['c_val_' + metric for metric in classifier.metrics_names]
 
-            loss_keys = a_loss_keys + val_a_loss_keys
+            loss_keys = c_loss_keys + val_c_loss_keys
             logs = dict(zip(loss_keys, loss_values))
 
             TC_cla.on_epoch_end(epoch, logs)
@@ -807,17 +910,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             with open(os.path.join(LOG_DIR, 'losses_aae.json'), 'a') as log_file:
                 log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
 
-            print("\nAvg a_loss: " + str(avg_a_loss) +
-                  " Avg val_a_loss: " + str(avg_val_a_loss))
+            print("\nAvg c_loss: " + str(avg_c_loss) +
+                  " Avg val_c_loss: " + str(avg_val_c_loss))
 
             # Save model weights per epoch to file
-            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_'+str(epoch)+'.h5'), True)
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_' + str(epoch) + '.h5'), True)
             decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_cla_epoch_' + str(epoch) + '.h5'), True)
-            classifier.save_weights(os.path.join(CHECKPOINT_DIR, 'classifier_cla_epoch_' + str(epoch) + '.h5'), True)
+            classifier.save_weights(os.path.join(CHECKPOINT_DIR, 'classifier_cla_epoch_' + str(epoch) + '.h5'),
+                                    True)
 
     # End TensorBoard Callback
-    TC.on_train_end('_')
-    TC_cla.on_train_end('_')
+    # TC.on_train_end('_')
+    # TC_cla.on_train_end('_')
 
 def test(ENC_WEIGHTS, DEC_WEIGHTS):
 

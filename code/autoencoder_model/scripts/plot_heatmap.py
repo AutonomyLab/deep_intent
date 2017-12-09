@@ -11,16 +11,18 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import cv2
 import ast
-from config_ac import *
+from config_ac import TEST_RESULTS_DIR
 
-def plot_heatmap(attn_layer, epoch, vid_num):
+def plot_heatmap(attn_layer, epoch, vid_num, file):
     print (attn_layer)
     for i in attn_layer:
         gen = i
         gen_name = 'gen' + str(gen)
-        data = np.load('./../zhora/history/attention_weights_' + gen_name + '_' + str(epoch) + '.npy')
+        data = np.load(file)
+        if file == "None":
+            data = np.load('./../zhora/history/attention_weights_' + gen_name + '_' + str(epoch) + '.npy')
         data = data[vid_num]
-        for i in range(10):
+        for i in range(data.shape[0]):
             for j in range(data.shape[-1]):
                 frame = data[i, :, :, j]
                 # frame_1 = data[i, : ,:, 0]
@@ -37,6 +39,7 @@ def plot_heatmap(attn_layer, epoch, vid_num):
 
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--file", type=str, default="None")
     parser.add_argument('--attn_layers', nargs='+', type=int)
     parser.add_argument("--epoch", type=int, default=0)
     parser.add_argument("--vid_num", type=int, default=2)
@@ -49,4 +52,4 @@ if __name__ == "__main__":
     # print (type(args.attn_layers))
     # print (args.epoch)
     # print (args.vid_num)
-    plot_heatmap(attn_layer=args.attn_layers, epoch=args.epoch, vid_num=args.vid_num)
+    plot_heatmap(attn_layer=args.attn_layers, epoch=args.epoch, vid_num=args.vid_num, file=args.file)
