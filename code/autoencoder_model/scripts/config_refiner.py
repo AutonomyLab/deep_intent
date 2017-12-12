@@ -87,7 +87,7 @@ LOSS_WEIGHTS = [1, 1]
 print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
+BATCH_SIZE = 8
 NB_EPOCHS_AUTOENCODER = 0
 NB_EPOCHS_GAN = 100
 

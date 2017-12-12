@@ -92,7 +92,7 @@ def decoder_model():
     inputs = Input(shape=(10, 16, 16, 32))
 
     # 10x16x16
-    convlstm_1 = ConvLSTM2D(filters=64,
+    convlstm_1 = ConvLSTM2D(filters=32,
                             kernel_size=(5, 5),
                             strides=(1, 1),
                             padding='same',
@@ -103,7 +103,7 @@ def decoder_model():
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
     flat_1 = TimeDistributed(Flatten())(out_1)
-    aclstm_1 = GRU(units=16 * 16,
+    aclstm_1 = LSTM(units=16 * 16,
                    activation='tanh',
                    recurrent_dropout=0.5,
                    return_sequences=True)(flat_1)
@@ -391,25 +391,40 @@ def load_X_y(videos_list, index, frames, action_cats):
     y = np.asarray(y)
     return X,y
 
+def load_X(videos_list, index, data_dir):
+    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+    for i in range(BATCH_SIZE):
+        for j in range(VIDEO_LENGTH):
+            filename = "frame_" + str(videos_list[(index*BATCH_SIZE + i), j]) + ".png"
+            im_file = os.path.join(data_dir, filename)
+            try:
+                frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+                X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
+            except AttributeError as e:
+                print (im_file)
+                print (e)
+
+    return X
+
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
 
-    frames_source = frames_source[:: 2]
-    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
-
-    j = 1
-    for i in range(1, len(frames_source)):
-        filename = "frame_" + str(j) + ".png"
-        im_file = os.path.join(DATA_DIR, filename)
-        try:
-            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
-            j = j + 2
-        except AttributeError as e:
-            print(im_file)
-            print(e)
+    # frames_source = frames_source[:: 2]
+    # frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+    #
+    # j = 1
+    # for i in range(1, len(frames_source)):
+    #     filename = "frame_" + str(j) + ".png"
+    #     im_file = os.path.join(DATA_DIR, filename)
+    #     try:
+    #         frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+    #         frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
+    #         j = j + 2
+    #     except AttributeError as e:
+    #         print(im_file)
+    #         print(e)
 
     # Build video progressions
     videos_list = []
@@ -418,7 +433,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     while (end_frame_index <= len(frames_source)):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
-            videos_list.append((start_frame_index, end_frame_index))
+            videos_list.append(range(start_frame_index, end_frame_index))
             start_frame_index = start_frame_index + 1
             end_frame_index = end_frame_index + 1
         else:
@@ -432,58 +447,58 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
 
-    # Load labesl into categorical 1-hot vectors
-    actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
-    print ("Loading annotations...")
-    action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
-    action_nums = []
-    for i in range(len(action_classes)):
-        action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
-        action_nums.append(actions.index(str(action_dict['Driver'])))
-    action_nums = action_nums[::2]
-    action_cats = np.asarray(to_categorical(action_nums, len(actions)))
-
-    # Setup validation
-    val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
-    val_frames_source = val_frames_source[:: 2]
-    val_frames = np.zeros(shape=((len(val_frames_source),) + IMG_SIZE))
-
-    j = 1
-    for i in range(1, len(val_frames_source)):
-        filename = "frame_" + str(j) + ".png"
-        im_file = os.path.join(DATA_DIR, filename)
-        try:
-            val_frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            val_frames[i] = (val_frame.astype(np.float32) - 127.5) / 127.5
-            j = j + 2
-        except AttributeError as e:
-            print(im_file)
-            print(e)
-
-    val_videos_list = []
-    start_frame_index = 0
-    end_frame_index = VIDEO_LENGTH
-    while (end_frame_index <= len(val_frames_source)):
-        val_frame_list = val_frames_source[start_frame_index:end_frame_index]
-        if (len(set(val_frame_list)) == 1):
-            val_videos_list.append((start_frame_index, end_frame_index))
-            start_frame_index = start_frame_index + VIDEO_LENGTH
-            end_frame_index = end_frame_index + VIDEO_LENGTH
-        else:
-            start_frame_index = end_frame_index - 1
-            end_frame_index = start_frame_index + VIDEO_LENGTH
-
-    val_videos_list = np.asarray(val_videos_list, dtype=np.int32)
-    n_val_videos = val_videos_list.shape[0]
-
-    # Load val labesl into categorical 1-hot vectors
-    val_action_classes = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
-    val_action_nums = []
-    for i in range(len(val_action_classes)):
-        val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
-        val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
-    val_action_nums = val_action_nums[::2]
-    val_action_cats = to_categorical(val_action_nums, len(actions))
+    # # Load labesl into categorical 1-hot vectors
+    # actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast', 'fake']
+    # print ("Loading annotations...")
+    # action_classes = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
+    # action_nums = []
+    # for i in range(len(action_classes)):
+    #     action_dict = dict(ele.split(':') for ele in action_classes[i].split(', ')[2:])
+    #     action_nums.append(actions.index(str(action_dict['Driver'])))
+    # action_nums = action_nums[::2]
+    # action_cats = np.asarray(to_categorical(action_nums, len(actions)))
+    #
+    # # Setup validation
+    # val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
+    # val_frames_source = val_frames_source[:: 2]
+    # val_frames = np.zeros(shape=((len(val_frames_source),) + IMG_SIZE))
+    #
+    # j = 1
+    # for i in range(1, len(val_frames_source)):
+    #     filename = "frame_" + str(j) + ".png"
+    #     im_file = os.path.join(DATA_DIR, filename)
+    #     try:
+    #         val_frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+    #         val_frames[i] = (val_frame.astype(np.float32) - 127.5) / 127.5
+    #         j = j + 2
+    #     except AttributeError as e:
+    #         print(im_file)
+    #         print(e)
+    #
+    # val_videos_list = []
+    # start_frame_index = 0
+    # end_frame_index = VIDEO_LENGTH
+    # while (end_frame_index <= len(val_frames_source)):
+    #     val_frame_list = val_frames_source[start_frame_index:end_frame_index]
+    #     if (len(set(val_frame_list)) == 1):
+    #         val_videos_list.append((start_frame_index, end_frame_index))
+    #         start_frame_index = start_frame_index + VIDEO_LENGTH
+    #         end_frame_index = end_frame_index + VIDEO_LENGTH
+    #     else:
+    #         start_frame_index = end_frame_index - 1
+    #         end_frame_index = start_frame_index + VIDEO_LENGTH
+    #
+    # val_videos_list = np.asarray(val_videos_list, dtype=np.int32)
+    # n_val_videos = val_videos_list.shape[0]
+    #
+    # # Load val labesl into categorical 1-hot vectors
+    # val_action_classes = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_128.hkl'))
+    # val_action_nums = []
+    # for i in range(len(val_action_classes)):
+    #     val_action_dict = dict(ele.split(':') for ele in val_action_classes[i].split(', ')[2:])
+    #     val_action_nums.append(actions.index(str(val_action_dict['Driver'])))
+    # val_action_nums = val_action_nums[::2]
+    # val_action_cats = to_categorical(val_action_nums, len(actions))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models...")
@@ -513,7 +528,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
-    NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
+    # NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -535,7 +550,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X, y = load_X_y(videos_list, index, frames, [])
+            X = load_X(videos_list, index, DATA_DIR)
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))

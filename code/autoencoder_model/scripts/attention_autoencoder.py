@@ -118,55 +118,55 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(conv3D_1)
     x = TimeDistributed(Dropout(0.5))(x)
 
-    # conv3D_2 = Conv3D(filters=1,
-    #                   strides=(1, 1, 1),
-    #                   kernel_size=(3, 3, 3),
-    #                   dilation_rate=(3, 3, 3),
-    #                   padding='same')(x)
-    # x = TimeDistributed(BatchNormalization())(conv3D_2)
-    # x = TimeDistributed(Dropout(0.5))(x)
-    flat_1 = TimeDistributed(Flatten())(x)
-    dense_1 = TimeDistributed(Dense(units=64 * 64, activation='softmax'))(flat_1)
-    x = TimeDistributed(Dropout(0.5))(dense_1)
-    a = Reshape(target_shape=(10, 64, 64, 1))(x)
-
-    # Custom loss layer
-    class CustomLossLayer(Layer):
-        def __init__(self, **kwargs):
-            self.is_placeholder = True
-            super(CustomLossLayer, self).__init__(**kwargs)
-
-        def build(self, input_shape):
-            # Create a trainable weight variable for this layer.
-            super(CustomLossLayer, self).build(input_shape)  # Be sure to call this somewhere!
-
-        def attn_loss(self, a):
-            attn_loss = K.sum(K.flatten(K.square(1 - K.sum(a, axis=1))), axis=-1)
-            return ATTN_COEFF * K.mean(attn_loss)
-
-        def call(self, inputs):
-            x = inputs
-            print (inputs.shape)
-            loss = self.attn_loss(x)
-            self.add_loss(loss, inputs=inputs)
-            # We do use this output.
-            return x
-
-        def compute_output_shape(self, input_shape):
-            return (input_shape[0], 10, 64, 64, 1)
-
-    x = CustomLossLayer()(a)
-    x = Flatten()(x)
-    x = RepeatVector(n=64)(x)
-    x = Permute((2, 1))(x)
-    x = Reshape(target_shape=(10, 64, 64, 64))(x)
-    attn_1 = multiply([out_3, x])
+    # # conv3D_2 = Conv3D(filters=1,
+    # #                   strides=(1, 1, 1),
+    # #                   kernel_size=(3, 3, 3),
+    # #                   dilation_rate=(3, 3, 3),
+    # #                   padding='same')(x)
+    # # x = TimeDistributed(BatchNormalization())(conv3D_2)
+    # # x = TimeDistributed(Dropout(0.5))(x)
+    # flat_1 = TimeDistributed(Flatten())(x)
+    # dense_1 = TimeDistributed(Dense(units=64 * 64, activation='softmax'))(flat_1)
+    # x = TimeDistributed(Dropout(0.5))(dense_1)
+    # a = Reshape(target_shape=(10, 64, 64, 1))(x)
+    #
+    # # Custom loss layer
+    # class CustomLossLayer(Layer):
+    #     def __init__(self, **kwargs):
+    #         self.is_placeholder = True
+    #         super(CustomLossLayer, self).__init__(**kwargs)
+    #
+    #     def build(self, input_shape):
+    #         # Create a trainable weight variable for this layer.
+    #         super(CustomLossLayer, self).build(input_shape)  # Be sure to call this somewhere!
+    #
+    #     def attn_loss(self, a):
+    #         attn_loss = K.sum(K.flatten(K.square(1 - K.sum(a, axis=1))), axis=-1)
+    #         return ATTN_COEFF * K.mean(attn_loss)
+    #
+    #     def call(self, inputs):
+    #         x = inputs
+    #         print (inputs.shape)
+    #         loss = self.attn_loss(x)
+    #         self.add_loss(loss, inputs=inputs)
+    #         # We do use this output.
+    #         return x
+    #
+    #     def compute_output_shape(self, input_shape):
+    #         return (input_shape[0], 10, 64, 64, 1)
+    #
+    # x = CustomLossLayer()(a)
+    # x = Flatten()(x)
+    # x = RepeatVector(n=64)(x)
+    # x = Permute((2, 1))(x)
+    # x = Reshape(target_shape=(10, 64, 64, 64))(x)
+    # attn_1 = multiply([out_3, x])
 
     # 10x128x128
     conv_4 = Conv3DTranspose(filters=3,
                              kernel_size=(3, 11, 11),
                              strides=(1, 2, 2),
-                             padding='same')(attn_1)
+                             padding='same')(x)
     x = TimeDistributed(BatchNormalization())(conv_4)
     x = TimeDistributed(Activation('tanh'))(x)
     predictions = TimeDistributed(Dropout(0.5))(x)

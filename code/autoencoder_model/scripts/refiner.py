@@ -6,7 +6,7 @@ import hickle as hkl
 import numpy as np
 from tensorflow.python.pywrap_tensorflow import do_quantize_training_on_graphdef
 
-np.random.seed(2 ** 10)
+np.random.seed(9 ** 10)
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 from keras import regularizers
@@ -182,63 +182,120 @@ def refiner_g_model():
     # enc_2 = concatenate([conv_3, conv_4])
 
     # Decoder stage 2
-    conv_5 = TimeDistributed(Conv2DTranspose(filters=128,
-                                             kernel_size=(3, 3),
-                                             strides=(1, 1),
-                                             padding="same"))(conv_3)
-    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
-    conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
-    conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
+    # conv_5 = TimeDistributed(Conv2DTranspose(filters=128,
+    #                                          kernel_size=(3, 3),
+    #                                          strides=(1, 1),
+    #                                          padding="same"))(conv_3)
+    # conv_5 = TimeDistributed(BatchNormalization())(conv_5)
+    # conv_5 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_5)
+    # conv_5 = TimeDistributed(Dropout(0.5))(conv_5)
+    #
+    # conv_6 = TimeDistributed(Conv2DTranspose(filters=64,
+    #                                          kernel_size=(3, 3),
+    #                                          strides=(2, 2),
+    #                                          padding="same"))(conv_5)
+    # conv_6 = TimeDistributed(BatchNormalization())(conv_6)
+    # conv_6 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_6)
+    # conv_6 = TimeDistributed(Dropout(0.5))(conv_6)
+    #
+    # conv_7 = TimeDistributed(Conv2DTranspose(filters=32,
+    #                                          kernel_size=(3, 3),
+    #                                          strides=(2, 2),
+    #                                          padding="same"))(conv_6)
+    # conv_7 = TimeDistributed(BatchNormalization())(conv_7)
+    # conv_7 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_7)
+    # conv_7 = TimeDistributed(Dropout(0.5))(conv_7)
+    #
+    # conv_8 = TimeDistributed(Conv2DTranspose(filters=16,
+    #                                          kernel_size=(3, 3),
+    #                                          strides=(2, 2),
+    #                                          padding="same"))(conv_7)
+    # conv_8 = TimeDistributed(BatchNormalization())(conv_8)
+    # conv_8 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_8)
+    # conv_8 = TimeDistributed(Dropout(0.5))(conv_8)
+    #
+    # conv_9 = TimeDistributed(Conv2DTranspose(filters=3,
+    #                                          kernel_size=(3, 3),
+    #                                          strides=(2, 2),
+    #                                          padding="same"))(conv_8)
+    # conv_9 = TimeDistributed(BatchNormalization())(conv_9)
+    # conv_9 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_9)
+    # conv_9 = TimeDistributed(Dropout(0.5))(conv_9)
 
-    conv_6 = TimeDistributed(Conv2DTranspose(filters=64,
-                                             kernel_size=(3, 3),
-                                             strides=(2, 2),
-                                             padding="same"))(conv_5)
-    conv_6 = TimeDistributed(BatchNormalization())(conv_6)
-    conv_6 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_6)
-    conv_6 = TimeDistributed(Dropout(0.5))(conv_6)
+    # conv_10 = TimeDistributed(Conv2DTranspose(filters=3,
+    #                                          kernel_size=(2, 2),
+    #                                          strides=(1, 1),
+    #                                          padding="same"))(conv_9)
+    # conv_10 = TimeDistributed(BatchNormalization())(conv_10)
+    # conv_10 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_10)
+    # conv_10 = TimeDistributed(Dropout(0.5))(conv_10)
+    #
+    # conv_11 = TimeDistributed(Conv2DTranspose(filters=3,
+    #                                          kernel_size=(1, 1),
+    #                                          strides=(1, 1),
+    #                                          padding="same"))(conv_10)
+    # # conv_11 = TimeDistributed(BatchNormalization())(conv_11)
+    # conv_11 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_11)
+    # conv_11 = TimeDistributed(Dropout(0.5))(conv_11)
 
-    conv_7 = TimeDistributed(Conv2DTranspose(filters=32,
-                                             kernel_size=(3, 3),
-                                             strides=(2, 2),
-                                             padding="same"))(conv_6)
-    conv_7 = TimeDistributed(BatchNormalization())(conv_7)
-    conv_7 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_7)
-    conv_7 = TimeDistributed(Dropout(0.5))(conv_7)
 
-    conv_8 = TimeDistributed(Conv2DTranspose(filters=16,
-                                             kernel_size=(3, 3),
-                                             strides=(2, 2),
-                                             padding="same"))(conv_7)
-    conv_8 = TimeDistributed(BatchNormalization())(conv_8)
-    conv_8 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_8)
-    conv_8 = TimeDistributed(Dropout(0.5))(conv_8)
+    # 10x16x16
+    convlstm_1 = ConvLSTM2D(filters=128,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(conv_3)
+    x = TimeDistributed(BatchNormalization())(convlstm_1)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    h_1 = TimeDistributed(Dropout(0.5))(x)
+    out_1 = UpSampling3D(size=(1, 2, 2))(h_1)
 
-    conv_9 = TimeDistributed(Conv2DTranspose(filters=3,
-                                             kernel_size=(3, 3),
-                                             strides=(2, 2),
-                                             padding="same"))(conv_8)
-    conv_9 = TimeDistributed(BatchNormalization())(conv_9)
-    conv_9 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_9)
-    conv_9 = TimeDistributed(Dropout(0.5))(conv_9)
+    convlstm_2 = ConvLSTM2D(filters=64,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(out_1)
+    x = TimeDistributed(BatchNormalization())(convlstm_2)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    h_2 = TimeDistributed(Dropout(0.5))(x)
+    out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
 
-    conv_10 = TimeDistributed(Conv2DTranspose(filters=3,
-                                             kernel_size=(2, 2),
-                                             strides=(1, 1),
-                                             padding="same"))(conv_9)
-    conv_10 = TimeDistributed(BatchNormalization())(conv_10)
-    conv_10 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_10)
-    conv_10 = TimeDistributed(Dropout(0.5))(conv_10)
+    # 10x32x32
+    convlstm_3 = ConvLSTM2D(filters=32,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(out_2)
+    x = TimeDistributed(BatchNormalization())(convlstm_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    h_3 = TimeDistributed(Dropout(0.5))(x)
+    out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
 
-    conv_11 = TimeDistributed(Conv2DTranspose(filters=3,
-                                             kernel_size=(1, 1),
-                                             strides=(1, 1),
-                                             padding="same"))(conv_10)
-    # conv_11 = TimeDistributed(BatchNormalization())(conv_11)
-    conv_11 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_11)
-    conv_11 = TimeDistributed(Dropout(0.5))(conv_11)
+    # 10x64x64
+    convlstm_4 = ConvLSTM2D(filters=16,
+                            kernel_size=(2, 2),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(out_3)
+    x = TimeDistributed(BatchNormalization())(convlstm_4)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    h_4 = TimeDistributed(Dropout(0.5))(x)
+    out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
 
-    model = Model(inputs=inputs, outputs=conv_11)
+    # 10x128x128
+    convlstm_5 = ConvLSTM2D(filters=3,
+                            kernel_size=(1, 1),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.5)(out_4)
+    convlstm_5= TimeDistributed(Activation('tanh'))(convlstm_5)
+
+    model = Model(inputs=inputs, outputs=convlstm_5)
 
     return model
 
@@ -315,6 +372,17 @@ def autoencoder_model(encoder, decoder):
     model = Sequential()
     model.add(encoder)
     model.add(decoder)
+    return model
+
+
+def stacked_autoencoder(encoder, decoder, generator):
+    model = Sequential()
+    set_trainability(encoder, False)
+    model.add(encoder)
+    set_trainability(decoder, False)
+    model.add(decoder)
+    model.add(generator)
+
     return model
 
 
@@ -411,9 +479,12 @@ def run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
         print (decoder.summary())
         print (autoencoder.summary())
         if ADVERSARIAL:
-            print (generator.summary())
-            print (discriminator.summary())
-            print (gan.summary())
+            if generator!='None':
+                print (generator.summary())
+            if discriminator != 'None':
+                print (discriminator.summary())
+            if gan != 'None':
+                print (gan.summary())
         # exit(0)
 
     # Save model to file
@@ -432,26 +503,32 @@ def run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
             json_file.write(model_json)
 
         if ADVERSARIAL:
-            model_json = generator.to_json()
-            with open(os.path.join(MODEL_DIR, "generator.json"), "w") as json_file:
-                json_file.write(model_json)
+            if generator != "None":
+                model_json = generator.to_json()
+                with open(os.path.join(MODEL_DIR, "generator.json"), "w") as json_file:
+                    json_file.write(model_json)
 
-            model_json = discriminator.to_json()
-            with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
-                json_file.write(model_json)
+            if discriminator != "None":
+                model_json = discriminator.to_json()
+                with open(os.path.join(MODEL_DIR, "discriminator.json"), "w") as json_file:
+                    json_file.write(model_json)
 
-            model_json = gan.to_json()
-            with open(os.path.join(MODEL_DIR, "gan.json"), "w") as json_file:
-                json_file.write(model_json)
+            if gan != "None":
+                model_json = gan.to_json()
+                with open(os.path.join(MODEL_DIR, "gan.json"), "w") as json_file:
+                    json_file.write(model_json)
 
         if PLOT_MODEL:
             plot_model(encoder, to_file=os.path.join(MODEL_DIR, 'encoder.png'), show_shapes=True)
             plot_model(decoder, to_file=os.path.join(MODEL_DIR, 'decoder.png'), show_shapes=True)
             plot_model(autoencoder, to_file=os.path.join(MODEL_DIR, 'autoencoder.png'), show_shapes=True)
             if ADVERSARIAL:
-                plot_model(generator, to_file=os.path.join(MODEL_DIR, 'generator.png'), show_shapes=True)
-                plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
-                plot_model(gan, to_file=os.path.join(MODEL_DIR, 'gan.png'), show_shapes=True)
+                if generator!='None':
+                    plot_model(generator, to_file=os.path.join(MODEL_DIR, 'generator.png'), show_shapes=True)
+                if discriminator!='None':
+                    plot_model(discriminator, to_file=os.path.join(MODEL_DIR, 'discriminator.png'), show_shapes=True)
+                if gan!='None':
+                    plot_model(gan, to_file=os.path.join(MODEL_DIR, 'gan.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
         print ("Pre-loading encoder with weights...")
@@ -536,21 +613,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
 
     if ADVERSARIAL:
         generator = refiner_g_model()
-        discriminator = refiner_d_model()
-        gan = gan_model(autoencoder, generator, discriminator)
-        generator.compile(loss='binary_crossentropy', optimizer='sgd')
-        gan.compile(loss=['mse', 'binary_crossentropy'],
-                    loss_weights=LOSS_WEIGHTS,
-                    optimizer=OPTIM_G,
-                    metrics=['accuracy'])
-        print ('GAN')
-        print (gan.summary())
-        set_trainability(discriminator, True)
-        discriminator.compile(loss='binary_crossentropy',
-                              optimizer=OPTIM_D,
-                              metrics=['accuracy'])
-        run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
-                      ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS)
+        generator.compile(loss='mse', optimizer=OPTIM_G)
+        # discriminator = refiner_d_model()
+        # gan = gan_model(autoencoder, generator, discriminator)
+        sautoencoder = stacked_autoencoder(encoder, decoder, generator)
+        # generator.compile(loss='binary_crossentropy', optimizer='sgd')
+        # gan.compile(loss=['mse', 'binary_crossentropy'],
+        #             loss_weights=LOSS_WEIGHTS,
+        #             optimizer=OPTIM_G,
+        #             metrics=['accuracy'])
+        # print ('GAN')
+        # print (gan.summary())
+        # set_trainability(discriminator, True)
+        # discriminator.compile(loss='binary_crossentropy',
+        #                       optimizer=OPTIM_D,
+        #                       metrics=['accuracy'])
+        sautoencoder.compile(loss='mse', optimizer=OPTIM_G)
+        # run_utilities(encoder, decoder, autoencoder, generator, discriminator, gan,
+        #               ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS)
+        run_utilities(encoder, decoder, autoencoder, generator, 'None', sautoencoder,
+                      ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, 'None')
     else:
         run_utilities(encoder, decoder, autoencoder, 'None', 'None', 'None',
                       ENC_WEIGHTS, DEC_WEIGHTS, 'None', 'None')
@@ -563,7 +645,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     TC_gan = tb_callback.TensorBoard(log_dir=TF_LOG_GAN_DIR, histogram_freq=0, write_graph=False, write_images=False)
     LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    LRS.set_model(discriminator)
+    # LRS.set_model(discriminator)
 
     print ("Beginning Training...")
     # Begin Training
@@ -639,61 +721,63 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
             print("\n\nEpoch ", epoch)
             g_loss = []
             val_g_loss = []
-            d_loss = []
-            val_d_loss = []
+            # d_loss = []
+            # val_d_loss = []
             # a_loss = []
 
             # # Set learning rate every epoch
             # LRS.on_epoch_begin(epoch=epoch)
-            LRS.on_epoch_begin(epoch=epoch)
-            lr = K.get_value(gan.optimizer.lr)
-            print ("GAN learning rate: " + str(lr))
-            lr = K.get_value(discriminator.optimizer.lr)
-            print("Disc learning rate: " + str(lr))
-            print("g_loss_metrics: " + str(gan.metrics_names))
-            print("d_loss_metrics: " + str(discriminator.metrics_names))
+            # LRS.on_epoch_begin(epoch=epoch)
+            lr = K.get_value(generator.optimizer.lr)
+            print ("Generator learning rate: " + str(lr))
+            # lr = K.get_value(discriminator.optimizer.lr)
+            # print("Disc learning rate: " + str(lr))
+            print("g_loss_metrics: " + str(generator.metrics_names))
+            # print("d_loss_metrics: " + str(discriminator.metrics_names))
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
                 X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
                 X_hd = load_X(videos_list, index, HD_DATA_DIR, (256, 256, 3))
                 X128 = X[:, 0 : int(VIDEO_LENGTH/2)]
-                Y128 = autoencoder.predict(X128, verbose=0)
+                # Y128 = autoencoder.predict(X128, verbose=0)
                 X256_real = X_hd[:, int(VIDEO_LENGTH/2) :]
-                X256_fake = generator.predict(Y128, verbose=0)
-
-                trainable_fakes = exp_memory.get_trainable_fakes(current_gens=X256_fake, exp_window_size=4)
+                # X256_fake = generator.predict(Y128, verbose=0)
+                #
+                # trainable_fakes = exp_memory.get_trainable_fakes(current_gens=X256_fake, exp_window_size=4)
 
                 # Train Discriminator on future images (y_train, not X_train)
-                X = X256_real
-                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
-                loss_true = discriminator.train_on_batch(X, y)
-
-                X = trainable_fakes
-                y = np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
-                loss_fake = discriminator.train_on_batch(X, y)
-                d_loss.append((np.asarray(loss_true) + np.asarray(loss_fake))/2)
-
+                # X = X256_real
+                # y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                # loss_true = discriminator.train_on_batch(X, y)
+                #
+                # X = trainable_fakes
+                # y = np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                # loss_fake = discriminator.train_on_batch(X, y)
+                # d_loss.append((np.asarray(loss_true) + np.asarray(loss_fake))/2)
+                #
                 # Train AAE
-                set_trainability(discriminator, False)
-                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
-                g_loss.append(gan.train_on_batch(X128, [X256_real, y]))
-                set_trainability(discriminator, True)
+                # set_trainability(discriminator, False)
+                # y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                # g_loss.append(gan.train_on_batch(X128, [X256_real, y]))
+                # set_trainability(discriminator, True)
 
                 # # Train Autoencoder
                 # a_loss.append(autoencoder.train_on_batch(X_train, y_train))
 
+                # Train sautoencoder
+                g_loss.append(sautoencoder.train_on_batch(X128, X256_real))
+
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS-1) + "  " +
-                             "g_loss: " + str([g_loss[len(g_loss) - 1][j] for j in [0, -1]]) + "  " +
-                             "d_loss: " + str(d_loss[len(d_loss) - 1]) +
+                             "g_loss: " + str(g_loss[len(g_loss) - 1]) + "  " +
                              "\t    [" + "{0}>".format("="*(arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
-                predicted_images = generator.predict(Y128, verbose=0)
-                orig_image, truth_image, pred_image = combine_images(Y128, X256_real, predicted_images)
+                predicted_images = sautoencoder.predict(X128, verbose=0)
+                orig_image, truth_image, pred_image = combine_images(X128, X256_real, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
@@ -708,40 +792,41 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
                 X = load_X(val_videos_list, index, VAL_DATA_DIR, (128, 128, 3))
                 X_hd = load_X(val_videos_list, index, VAL_HD_DATA_DIR, (256, 256, 3))
                 X128_val = X[:, 0: int(VIDEO_LENGTH / 2)]
-                Y128_val = autoencoder.predict(X128, verbose=0)
+                # Y128_val = autoencoder.predict(X128, verbose=0)
                 X256_real_val = X_hd[:, int(VIDEO_LENGTH / 2):]
-                X256_fake_val = generator.predict(Y128_val, verbose=0)
+                # X256_fake_val = generator.predict(Y128_val, verbose=0)
 
-                X = np.concatenate((X256_real_val, X256_fake_val))
-                y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32),
-                                    np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)), axis=0)
-                val_d_loss.append(discriminator.test_on_batch(X, y))
+                # X = np.concatenate((X256_real_val, X256_fake_val))
+                # y = np.concatenate((np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32),
+                #                     np.zeros(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)), axis=0)
+                # val_d_loss.append(discriminator.test_on_batch(X, y))
+                #
+                # y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
+                # val_g_loss.append(gan.test_on_batch(X128_val, [X256_real_val, y]))
 
-                y = np.ones(shape=(BATCH_SIZE, 10, 1), dtype=np.float32)
-                val_g_loss.append(gan.test_on_batch(X128_val, [X256_real_val, y]))
+                # Validate sautoencoder
+                val_g_loss.append(sautoencoder.test_on_batch(X128_val, X256_real_val))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                             "val_g_loss: " + str([val_g_loss[len(val_g_loss) - 1][j] for j in [0, -1]]) + "  " +
-                             "val_d_loss: " + str(val_d_loss[len(val_d_loss) - 1]))
+                             "val_g_loss: " + str(val_g_loss[len(val_g_loss) - 1]))
                 stdout.flush()
 
             # then after each epoch/iteration
-            avg_d_loss = np.mean(np.asarray(d_loss, dtype=np.float32), axis=0)
-            avg_val_d_loss = np.mean(np.asarray(val_d_loss, dtype=np.float32), axis=0)
+            # avg_d_loss = np.mean(np.asarray(d_loss, dtype=np.float32), axis=0)
+            # avg_val_d_loss = np.mean(np.asarray(val_d_loss, dtype=np.float32), axis=0)
             avg_g_loss = np.mean(np.asarray(g_loss, dtype=np.float32), axis=0)
             avg_val_g_loss = np.mean(np.asarray(val_g_loss, dtype=np.float32), axis=0)
 
-            loss_values = np.asarray(avg_d_loss.tolist() + avg_val_d_loss.tolist() \
-                                     + avg_g_loss.tolist() + avg_val_g_loss.tolist(), dtype=np.float32)
-            d_loss_keys = ['d_' + metric for metric in discriminator.metrics_names]
-            g_loss_keys = ['g_' + metric for metric in gan.metrics_names]
-            val_d_loss_keys = ['d_val_' + metric for metric in discriminator.metrics_names]
-            val_g_loss_keys = ['g_val_' + metric for metric in gan.metrics_names]
+            loss_values = np.asarray(avg_g_loss.tolist() + avg_val_g_loss.tolist(), dtype=np.float32)
+            # d_loss_keys = ['d_' + metric for metric in discriminator.metrics_names]
+            g_loss_keys = ['g_' + metric for metric in generator.metrics_names]
+            # val_d_loss_keys = ['d_val_' + metric for metric in discriminator.metrics_names]
+            val_g_loss_keys = ['g_val_' + metric for metric in generator.metrics_names]
 
-            loss_keys = d_loss_keys + val_d_loss_keys + \
-                        g_loss_keys + val_g_loss_keys
-            logs = dict(zip(loss_keys, loss_values))
+            loss_keys = g_loss_keys + val_g_loss_keys
+            # logs = dict(zip(loss_keys, loss_values))
+            logs = {'g_loss': avg_g_loss, 'val_g_loss': avg_val_g_loss}
 
             TC_gan.on_epoch_end(epoch, logs)
 
@@ -749,10 +834,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
             with open(os.path.join(LOG_DIR, 'losses_gan.json'), 'a') as log_file:
                 log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
 
-            print("\nAvg d_loss: " + str(avg_d_loss) +
-                  " Avg val_d_loss: " + str(avg_val_d_loss) +
-                  "\nAvg g_loss: " + str([avg_g_loss[j] for j in [0, -1]]) +
-                  " Avg val_g_loss: " + str([avg_val_g_loss[j] for j in [0, -1]]))
+            print("\nAvg g_loss: " + str(avg_g_loss) +
+                  " Avg val_g_loss: " + str(avg_val_g_loss))
 
             # Save model weights per epoch to file
             encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_gan_epoch_'+str(epoch)+'.h5'), True)
@@ -760,9 +843,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
             generator.save_weights(os.path.join(CHECKPOINT_DIR,
                                                     'generator_gan_epoch_' +
                                                     str(epoch) + '.h5'), True)
-            discriminator.save_weights(os.path.join(CHECKPOINT_DIR,
-                                                    'discriminator_gan_epoch_' +
-                                                    str(epoch) + '.h5'), True)
+            # discriminator.save_weights(os.path.join(CHECKPOINT_DIR,
+            #                                         'discriminator_gan_epoch_' +
+            #                                         str(epoch) + '.h5'), True)
 
     # End TensorBoard Callback
     TC.on_train_end('_')

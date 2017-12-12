@@ -194,16 +194,16 @@ def classifier_model():
                         kernel_size=(3, 3),
                         strides=(2, 2),
                         padding="same",
-                        return_sequences=True,
+                        return_sequences=False,
                         recurrent_dropout=0.5)(conv_3)
-    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
-    conv_4 = TimeDistributed(LeakyReLU(alpha=0.2))(conv_4)
-    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
+    conv_4 = BatchNormalization()(conv_4)
+    conv_4 = LeakyReLU(alpha=0.2)(conv_4)
+    conv_4 = Dropout(0.5)(conv_4)
 
-    flat_1 = TimeDistributed(Flatten())(conv_4)
-    dense_1 = TimeDistributed(Dense(units=512, activation='tanh'))(flat_1)
-    dense_1 = TimeDistributed(Dropout(0.5))(dense_1)
-    dense_2 = TimeDistributed(Dense(units=len(driver_actions), activation='sigmoid'))(dense_1)
+    flat_1 = Flatten()(conv_4)
+    dense_1 = Dense(units=512, activation='tanh')(flat_1)
+    dense_1 = Dropout(0.5)(dense_1)
+    dense_2 = Dense(units=len(driver_actions), activation='sigmoid')(dense_1)
     dense_3 = TimeDistributed(Dense(units=len(ped_actions), activation='sigmoid'))(dense_1)
 
     model = Model(inputs=inputs, outputs=[dense_2, dense_3])
@@ -552,17 +552,16 @@ def get_action_classes(action_labels):
     print("Loading annotations.")
     driver_action_class = []
     ped_action_class = []
-    action_class = []
+    # action_class = []
     for i in range(len(action_labels)):
         action_dict = dict(ele.split(':') for ele in action_labels[i].split(', ')[2:])
-        ped_action_per_frame = []
         if ',' in action_dict['Driver']:
             driver_action_nums = driver_actions.index(action_dict['Driver'].split(',')[0])
-            encoded_driver_action = to_categorical(driver_action_nums, len(joint_action_set))
+            encoded_driver_action = to_categorical(driver_action_nums, len(driver_actions))
             driver_action_class.append(encoded_driver_action.T)
         else:
             driver_action_nums = driver_actions.index(action_dict['Driver'])
-            encoded_driver_action = to_categorical(driver_action_nums, len(joint_action_set))
+            encoded_driver_action = to_categorical(driver_action_nums, len(driver_actions))
             driver_action_class.append(encoded_driver_action.T)
         a = action_dict.values()[0:(len(action_dict.values()) - 1)]
         a_clean = []
@@ -574,23 +573,23 @@ def get_action_classes(action_labels):
             else:
                 a_clean.append(a[j])
         ped_action_per_frame = list(set(a_clean))
-        encoded_ped_action = np.zeros(shape=(1, len(joint_action_set)), dtype=np.float32)
+        encoded_ped_action = np.zeros(shape=(1, len(ped_actions)), dtype=np.float32)
         # print (ped_action_per_frame)
         for action in ped_action_per_frame:
             # Offset ped action from driver action
-            ped_action = ped_actions.index(action) + 5
+            ped_action = ped_actions.index(action)
             # Add all unique categorical one-hot vectors
-            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(joint_action_set))
+            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(ped_actions))
 
         ped_action_class.append(encoded_ped_action.T)
-        action_class.append((encoded_driver_action + encoded_ped_action).T)
+        # action_class.append((encoded_driver_action + encoded_ped_action).T)
 
     driver_action_class = np.asarray(driver_action_class)
     driver_action_class = np.reshape(driver_action_class, newshape=(driver_action_class.shape[0:2]))
     ped_action_class = np.asarray(ped_action_class)
     ped_action_class = np.reshape(ped_action_class, newshape=(ped_action_class.shape[0:2]))
-    action_class = np.asarray(action_class)
-    action_class = np.reshape(action_class, newshape=(action_class.shape[0:2]))
+    # action_class = np.asarray(action_class)
+    # action_class = np.reshape(action_class, newshape=(action_class.shape[0:2]))
 
     # print (driver_action_class.shape)
     # print (ped_action_class.shape)
@@ -663,10 +662,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Build stacked classifier
     classifier = classifier_model()
-    classifier.compile(loss=["categorical_crossentropy", "categorical_crossenropy"],
+    classifier.compile(loss=["categorical_crossentropy", "categorical_crossentropy"],
                              optimizer=OPTIM_C, metrics=['accuracy'])
     sclassifier = stacked_classifier_model(encoder, decoder, classifier)
-    sclassifier.compile(loss=["categorical_crossentropy", "categorical_crossenropy"],
+    sclassifier.compile(loss=["categorical_crossentropy", "categorical_crossentropy"],
                               optimizer=OPTIM_C,
                               metrics=['accuracy'])
 
@@ -784,7 +783,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                             "c_loss: " + str(c_loss[len(c_loss) - 1]) + "  " +
+                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 3, 4]]) + "  " +
                              "\t    [" + "{0}>".format("=" * (arrow)))
                 stdout.flush()
 
@@ -798,21 +797,27 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 truth_image = truth_image * 127.5 + 127.5
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 if epoch == 0:
-                    y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
+                    y1_orig_classes = y1[:, 0: int(VIDEO_LENGTH / 2)]
+                    y2_orig_classes = y2[:, 0: int(VIDEO_LENGTH / 2)]
                     # Add labels as text to the image
                     for k in range(BATCH_SIZE):
                         for j in range(int(VIDEO_LENGTH / 2)):
-                            topk_past = np.argpartition(-y_orig_classes[k, j], 2)
-                            top2_past = -topk_past[:2]
-                            topk_futr = np.argpartition(-y_true_classes[k, j], 2)
-                            top2_futr = -topk_futr[:2]
-                            for l in range(len(top2_past)):
-                                class_num_past = int(top2_past[l])
-                                class_num_futr = int(top2_futr[l])
-                                cv2.putText(orig_image, formatted_joint_action_set[class_num_past],
-                                            (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
-                                cv2.putText(truth_image, formatted_joint_action_set[class_num_futr],
-                                            (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                                class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
+                                class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
+                                class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
+                                class_num_futr_y2 = np.argmax(y2_true_classes[k, j])
+                                cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                                            (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                            cv2.LINE_AA)
+                                cv2.putText(orig_image, "Ped: " + ped_actions[class_num_past_y2],
+                                            (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                            cv2.LINE_AA)
+                                cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                                            (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                            cv2.LINE_AA)
+                                cv2.putText(truth_image, "Ped: " + ped_actions[class_num_futr_y2],
+                                            (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                            cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
@@ -821,12 +826,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH / 2)):
-                        topk_pred = np.argpartition(-predicted_classes[k, j], 2)
-                        top2_pred = -topk_pred[:2]
-                        for l in range(len(top2_pred)):
-                            class_num = int(top2_pred[l])
-                            cv2.putText(pred_image, formatted_joint_action_set[class_num],
-                                        (2 + j * (128), 120 - (l*15) + k * 128), font, 0.5, (255, 255, 255), 1, cv2.LINE_AA)
+                            class_num_y1 = np.argmax(driver_pred_classes[k, j])
+                            class_num_y2 = np.argmax(ped_pred_classes[k, j])
+                            cv2.putText(pred_image,  "Car: " + driver_actions[class_num_y1],
+                                        (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                            cv2.putText(pred_image, "Ped: " +  ped_actions[class_num_y2],
+                                        (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"),
                             pred_image)
 
@@ -835,42 +842,47 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for index in range(NB_VAL_ITERATIONS):
                 X, y1, y2 = load_X_y(val_videos_list, index, VAL_DATA_DIR, val_driver_action_classes, val_ped_action_classes)
                 X_val = X[:, 0: int(VIDEO_LENGTH / 2)]
-                y_true_classes = y[:, int(VIDEO_LENGTH / 2):]
+                y1_true_classes = y1[:, int(VIDEO_LENGTH / 2):]
+                y2_true_classes = y2[:, int(VIDEO_LENGTH / 2):]
                 y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                val_c_loss.append(sclassifier.test_on_batch(X_val, y_true_classes))
+                val_c_loss.append(sclassifier.test_on_batch(X_val, [y1_true_classes, y2_true_classes]))
 
                 arrow = int(index / (NB_VAL_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                             "val_c_loss: " + str(val_c_loss[len(val_c_loss) - 1]))
+                             "val_c_loss: " +  str([ val_c_loss[len(val_c_loss) - 1][j]  for j in [0, 3, 4]]))
                 stdout.flush()
 
             # Save generated images to file
             predicted_images = autoencoder.predict(X_val)
-            predicted_classes = sclassifier.predict(X_train, verbose=0)
+            driver_pred_classes, ped_pred_classes = sclassifier.predict(X_val, verbose=0)
             orig_image, truth_image, pred_image = combine_images(X_val, y_true_imgs, predicted_images)
             pred_image = pred_image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
             truth_image = truth_image * 127.5 + 127.5
             font = cv2.FONT_HERSHEY_SIMPLEX
             if epoch == 0:
-                y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
+                y1_orig_classes = y1[:, 0: int(VIDEO_LENGTH / 2)]
+                y2_orig_classes = y2[:, 0: int(VIDEO_LENGTH / 2)]
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH / 2)):
-                        topk_past = np.argpartition(-y_orig_classes[k, j], 2)
-                        top2_past = -topk_past[:2]
-                        topk_futr = np.argpartition(-y_true_classes[k, j], 2)
-                        top2_futr = -topk_futr[:2]
-                        for l in range(len(top2_past)):
-                            class_num_past = int(top2_past[l])
-                            class_num_futr = int(top2_futr[l])
-                            cv2.putText(orig_image, formatted_joint_action_set[class_num_past],
-                                        (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
-                                        cv2.LINE_AA)
-                            cv2.putText(truth_image, formatted_joint_action_set[class_num_futr],
-                                        (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
-                                        cv2.LINE_AA)
+                        class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
+                        class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
+                        class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
+                        class_num_futr_y2 = np.argmax(y2_true_classes[k, j])
+                        cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                                    (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+                        cv2.putText(orig_image, "Ped: " + ped_actions[class_num_past_y2],
+                                    (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+                        cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                                    (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+                        cv2.putText(truth_image, "Ped: " + ped_actions[class_num_futr_y2],
+                                    (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                          "_cla_val_orig.png"), orig_image)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
@@ -879,13 +891,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             # Add labels as text to the image
             for k in range(BATCH_SIZE):
                 for j in range(int(VIDEO_LENGTH / 2)):
-                    topk_pred = np.argpartition(-predicted_classes[k, j], 2)
-                    top2_pred = -topk_pred[:2]
-                    for l in range(len(top2_pred)):
-                        class_num = int(top2_pred[l])
-                        cv2.putText(pred_image, formatted_joint_action_set[class_num],
-                                    (2 + j * (128), 120 - (l * 15) + k * 128), font, 0.5, (255, 255, 255), 1,
-                                    cv2.LINE_AA)
+                    class_num_y1 = np.argmax(driver_pred_classes[k, j])
+                    class_num_y2 = np.argmax(ped_pred_classes[k, j])
+                    cv2.putText(pred_image, "Car: " + driver_actions[class_num_y1],
+                                (2 + j * (128), 120 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                cv2.LINE_AA)
+                    cv2.putText(pred_image, "Ped: " + ped_actions[class_num_y2],
+                                (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
+                                cv2.LINE_AA)
             cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_val_pred.png"),
                         pred_image)
 

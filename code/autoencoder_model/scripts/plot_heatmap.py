@@ -11,6 +11,7 @@ import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import cv2
 import ast
+import os
 from config_ac import TEST_RESULTS_DIR
 
 def plot_heatmap(attn_layer, epoch, vid_num, file):
@@ -32,9 +33,11 @@ def plot_heatmap(attn_layer, epoch, vid_num, file):
                 plt.clf()
                 plt.imshow(frame, cmap='binary', interpolation='nearest')
                 # plt.imshow(frame, cmap=cm.gray, interpolation='nearest')
-                plt.colorbar()
+                # plt.colorbar()
                 # plt.cbar_axes[1].colorbar()
-                plt.savefig(os.path.join(TEST_RESULTS_DIR, 'plot_' + gen_name + '_' + str(i) + '_' + str(j) + '.png'))
+                plt.axis('off')
+                plt.savefig(os.path.join(TEST_RESULTS_DIR, 'plot_' + gen_name + '_' + str(i) + '_' + str(j) + '.png'),
+                            transparent=True)
 
 
 def get_args():
