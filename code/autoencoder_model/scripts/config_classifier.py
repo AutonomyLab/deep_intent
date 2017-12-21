@@ -28,6 +28,9 @@ TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
 
+PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
+PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
+
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
@@ -69,8 +72,8 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 20
-IMG_SIZE = (128, 128, 3)
+VIDEO_LENGTH = 32
+IMG_SIZE = (112, 112, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
 # KL coeff damages learning
@@ -103,14 +106,14 @@ formatted_joint_action_set = ['car moving slow', 'car slowing down', 'car standi
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
+BATCH_SIZE = 20
 NB_EPOCHS_AUTOENCODER = 0
 NB_EPOCHS_CLASS = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_D = Adam(lr=0.000001, beta_1=0.5)
-OPTIM_C = Adam(lr=0.00001, beta_1=0.5)
+OPTIM_C = Adam(lr=0.00000001, beta_1=0.5)
 
 lr_schedule = [4, 10, 30]  # epoch_step
 

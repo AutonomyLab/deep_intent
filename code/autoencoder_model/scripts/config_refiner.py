@@ -19,8 +19,6 @@ if hostname == 'baymax':
     path_var = 'baymax/'
 elif hostname == 'walle':
     path_var = 'walle/'
-elif hostname == 'bender':
-    path_var = 'bender/'
 else:
     path_var = 'zhora/'
 
@@ -42,10 +40,6 @@ if not os.path.exists(MODEL_DIR):
 CHECKPOINT_DIR = './../' + path_var + 'checkpoints'
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
-
-ATTN_WEIGHTS_DIR = './../' + path_var + 'attn_weights'
-if not os.path.exists(ATTN_WEIGHTS_DIR):
-    os.mkdir(ATTN_WEIGHTS_DIR)
 
 GEN_IMAGES_DIR = './../' + path_var + 'generated_images'
 if not os.path.exists(GEN_IMAGES_DIR):
@@ -78,7 +72,7 @@ SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
-ADVERSARIAL = True
+ADVERSARIAL = False
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
 
@@ -87,23 +81,23 @@ LOSS_WEIGHTS = [1, 1]
 print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 8
-NB_EPOCHS_AUTOENCODER = 0
+BATCH_SIZE = 10
+NB_EPOCHS_AUTOENCODER = 20
 NB_EPOCHS_GAN = 100
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
 OPTIM_D = Adam(lr=0.00001, beta_1=0.5)
 # OPTIM_D = SGD(lr=0.000001, momentum=0.5, nesterov=True)
-# OPTIM_D = rmsprop(lr=0.00001)
+# OPTIM = rmsprop(lr=0.00001)
 
-lr_schedule = [4, 20, 30]  # epoch_step
+lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.00001
+        return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.00001
     return 0.000001

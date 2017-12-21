@@ -527,7 +527,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
     autoencoder = autoencoder_model(encoder, decoder)
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[11].output)
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[1].output)
     mask_gen_1 = Sequential()
     mask_gen_1.add(encoder)
     mask_gen_1.add(intermediate_decoder)
@@ -605,6 +605,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, GEN_WEIGHTS, DIS_WEIGHTS):
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_image)
+
+        predicted_attn = mask_gen_1.predict(X_train, verbose=0)
+        a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, VIDEO_LENGTH - 10, 16, 16, 1))
+        np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
 
         # Run over validation data
         for index in range(NB_VAL_ITERATIONS):

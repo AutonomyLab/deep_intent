@@ -39,7 +39,7 @@ from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Input
 from keras.models import Model
 from experience_memory import ExperienceMemory
-from config_refiner import *
+from config_aa import *
 from sys import stdout
 
 import tb_callback
@@ -298,6 +298,7 @@ def refiner_g_model():
     model = Model(inputs=inputs, outputs=convlstm_5)
 
     return model
+
 
 def refiner_d_model():
 
