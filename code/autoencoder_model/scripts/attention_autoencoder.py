@@ -311,10 +311,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     videos_list = get_video_lists(frames_source=frames_source, stride=1)
     n_videos = videos_list.shape[0]
 
-    # Setup validation
-    val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_128.hkl'))
-    val_videos_list = get_video_lists(frames_source=val_frames_source, stride=(VIDEO_LENGTH - 10))
-    n_val_videos = val_videos_list.shape[0]
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(VIDEO_LENGTH - 10))
+    n_test_videos = test_videos_list.shape[0]
 
     if SHUFFLE:
         # Shuffle images to aid generalization
@@ -325,7 +325,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     # Build attention layer output
     intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
@@ -338,7 +338,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 5
-    NB_VAL_ITERATIONS = int(n_val_videos / BATCH_SIZE)
+    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -350,7 +350,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     for epoch in range(NB_EPOCHS_AUTOENCODER):
         print("\n\nEpoch ", epoch)
         loss = []
-        val_loss = []
+        test_loss = []
 
         # Set learning rate every epoch
         # LRS.on_epoch_begin(epoch=epoch)
@@ -382,30 +382,30 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_image)
 
-        # Run over validation data
-        for index in range(NB_VAL_ITERATIONS):
-            X = load_X(val_videos_list, index, VAL_DATA_DIR, (128, 128, 3))
+        # Run over test data
+        for index in range(NB_TEST_ITERATIONS):
+            X = load_X(test_videos_list, index, TEST_DATA_DIR, (128, 128, 3))
             X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
             y_train = X[:, int(VIDEO_LENGTH / 2):]
-            val_loss.append(autoencoder.test_on_batch(X_train, y_train))
+            test_loss.append(autoencoder.test_on_batch(X_train, y_train))
 
-            arrow = int(index / (NB_VAL_ITERATIONS / 40))
-            stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                         "val_loss: " + str(val_loss[len(val_loss) - 1]) +
+            arrow = int(index / (NB_TEST_ITERATIONS / 40))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
+                         "test_loss: " + str(test_loss[len(test_loss) - 1]) +
                          "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
         # then after each epoch/iteration
         avg_loss = sum(loss)/len(loss)
-        avg_val_loss = sum(val_loss) / len(val_loss)
-        logs = {'loss': avg_loss, 'val_loss': avg_val_loss}
+        avg_test_loss = sum(test_loss) / len(test_loss)
+        logs = {'loss': avg_loss, 'test_loss': avg_test_loss}
         TC.on_epoch_end(epoch, logs)
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
             log_file.write("{\"epoch\":%d, \"loss\":%f};\n" % (epoch, avg_loss))
 
-            print("\nAvg loss: " + str(avg_loss) + " Avg val loss: " + str(avg_val_loss))
+            print("\nAvg loss: " + str(avg_loss) + " Avg test loss: " + str(avg_test_loss))
 
         # Save model weights per epoch to file
         encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)

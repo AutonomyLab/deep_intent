@@ -66,6 +66,8 @@ SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
 IMG_SIZE = (128, 128, 3)
+ATTN_COEFF = 0
+KL_COEFF = 0
 
 # -------------------------------------------------
 # Network configuration:
@@ -73,7 +75,7 @@ print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 30
+NB_EPOCHS_AUTOENCODER = 40
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
