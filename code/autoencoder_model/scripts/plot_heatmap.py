@@ -12,7 +12,7 @@ import matplotlib.cm as cm
 import cv2
 import ast
 import os
-from config_ac import TEST_RESULTS_DIR
+from config_aa import TEST_RESULTS_DIR
 
 def plot_heatmap(attn_layer, epoch, vid_num, file):
     print (attn_layer)

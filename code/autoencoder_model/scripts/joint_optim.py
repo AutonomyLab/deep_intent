@@ -171,8 +171,8 @@ def process_prec3d():
 
     model.load_weights(PRETRAINED_C3D_WEIGHTS)
     print("Loaded model from disk")
-    for layer in model.layers[:11]:
-        layer.trainable = True
+    for layer in model.layers[:13]:
+        layer.trainable = False
 
     # i = 0
     # for layer in model.layers:
@@ -198,7 +198,7 @@ def process_prec3d():
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
-    #
+
     # model.layers.pop()
     # model.outputs = [model.layers[-1].output]
     # model.layers[-1].outbound_nodes = []
@@ -283,12 +283,11 @@ def pretrained_c3d():
     #
     # model.add(Flatten())
 
-    dense = Dense(units=1024, activation='tanh')(c3d_out)
+    dense = Dense(units=512, activation='tanh')(c3d_out)
     x = Dropout(0.5)(dense)
     x = Dense(units=512, activation='tanh')(x)
     x = Dropout(0.5)(x)
-    actions = Dense(units=len(driver_actions), activation='softmax')(x)
-
+    actions = Dense(units=len(simple_driver_set), activation='softmax')(x)
     model = Model(inputs=inputs, outputs=actions)
     # i=0
     # for layer in model.layers:
@@ -312,29 +311,15 @@ def autoencoder_model(encoder, decoder):
     return model
 
 
-def action_model(encoder, decoder, classifier):
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 128, 3))
-    set_trainability(encoder, False)
-    z = encoder(inputs)
-    set_trainability(decoder, False)
-    images = decoder(z)
-    predictions = classifier(images)
-
-    # model = Model(inputs=inputs, outputs=[images, predictions])
-    model = Model(inputs=inputs, outputs=predictions)
-
-    return model
-
-
 def stacked_classifier_model(encoder, decoder, classifier):
     input = Input(shape=(16, 112, 112, 3))
-    set_trainability(encoder, False)
+    set_trainability(encoder, True)
     z = encoder(input)
-    set_trainability(decoder, False)
+    set_trainability(decoder, True)
     future = decoder(z)
     actions = classifier(future)
 
-    model = Model(inputs=input, outputs=actions)
+    model = Model(inputs=input, outputs=[future, actions])
 
     return model
 
@@ -475,23 +460,23 @@ def get_action_classes(action_labels):
         action_dict = dict(ele.split(':') for ele in action_labels[i].split(', ')[2:])
         if ',' in action_dict['Driver']:
             driver_action_nums = driver_actions.index(action_dict['Driver'].split(',')[0])
-            # if driver_action_nums < 2:
-            #     driver_action_nums = 0
-            # elif driver_action_nums == 2:
-            #     driver_action_nums = 1
-            # else:
-            #     driver_action_nums = 2
-            encoded_driver_action = to_categorical(driver_action_nums, len(driver_actions))
+            if driver_action_nums < 2:
+                driver_action_nums = 0
+            elif driver_action_nums == 2:
+                driver_action_nums = 1
+            else:
+                driver_action_nums = 2
+            encoded_driver_action = to_categorical(driver_action_nums, len(simple_driver_set))
             driver_action_class.append(encoded_driver_action.T)
         else:
             driver_action_nums = driver_actions.index(action_dict['Driver'])
-            # if driver_action_nums < 2:
-            #     driver_action_nums = 0
-            # elif driver_action_nums == 2:
-            #     driver_action_nums = 1
-            # else:
-            #     driver_action_nums = 2
-            encoded_driver_action = to_categorical(driver_action_nums, len(driver_actions))
+            if driver_action_nums < 2:
+                driver_action_nums = 0
+            elif driver_action_nums == 2:
+                driver_action_nums = 1
+            else:
+                driver_action_nums = 2
+            encoded_driver_action = to_categorical(driver_action_nums, len(simple_driver_set))
             driver_action_class.append(encoded_driver_action.T)
         a = action_dict.values()[0:(len(action_dict.values()) - 1)]
         a_clean = []
@@ -592,17 +577,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     def top_2_categorical_accuracy(y_true, y_pred):
-        return top_k_categorical_accuracy(y_true, y_pred, k=2)
+        return top_k_categorical_accuracy(y_true, y_pred, k=1)
 
         # Build stacked classifier
     if CLASSIFIER:
         classifier = pretrained_c3d()
         classifier.compile(loss="categorical_crossentropy",
-                                 optimizer=OPTIM_C, metrics=[top_2_categorical_accuracy])
+                                 optimizer=OPTIM_C, metrics=['acc'])
         sclassifier = stacked_classifier_model(encoder, decoder, classifier)
-        sclassifier.compile(loss="categorical_crossentropy",
+        sclassifier.compile(loss=["mean_squared_error", "categorical_crossentropy"],
                             optimizer=OPTIM_C,
-                            metrics=[top_2_categorical_accuracy])
+                            loss_weights=[1, 0],
+                            metrics=['acc'])
         print (sclassifier.summary())
 
     run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
@@ -612,12 +598,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
     NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 1
 
-    # Setup TensorBoard Callback
+    # Setup TnsorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False, write_images=False)
     LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    LRS.set_model(sclassifier)
+    # LRS.set_model(sclassifier)
 
 
     print ("Beginning Training.")
@@ -701,10 +688,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             test_c_loss = []
 
             # # Set learning rate every epoch
-            LRS.on_epoch_begin(epoch=epoch)
+            # LRS.on_epoch_begin(epoch=epoch)
             lr = K.get_value(sclassifier.optimizer.lr)
             print("Learning rate: " + str(lr))
-            print("c_loss_metrics: " + str(classifier.metrics_names))
+            print("c_loss_metrics: " + str(sclassifier.metrics_names))
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
@@ -715,18 +702,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 y1_true_class = y1[:, int(VIDEO_LENGTH/2) + 8]
                 # y2_true_classes = y2[:, int(VIDEO_LENGTH / 2):]
 
-                c_loss.append(sclassifier.train_on_batch(X_train, y1_true_class))
+                c_loss.append(sclassifier.train_on_batch(X_train, [y_true_imgs, y1_true_class]))
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1]]) + "  " +
+                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, -1]]) + "  " +
                              "\t    [" + "{0}>".format("=" * (arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
                 predicted_images = autoencoder.predict(X_train)
-                driver_pred_class = sclassifier.predict(X_train, verbose=0)
+                imgs, driver_pred_class = sclassifier.predict(X_train, verbose=0)
                 orig_image, truth_image, pred_image = combine_images(X_train, y_true_imgs, predicted_images)
                 pred_image = pred_image * 127.5 + 127.5
                 orig_image = orig_image * 127.5 + 127.5
@@ -742,13 +729,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                 # class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
                                 class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
                                 # class_num_futr_y2 = np.argmax(y2_true_classes[k, j])
-                                cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                                cv2.putText(orig_image, "Car: " + simple_driver_set[class_num_past_y1],
                                             (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                                 # cv2.putText(orig_image, "Ped: " + ped_actions[class_num_past_y2],
                                 #             (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
                                 #             cv2.LINE_AA)
-                                cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                                cv2.putText(truth_image, "Car: " + simple_driver_set[class_num_futr_y1],
                                             (2 + j * (128), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                                 # cv2.putText(truth_image, "Ped: " + ped_actions[class_num_futr_y2],
@@ -763,7 +750,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 for k in range(BATCH_SIZE):
                     class_num_y1 = np.argmax(driver_pred_class[k])
                     # class_num_y2 = np.argmax(ped_pred_classes[k, j])
-                    cv2.putText(pred_image,  "Car: " + driver_actions[class_num_y1],
+                    cv2.putText(pred_image,  "Car: " + simple_driver_set[class_num_y1],
                                 (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                 cv2.LINE_AA)
                     # cv2.putText(pred_image, "Ped: " +  ped_actions[class_num_y2],
@@ -782,16 +769,16 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 # y2_true_classes = y2[:, int(VIDEO_LENGTH / 2):]
                 y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                test_c_loss.append(sclassifier.test_on_batch(X_test, y1_true_class))
+                test_c_loss.append(sclassifier.test_on_batch(X_test, [y_true_imgs, y1_true_class]))
 
                 arrow = int(index / (NB_TEST_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, 1]]))
+                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, -1]]))
                 stdout.flush()
 
             # Save generated images to file
             predicted_images = autoencoder.predict(X_test)
-            driver_pred_class = sclassifier.predict(X_test, verbose=0)
+            imgs, driver_pred_class = sclassifier.predict(X_test, verbose=0)
             orig_image, truth_image, pred_image = combine_images(X_test, y_true_imgs, predicted_images)
             pred_image = pred_image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
@@ -807,13 +794,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                         # class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
                         class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
                         # class_num_futr_y2 = np.argmax(y2_true_classes[k, j])
-                        cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                        cv2.putText(orig_image, "Car: " + simple_driver_set[class_num_past_y1],
                                     (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
                         # cv2.putText(orig_image, "Ped: " + ped_actions[class_num_past_y2],
                         #             (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
                         #             cv2.LINE_AA)
-                        cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                        cv2.putText(truth_image, "Car: " + simple_driver_set[class_num_futr_y1],
                                     (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
                         # cv2.putText(truth_image, "Ped: " + ped_actions[class_num_futr_y2],
@@ -828,7 +815,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for k in range(BATCH_SIZE):
                 class_num_y1 = np.argmax(driver_pred_class[k])
                 # class_num_y2 = np.argmax(ped_pred_classes[k, j])
-                cv2.putText(pred_image, "Car: " + driver_actions[class_num_y1],
+                cv2.putText(pred_image, "Car: " + simple_driver_set[class_num_y1],
                             (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                             cv2.LINE_AA)
                 # cv2.putText(pred_image, "Ped: " + ped_actions[class_num_y2],
@@ -930,10 +917,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for j in range(int(VIDEO_LENGTH / 2)):
                 class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
                 class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
-                cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                cv2.putText(orig_image, "Car: " + simple_driver_set[class_num_past_y1],
                             (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                             cv2.LINE_AA)
-                cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                cv2.putText(truth_image, "Car: " + simple_driver_set[class_num_futr_y1],
                             (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                             cv2.LINE_AA)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_" + str(index) +
@@ -944,7 +931,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Add labels as text to the image
         for k in range(BATCH_SIZE):
             class_num_y1 = np.argmax(driver_pred_class[k])
-            cv2.putText(pred_image, "Car: " + driver_actions[class_num_y1],
+            cv2.putText(pred_image, "Car: " + simple_driver_set[class_num_y1],
                         (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                         cv2.LINE_AA)
         cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_" + str(index) + "_cla_pred.png"),

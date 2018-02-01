@@ -81,15 +81,15 @@ OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
 # OPTIM_A = rmsprop(lr=0.00001)
 
-lr_schedule = [4, 20, 30]  # epoch_step
+lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.00001
+        return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000001  # lr_decay_ratio = 10
+        return 0.00001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.00001
+        return 0.000001
     return 0.000001
 
 

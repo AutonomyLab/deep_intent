@@ -101,12 +101,12 @@ def decoder_model():
 
     flat_1 = TimeDistributed(Flatten())(out_1)
     aclstm_1 = GRU(units=16 * 16,
-                   activation='tanh',
                    recurrent_dropout=0.5,
                    return_sequences=True)(flat_1)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
-    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
+    # x = TimeDistributed(BatchNormalization())(aclstm_1)
+    x = TimeDistributed(Activation(activation='softmax'))(aclstm_1)
+    # dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(x)
     a1 = AttnLossLayer()(a1_reshape)
     dot_1 = multiply([out_1, a1])
 
@@ -343,7 +343,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    # LRS.set_model(discriminator)
+    LRS.set_model(autoencoder)
 
     print ("Beginning Training...")
     # Begin Training
@@ -353,7 +353,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         test_loss = []
 
         # Set learning rate every epoch
-        # LRS.on_epoch_begin(epoch=epoch)
+        LRS.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
         print ("Learning rate: " + str(lr))
 
@@ -403,7 +403,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
         # Log the losses
         with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"loss\":%f};\n" % (epoch, avg_loss))
+            log_file.write("{\"epoch\":%d, \"loss\":%f, \"test_loss\":%f};\n" % (epoch, avg_loss, avg_test_loss))
 
             print("\nAvg loss: " + str(avg_loss) + " Avg test loss: " + str(avg_test_loss))
 
@@ -431,80 +431,116 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
     autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
 
-    for i in range(len(decoder.layers)):
-        print (decoder.layers[i], str(i))
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(VIDEO_LENGTH - 10))
+    n_test_videos = test_videos_list.shape[0]
 
-    exit(0)
+    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
 
-    def build_intermediate_model(encoder, decoder):
-        # convlstm-13, conv3d-25
-        intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[21].output)
-        intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[27].output)
+    test_loss = []
+    for index in range(NB_TEST_ITERATIONS):
+        X = load_X(test_videos_list, index, TEST_DATA_DIR, (128, 128, 3))
+        X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
+        y_train = X[:, int(VIDEO_LENGTH / 2):]
+        test_loss.append(autoencoder.test_on_batch(X_train, y_train))
 
-        imodel_1 = Sequential()
-        imodel_1.add(encoder)
-        imodel_1.add(intermediate_decoder_1)
-
-        imodel_2 = Sequential()
-        imodel_2.add(encoder)
-        imodel_2.add(intermediate_decoder_2)
-
-        return imodel_1, imodel_2
-
-    imodel_1, imodel_2 = build_intermediate_model(encoder, decoder)
-    imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
-    imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
-
-    # Build video progressions
-    frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    videos_list = []
-    start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
-    while (end_frame_index <= len(frames_source)):
-        frame_list = frames_source[start_frame_index:end_frame_index]
-        if (len(set(frame_list)) == 1):
-            videos_list.append(range(start_frame_index, end_frame_index))
-            start_frame_index = start_frame_index + VIDEO_LENGTH
-            end_frame_index = end_frame_index + VIDEO_LENGTH
-        else:
-            start_frame_index = end_frame_index - 1
-            end_frame_index = start_frame_index + VIDEO_LENGTH
-
-    videos_list = np.asarray(videos_list, dtype=np.int32)
-    n_videos = videos_list.shape[0]
-
-    # Test model by making predictions
-    loss = []
-    NB_ITERATIONS = int(n_videos / BATCH_SIZE)
-    for index in range(NB_ITERATIONS):
-        # Test Autoencoder
-        X = load_X(videos_list, index, TEST_DATA_DIR)
-        X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
-        y_test = X[:, int(VIDEO_LENGTH / 2):]
-        loss.append(autoencoder.test_on_batch(X_test, y_test))
-        y_pred = autoencoder.predict_on_batch(X_test)
-        a_pred_1 = imodel_1.predict_on_batch(X_test)
-        a_pred_2 = imodel_2.predict_on_batch(X_test)
-
-        arrow = int(index / (NB_ITERATIONS / 40))
-        stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                     "loss: " + str(loss[len(loss) - 1]) +
+        arrow = int(index / (NB_TEST_ITERATIONS / 40))
+        stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
+                     "test_loss: " + str(test_loss[len(test_loss) - 1]) +
                      "\t    [" + "{0}>".format("=" * (arrow)))
         stdout.flush()
 
-        orig_image, truth_image, pred_image = combine_images(X_test, y_test, y_pred)
-        pred_image = pred_image * 127.5 + 127.5
-        orig_image = orig_image * 127.5 + 127.5
-        truth_image = truth_image * 127.5 + 127.5
+        if SAVE_GENERATED_IMAGES:
+            # Save generated images to file
+            predicted_images = autoencoder.predict(X_train, verbose=0)
+            orig_image, truth_image, pred_image = combine_images(X_train, y_train, predicted_images)
+            pred_image = pred_image * 127.5 + 127.5
+            orig_image = orig_image * 127.5 + 127.5
+            truth_image = truth_image * 127.5 + 127.5
 
-        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
-        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
-        cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_orig.png"), orig_image)
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_truth.png"), truth_image)
+            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_pred.png"), pred_image)
 
-        #------------------------------------------
-        a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1_' + str(index) +'.npy'), a_pred_1)
-        np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_2_' + str(index) + '.npy'), a_pred_2)
+    # then after each epoch/iteration
+    avg_test_loss = sum(test_loss) / len(test_loss)
+
+
+    # for i in range(len(decoder.layers)):
+    #     print (decoder.layers[i], str(i))
+    #
+    # exit(0)
+    #
+    # def build_intermediate_model(encoder, decoder):
+    #     # convlstm-13, conv3d-25
+    #     intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[21].output)
+    #     intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[27].output)
+    #
+    #     imodel_1 = Sequential()
+    #     imodel_1.add(encoder)
+    #     imodel_1.add(intermediate_decoder_1)
+    #
+    #     imodel_2 = Sequential()
+    #     imodel_2.add(encoder)
+    #     imodel_2.add(intermediate_decoder_2)
+    #
+    #     return imodel_1, imodel_2
+    #
+    # imodel_1, imodel_2 = build_intermediate_model(encoder, decoder)
+    # imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
+    # imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
+
+    # Build video progressions
+    # frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    # videos_list = []
+    # start_frame_index = 1
+    # end_frame_index = VIDEO_LENGTH + 1
+    # while (end_frame_index <= len(frames_source)):
+    #     frame_list = frames_source[start_frame_index:end_frame_index]
+    #     if (len(set(frame_list)) == 1):
+    #         videos_list.append(range(start_frame_index, end_frame_index))
+    #         start_frame_index = start_frame_index + VIDEO_LENGTH
+    #         end_frame_index = end_frame_index + VIDEO_LENGTH
+    #     else:
+    #         start_frame_index = end_frame_index - 1
+    #         end_frame_index = start_frame_index + VIDEO_LENGTH
+    #
+    # videos_list = np.asarray(videos_list, dtype=np.int32)
+    # n_videos = videos_list.shape[0]
+    #
+    # # Test model by making predictions
+    # loss = []
+    # NB_ITERATIONS = int(n_videos / BATCH_SIZE)
+    # for index in range(NB_ITERATIONS):
+    #     # Test Autoencoder
+    #     X = load_X(videos_list, index, TEST_DATA_DIR)
+    #     X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
+    #     y_test = X[:, int(VIDEO_LENGTH / 2):]
+    #     loss.append(autoencoder.test_on_batch(X_test, y_test))
+    #     y_pred = autoencoder.predict_on_batch(X_test)
+    #     a_pred_1 = imodel_1.predict_on_batch(X_test)
+    #     a_pred_2 = imodel_2.predict_on_batch(X_test)
+    #
+    #     arrow = int(index / (NB_ITERATIONS / 40))
+    #     stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
+    #                  "loss: " + str(loss[len(loss) - 1]) +
+    #                  "\t    [" + "{0}>".format("=" * (arrow)))
+    #     stdout.flush()
+    #
+    #     orig_image, truth_image, pred_image = combine_images(X_test, y_test, y_pred)
+    #     pred_image = pred_image * 127.5 + 127.5
+    #     orig_image = orig_image * 127.5 + 127.5
+    #     truth_image = truth_image * 127.5 + 127.5
+    #
+    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
+    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
+    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
+
+        # #------------------------------------------
+        # a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1_' + str(index) +'.npy'), a_pred_1)
+        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_2_' + str(index) + '.npy'), a_pred_2)
         # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
         # pred_image = (pred_image*100) * 127.5 + 127.5
         # y_pred = y_pred * 127.5 + 127.5
@@ -518,8 +554,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         # pred_image = (pred_image*100) * 127.5 + 127.5
         # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_2.png"), pred_image)
 
-    avg_loss = sum(loss) / len(loss)
-    print("\nAvg loss: " + str(avg_loss))
+    # avg_loss = sum(loss) / len(loss)
+    print("\nAvg loss: " + str(avg_test_loss))
 
 
 def get_args():

@@ -72,7 +72,7 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 32
+VIDEO_LENGTH = 16
 IMG_SIZE = (112, 112, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
@@ -107,22 +107,18 @@ formatted_joint_action_set = ['car moving slow', 'car slowing down', 'car standi
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
-NB_EPOCHS_AUTOENCODER = 0
+BATCH_SIZE = 20
 NB_EPOCHS_CLASS = 100
 
-OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
-OPTIM_G = Adam(lr=0.0001, beta_1=0.5)
-OPTIM_D = Adam(lr=0.000001, beta_1=0.5)
-OPTIM_C = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 
 lr_schedule = [10, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.00000002
+        return 0.00002
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000000002  # lr_decay_ratio = 10
+        return 0.000002  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.0000000002
-    return 0.0000000002
+        return 0.0000002
+    return 0.0000002
