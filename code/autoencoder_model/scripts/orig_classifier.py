@@ -6,6 +6,7 @@ import hickle as hkl
 import numpy as np
 
 np.random.seed(2 ** 10)
+import tensorflow as tf
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 from keras import regularizers
@@ -44,7 +45,6 @@ from keras.models import Model
 from custom_layers import AttnLossLayer
 from keras.models import model_from_json
 from keras.metrics import top_k_categorical_accuracy
-
 from experience_memory import ExperienceMemory
 from config_oc import *
 from sys import stdout
@@ -65,7 +65,7 @@ def process_prec3d():
     model = model_from_json(loaded_model_json)
 
     model.load_weights(PRETRAINED_C3D_WEIGHTS)
-    print("Loaded model from disk")
+    print("Loaded weights from disk")
     for layer in model.layers[:13]:
         layer.trainable = True
 
@@ -126,27 +126,6 @@ def process_prec3d():
 
     return model
 
-def get_zeros(x):
-    zero = K.zeros_like(x)
-    return zero
-
-    z1 = Lambda(get_zeros)(h0)
-    h0_cat = concatenate([h0, z1])
-
-    # 10x16x16
-    clstm_input = Input(shape=(20, 16, 16, 128))
-    convlstm_1 = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.5)(clstm_input)
-    x = TimeDistributed(BatchNormalization())(convlstm_1)
-    convlstm_1_out = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    model = Model(inputs=clstm_input, outputs=convlstm_1_out)
-
-    return model
-
 
 def pretrained_c3d():
     c3d = process_prec3d()
@@ -200,16 +179,134 @@ def pretrained_c3d():
     # model.add(Flatten())
 
     dense = Dense(units=512, activation='tanh')(c3d_out)
-    x = Dropout(0.5)(dense)
-    x = Dense(units=512, activation='tanh')(x)
+    x = BatchNormalization()(dense)
     x = Dropout(0.5)(x)
-    actions = Dense(units=len(simple_driver_set), activation='softmax')(x)
+    x = Dense(units=512, activation='tanh')(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    actions = Dense(units=len(simple_ped_set), activation='sigmoid')(x)
     model = Model(inputs=inputs, outputs=actions)
     # i=0
     # for layer in model.layers:
     #     print (layer, i)
     #     i = i+1
     # exit(0)
+
+    return model
+
+
+def clstm_classifier():
+    inputs = Input(shape=(20, 128, 128, 3))
+
+    conv_1 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(3, 3),
+                                    strides=(1, 1),
+                                    padding="same"))(inputs)
+    conv_1 = TimeDistributed(BatchNormalization())(conv_1)
+    conv_1 = TimeDistributed(Activation('relu'))(conv_1)
+
+    conv_2 = TimeDistributed(Conv2D(filters=32,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_1)
+    conv_2 = TimeDistributed(BatchNormalization())(conv_2)
+    conv_2 = TimeDistributed(Activation('relu'))(conv_2)
+    conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
+
+    conv_3 = TimeDistributed(Conv2D(filters=64,
+                                    kernel_size=(3, 3),
+                                    strides=(1, 1),
+                                    padding="same"))(conv_2)
+    conv_3 = TimeDistributed(BatchNormalization())(conv_3)
+    conv_3 = TimeDistributed(Activation('relu'))(conv_3)
+
+    conv_4 = TimeDistributed(Conv2D(filters=64,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_3)
+    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
+    conv_4 = TimeDistributed(Activation('relu'))(conv_4)
+    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
+
+    conv_5 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(1, 1),
+                                    padding="same"))(conv_4)
+    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
+    conv_5 = TimeDistributed(Activation('relu'))(conv_5)
+
+    conv_6 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_5)
+    conv_6 = TimeDistributed(BatchNormalization())(conv_6)
+    conv_6 = TimeDistributed(Activation('relu'))(conv_6)
+    conv_6 = TimeDistributed(Dropout(0.5))(conv_6)
+
+    conv_7 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(1, 1),
+                                    padding="same"))(conv_6)
+    conv_7 = TimeDistributed(BatchNormalization())(conv_7)
+    conv_7 = TimeDistributed(Activation('relu'))(conv_7)
+
+    conv_8 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_7)
+    conv_8 = TimeDistributed(BatchNormalization())(conv_8)
+    conv_8 = TimeDistributed(Activation('relu'))(conv_8)
+    conv_8 = TimeDistributed(Dropout(0.5))(conv_8)
+
+    conv_9 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(1, 1),
+                                    padding="same"))(conv_8)
+    conv_9 = TimeDistributed(BatchNormalization())(conv_9)
+    conv_9 = TimeDistributed(Activation('relu'))(conv_9)
+
+    conv_10 = TimeDistributed(Conv2D(filters=128,
+                                    kernel_size=(3, 3),
+                                    strides=(2, 2),
+                                    padding="same"))(conv_9)
+    conv_10 = TimeDistributed(BatchNormalization())(conv_10)
+    conv_10 = TimeDistributed(Activation('relu'))(conv_10)
+    conv_10 = TimeDistributed(Dropout(0.5))(conv_10)
+
+    lstm_1 = ConvLSTM2D(filters=128,
+                        kernel_size=(3, 3),
+                        strides=(1, 1),
+                        padding='same',
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(conv_10)
+    lstm_1 = TimeDistributed(BatchNormalization())(lstm_1)
+    lstm_1 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_1)
+
+    lstm_2 = ConvLSTM2D(filters=128,
+                        kernel_size=(3, 3),
+                        strides=(1, 1),
+                        padding='same',
+                        return_sequences=True,
+                        recurrent_dropout=0.5)(lstm_1)
+    lstm_2 = TimeDistributed(BatchNormalization())(lstm_2)
+    lstm_2 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_2)
+
+    lstm_3 = ConvLSTM2D(filters=128,
+                        kernel_size=(3, 3),
+                        strides=(1, 1),
+                        padding='same',
+                        return_sequences=False,
+                        recurrent_dropout=0.5)(lstm_2)
+    lstm_3 = BatchNormalization()(lstm_3)
+    lstm_3 = LeakyReLU(alpha=0.2)(lstm_3)
+
+    flat_1 = Flatten()(lstm_3)
+    x = Dense(units=512, activation='tanh')(flat_1)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    dense = Dense(units=len(simple_ped_set), activation='sigmoid')(x)
+
+    model = Model(inputs=inputs, outputs=dense)
 
     return model
 
@@ -255,6 +352,7 @@ def load_weights(weights_file, model):
 
 
 def run_utilities(classifier, CLA_WEIGHTS):
+
 # def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
         if CLASSIFIER:
@@ -280,6 +378,27 @@ def run_utilities(classifier, CLA_WEIGHTS):
             load_weights(CLA_WEIGHTS, classifier)
 
 
+def load_X_y_RAM(videos_list, index, frames, driver_action_cats, ped_action_cats):
+    # X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+    X = []
+    y1 = []
+    y2 = []
+    for i in range(BATCH_SIZE):
+        start_index = videos_list[(index*BATCH_SIZE + i), 0]
+        end_index = videos_list[(index*BATCH_SIZE + i), -1]
+        X.append(frames[start_index:end_index+1])
+        if (len(driver_action_cats) != 0):
+            y1.append(driver_action_cats[start_index:end_index+1])
+        if (len(ped_action_cats) != 0):
+            y2.append(ped_action_cats[start_index:end_index+1])
+
+    X = np.asarray(X)
+    y1 = np.asarray(y1)
+    y2 = np.asarray(y2)
+
+    return X, y1, y2
+
+
 def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
     X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
     y1 = []
@@ -293,7 +412,7 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
+                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
@@ -317,12 +436,31 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
     return X, np.asarray(y1), np.asarray(y2)
 
 
+def map_to_simple(ped_action):
+    if (ped_action <= 1):
+        return 0
+    elif (ped_action <= 3):
+        return 1
+    elif (ped_action <= 5):
+        return 2
+    elif (ped_action <= 7):
+        return 3
+    elif (ped_action == 8):
+        return 4
+    elif (ped_action == 9):
+        return 5
+    elif (ped_action == 10):
+        return 3
+    elif (ped_action == 11):
+        return 6
+    elif (ped_action == 12):
+        return 7
+
+
 def get_action_classes(action_labels):
     # Load labesl into categorical 1-hot vectors
     print("Loading annotations.")
-    slow = 0
-    stop = 0
-    speed = 0
+    count = [0] * len(simple_ped_set)
     driver_action_class = []
     ped_action_class = []
     # action_class = []
@@ -332,45 +470,46 @@ def get_action_classes(action_labels):
             driver_action_nums = driver_actions.index(action_dict['Driver'].split(',')[0])
             if driver_action_nums < 2:
                 driver_action_nums = 0
-                slow = slow + 1
             elif driver_action_nums == 2:
                 driver_action_nums = 1
-                stop = stop + 1
             else:
                 driver_action_nums = 2
-                speed = speed + 1
             encoded_driver_action = to_categorical(driver_action_nums, len(simple_driver_set))
             driver_action_class.append(encoded_driver_action.T)
         else:
             driver_action_nums = driver_actions.index(action_dict['Driver'])
             if driver_action_nums < 2:
                 driver_action_nums = 0
-                slow = slow + 1
             elif driver_action_nums == 2:
                 driver_action_nums = 1
-                stop = stop + 1
             else:
                 driver_action_nums = 2
-                speed = speed + 1
             encoded_driver_action = to_categorical(driver_action_nums, len(simple_driver_set))
             driver_action_class.append(encoded_driver_action.T)
-        a = action_dict.values()[0:(len(action_dict.values()) - 1)]
+
+        # Settle pedestrian classes
+        # print (action_dict)
         a_clean = []
-        for j in range(len(a)):
-            if ',' in a[j]:
-                splits = a[j].split(',')
-                for k in range(len(splits)):
-                    a_clean.append(splits[k])
-            else:
-                a_clean.append(a[j])
+        for key, value in action_dict.iteritems():
+            if 'pedestrian' in key:
+                if ',' in value:
+                    splits = value.split(',')
+                    for k in range(len(splits)):
+                        a_clean.append(splits[k])
+                else:
+                    a_clean.append(value)
+        # print (a_clean)
         ped_action_per_frame = list(set(a_clean))
-        encoded_ped_action = np.zeros(shape=(1, len(ped_actions)), dtype=np.float32)
+        encoded_ped_action = np.zeros(shape=(1, len(simple_ped_set)), dtype=np.float32)
         # print (ped_action_per_frame)
         for action in ped_action_per_frame:
-            # Offset ped action from driver action
+            # Get ped action number and map it to simple set
             ped_action = ped_actions.index(action)
+            ped_action = map_to_simple(ped_action)
+            count[ped_action] = count[ped_action] + 1
+
             # Add all unique categorical one-hot vectors
-            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(ped_actions))
+            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(simple_ped_set))
 
         ped_action_class.append(encoded_ped_action.T)
         # action_class.append((encoded_driver_action + encoded_ped_action).T)
@@ -394,7 +533,25 @@ def get_action_classes(action_labels):
     # print (action_class[0])
     # exit(0)
 
-    return driver_action_class, ped_action_class, slow, stop, speed
+    return driver_action_class, ped_action_class, count
+
+def load_to_RAM(frames_source):
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+
+    j = 1
+    for i in range(1, len(frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
+            frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
+            j = j + 1
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
+    return frames
 
 
 def get_video_lists(frames_source, stride):
@@ -415,6 +572,7 @@ def get_video_lists(frames_source, stride):
     videos_list = np.asarray(videos_list, dtype=np.int32)
 
     return np.asarray(videos_list)
+
 
 def subsample_videos(videos_list, driver_action_labels):
     print (videos_list.shape)
@@ -460,6 +618,78 @@ def subsample_videos(videos_list, driver_action_labels):
 
     return videos_list
 
+def metric_tp(y_true, y_pred):
+    value, update_op = tf.metrics.true_positives(K.cast(y_true, 'int32'), K.cast(K.round(y_pred), 'int32'))
+
+    # find all variables created for this metric
+    metric_vars = [i for i in tf.local_variables() if 'tp' in i.name.split('/')[1]]
+
+    # Add metric variables to GLOBAL_VARIABLES collection.
+    # They will be initialized for new session.
+    for v in metric_vars:
+        tf.add_to_collection(tf.GraphKeys.GLOBAL_VARIABLES, v)
+
+    # force to update metric values
+    with tf.control_dependencies([update_op]):
+        value = tf.identity(value)
+        return value
+
+
+def metric_precision(y_true, y_pred):
+    value, update_op = tf.metrics.precision(K.cast(y_true, 'int32'), K.cast(K.round(y_pred), 'int32'))
+
+    # find all variables created for this metric
+    metric_vars = [i for i in tf.local_variables() if 'precision' in i.name.split('/')[1]]
+
+    # Add metric variables to GLOBAL_VARIABLES collection.
+    # They will be initialized for new session.
+    for v in metric_vars:
+        tf.add_to_collection(tf.GraphKeys.GLOBAL_VARIABLES, v)
+
+    # force to update metric values
+    with tf.control_dependencies([update_op]):
+        value = tf.identity(value)
+        return value
+
+
+def metric_recall(y_true, y_pred):
+    value, update_op = tf.metrics.recall(K.cast(y_true, 'int32'), K.cast(K.round(y_pred), 'int32'))
+
+    # find all variables created for this metric
+    metric_vars = [i for i in tf.local_variables() if 'recall' in i.name.split('/')[1]]
+
+    # Add metric variables to GLOBAL_VARIABLES collection.
+    # They will be initialized for new session.
+    for v in metric_vars:
+        tf.add_to_collection(tf.GraphKeys.GLOBAL_VARIABLES, v)
+
+    # force to update metric values
+    with tf.control_dependencies([update_op]):
+        value = tf.identity(value)
+        return value
+
+
+def metric_mpca(y_true, y_pred):
+    value, update_op = tf.metrics.mean_per_class_accuracy(K.cast(y_true, 'int32'),
+                                                          K.cast(K.round(y_pred), 'int32'),
+                                                          len(simple_ped_set))
+
+    # print (tf.local_variables())
+    # exit(0)
+
+    # find all variables created for this metric
+    metric_vars = [i for i in tf.local_variables() if 'mpca' in i.name.split('/')[1]]
+
+    # Add metric variables to GLOBAL_VARIABLES collection.
+    # They will be initialized for new session.
+    for v in metric_vars:
+        tf.add_to_collection(tf.GraphKeys.GLOBAL_VARIABLES, v)
+
+    # force to update metric values
+    with tf.control_dependencies([update_op]):
+        value = tf.identity(value)
+        return value
+
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Loading data definitions.")
@@ -468,9 +698,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Load actions from annotations
     action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
-    driver_action_classes, ped_action_classes, sl, st, sp = get_action_classes(action_labels=action_labels)
-    print("Training Stats: slow: " + str(sl) + " stop: " + str(st) + " speed: " + str(sp))
-    videos_list = subsample_videos(videos_list=videos_list, driver_action_labels=driver_action_classes)
+    driver_action_classes, ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
+    print("Training Stats: " + str(ped_class_count))
+
+    if RAM_DECIMATE:
+        frames = load_to_RAM(frames_source=frames_source)
 
     if SHUFFLE:
         # Shuffle images to aid generalization
@@ -478,24 +710,25 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=1)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=10)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_128.hkl'))
-    test_driver_action_classes, test_ped_action_classes, sl, st, sp = get_action_classes(test_action_labels)
-    print ("Test Stats: slow: " + str(sl) + " stop: " + str(st) + " speed: " + str(sp))
-    test_videos_list = subsample_videos(videos_list=test_videos_list, driver_action_labels=test_driver_action_classes)
+    test_driver_action_classes, test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
+    print ("Test Stats: " + str(test_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
 
     def top_2_categorical_accuracy(y_true, y_pred):
-        return top_k_categorical_accuracy(y_true, y_pred, k=1)
+        return top_k_categorical_accuracy(y_true, y_pred, k=2)
 
         # Build stacked classifier
     if CLASSIFIER:
-        classifier = pretrained_c3d()
-        classifier.compile(loss="categorical_crossentropy",
-                                 optimizer=OPTIM_C, metrics=['acc'])
+        # classifier = pretrained_c3d()
+        classifier = clstm_classifier()
+        classifier.compile(loss="binary_crossentropy",
+                           optimizer=OPTIM_C,
+                           metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy', metric_tp])
 
     run_utilities(classifier, CLA_WEIGHTS)
 
@@ -532,42 +765,48 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
-                X, y1, y2 = load_X_y(videos_list, index, DATA_DIR, driver_action_classes, [])
-                X_train = X
-                y1_true_class = y1[:, 8]
+                if RAM_DECIMATE:
+                    X, y1, y2 = load_X_y_RAM(videos_list, index, frames, [], ped_action_classes)
+                else:
+                    X, y1, y2 = load_X_y(videos_list, index, DATA_DIR, [], ped_action_classes)
 
-                c_loss.append(classifier.train_on_batch(X_train, y1_true_class))
+                X_train = X
+                y2_true_class = y2[:, 10]
+
+                c_loss.append(classifier.train_on_batch(X_train, y2_true_class))
+
+                print (type(c_loss[len(c_loss) - 1][-1]))
 
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, -1]]) + "  " +
+                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1, 2, 3, 4, 5]]) + "  " +
                              "\t    [" + "{0}>".format("=" * (arrow)))
                 stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
-                driver_pred_class = classifier.predict(X_train, verbose=0)
+                ped_pred_class = classifier.predict(X_train, verbose=0)
                 orig_image = combine_images(X_train)
                 orig_image = orig_image * 127.5 + 127.5
                 pred_image = np.copy(orig_image)
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 if epoch == 0:
-                    y1_orig_classes = y1
+                    y2_orig_classes = y2
                     # Add labels as text to the image
                     for k in range(BATCH_SIZE):
                         for j in range(VIDEO_LENGTH):
-                                class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
-                                cv2.putText(orig_image, "Car: " + simple_driver_set[class_num_past_y1],
-                                            (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                                class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
+                                cv2.putText(orig_image, "Ped: " + simple_ped_set[class_num_past_y2],
+                                            (2 + j * (128), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
 
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
-                    class_num_y1 = np.argmax(driver_pred_class[k])
-                    cv2.putText(pred_image,  "Car: " + simple_driver_set[class_num_y1],
-                                (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                    class_num_y2 = np.argmax(ped_pred_class[k])
+                    cv2.putText(pred_image,  "Ped: " + simple_ped_set[class_num_y2],
+                                (2, 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                 cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"),
                             pred_image)
@@ -575,40 +814,40 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             # Run over test data
             print('')
             for index in range(NB_TEST_ITERATIONS):
-                X, y1, y2 = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_driver_action_classes, [])
+                X, y1, y2 = load_X_y(test_videos_list, index, TEST_DATA_DIR, [], test_ped_action_classes)
                 X_test = X
-                y1_true_class = y1[:, 8]
+                y2_true_class = y2[:, 10]
 
-                test_c_loss.append(classifier.test_on_batch(X_test, y1_true_class))
+                test_c_loss.append(classifier.test_on_batch(X_test, y2_true_class))
 
                 arrow = int(index / (NB_TEST_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, -1]]))
+                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, 1, 2, 3, 4, 5]]))
                 stdout.flush()
 
             # Save generated images to file
-            driver_pred_class = classifier.predict(X_test, verbose=0)
+            ped_pred_class = classifier.predict(X_test, verbose=0)
             orig_image = combine_images(X_test)
             orig_image = orig_image * 127.5 + 127.5
-            pred_image = orig_image
+            pred_image = np.copy(orig_image)
             font = cv2.FONT_HERSHEY_SIMPLEX
             if epoch == 0:
-                y1_orig_classes = y1
+                y2_orig_classes = y2
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     for j in range(VIDEO_LENGTH):
-                        class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
-                        cv2.putText(orig_image, "Car: " + simple_driver_set[class_num_past_y1],
-                                    (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                        class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
+                        cv2.putText(orig_image, "Ped: " + simple_ped_set[class_num_past_y2],
+                                    (2 + j * (128), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                          "_cla_test_orig.png"), orig_image)
 
             # Add labels as text to the image
             for k in range(BATCH_SIZE):
-                class_num_y1 = np.argmax(driver_pred_class[k])
-                cv2.putText(pred_image, "Car: " + simple_driver_set[class_num_y1],
-                            (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                class_num_y2 = np.argmax(ped_pred_class[k])
+                cv2.putText(pred_image, "Ped: " + simple_ped_set[class_num_y2],
+                            (2, 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                             cv2.LINE_AA)
             cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_test_pred.png"),
                         pred_image)

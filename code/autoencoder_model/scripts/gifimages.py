@@ -11,13 +11,12 @@ def create_gif(filenames, duration, vid_num):
     imageio.mimsave(os.path.join(GIF_DIR, video_name), images, duration=duration)
 
 
-def strip(image, img_size, vid_len):
+def strip(image, img_size, vid_len, vid_num=1):
     n_rows = image.shape[0]
     n_cols = image.shape[1]
     n_horizontal_imgs = n_cols/img_size
     n_vertical_imgs = n_rows/img_size
     frame_num = 1
-    vid_num = 1
     fps = 30
     duration = 1 / fps
     filenames = []
@@ -25,6 +24,13 @@ def strip(image, img_size, vid_len):
     for i in range(n_vertical_imgs):
         for j in range(n_horizontal_imgs):
             img = image[i*img_size:(i+1)*img_size, j*img_size:(j+1)*img_size]
+            if (j>=10):
+                # img = cv2.blur(img, (5, 5), 0)
+                img = cv2.medianBlur(img, 7)
+                # img = cv2.bilateralFilter(img, 9, 150, 25)
+                img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # convert it to hsv
+                img[:, :, 2] -= 2
+                img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
             filename = "vid_" + str(vid_num) + "_frame_" + str(frame_num) + ".png"
             cv2.imwrite(os.path.join(GIF_IMG_DIR, filename), img)
             filenames.append(os.path.join(GIF_IMG_DIR, filename))
@@ -36,8 +42,17 @@ def strip(image, img_size, vid_len):
             frame_num = frame_num + 1
 
 
+def gifmax(folder):
+    for i in range(880):
+        im_pred = cv2.imread(folder+'/truth/' + str(i) + '_truth.png', cv2.IMREAD_COLOR)
+        strip(im_pred, 128, 20, i)
+
+
 def get_args():
     parser = argparse.ArgumentParser()
+    parser.add_argument("--mode", type=str)
+    parser.add_argument("--folder", type=str, default="None")
+
     parser.add_argument("--file", type=str, default="None")
     parser.add_argument("--img_size", type=int, default=128)
     parser.add_argument("--vid_len", type=int, default=10)
@@ -54,13 +69,18 @@ if __name__ == "__main__":
     if not os.path.exists(GIF_IMG_DIR):
         os.mkdir(GIF_IMG_DIR)
 
-    args = get_args()
-    try:
-        im = cv2.imread(args.file, cv2.IMREAD_COLOR)
-    except cv2.error as e:
-        print("Image file being processed: ", args.file)
-        print (e)
-    except IOError as e:
-        print (e)
 
-    strip(image=im, img_size=args.img_size, vid_len=args.vid_len)
+    args = get_args()
+    if args.mode == 'gifmax':
+        print ('going into gifmax')
+        gifmax(args.folder)
+    else:
+        try:
+            im = cv2.imread(args.file, cv2.IMREAD_COLOR)
+        except cv2.error as e:
+            print("Image file being processed: ", args.file)
+            print (e)
+        except IOError as e:
+            print (e)
+
+        strip(image=im, img_size=args.img_size, vid_len=args.vid_len)

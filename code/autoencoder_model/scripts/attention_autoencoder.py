@@ -103,10 +103,10 @@ def decoder_model():
     aclstm_1 = GRU(units=16 * 16,
                    recurrent_dropout=0.5,
                    return_sequences=True)(flat_1)
-    # x = TimeDistributed(BatchNormalization())(aclstm_1)
-    x = TimeDistributed(Activation(activation='softmax'))(aclstm_1)
-    # dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(x)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    x = TimeDistributed(Activation(activation='softmax'))(x)
+    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
     a1 = AttnLossLayer()(a1_reshape)
     dot_1 = multiply([out_1, a1])
 
@@ -420,6 +420,37 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # TC.on_train_end('_')
 
 
+def arrange_images(video_stack):
+    n_frames = video_stack.shape[0] * video_stack.shape[1]
+    frames = np.zeros((n_frames,) + video_stack.shape[2:], dtype=video_stack.dtype)
+
+    frame_index = 0
+    for i in range(video_stack.shape[0]):
+        for j in range(video_stack.shape[1]):
+            frames[frame_index] = video_stack[i, j]
+            frame_index += 1
+
+    img_height = video_stack.shape[3]
+    img_width = video_stack.shape[2]
+    # width = img_size x video_length
+    width = img_width * video_stack.shape[1]
+    # height = img_size x batch_size
+    height = img_height * BATCH_SIZE
+    shape = frames.shape[1:]
+    image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
+    frame_number = 0
+    for i in range(BATCH_SIZE):
+        for j in range(video_stack.shape[1]):
+            image[(i * img_height):((i + 1) * img_height), (j * img_width):((j + 1) * img_width)] = frames[frame_number]
+            frame_number = frame_number + 1
+
+    return image
+
+
+def combine_images_test(X, y, generated_images):
+    return arrange_images(X), arrange_images(y), arrange_images(generated_images)
+
+
 def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     # Create models
@@ -428,8 +459,21 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
 
+    if not os.path.exists(TEST_RESULTS_DIR + '/orig/'):
+            os.mkdir(TEST_RESULTS_DIR + '/orig/')
+    if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
+        os.mkdir(TEST_RESULTS_DIR + '/truth/')
+    if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
+        os.mkdir(TEST_RESULTS_DIR + '/pred/')
+
+    def l1_l2_loss(y_true, y_pred):
+        mse_loss = K.mean(K.square(y_pred - y_true), axis=-1)
+        mae_loss = K.mean(K.abs(y_pred - y_true), axis=-1)
+
+        return mse_loss + mae_loss
+
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
-    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    autoencoder.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
@@ -454,14 +498,22 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
             predicted_images = autoencoder.predict(X_train, verbose=0)
-            orig_image, truth_image, pred_image = combine_images(X_train, y_train, predicted_images)
-            pred_image = pred_image * 127.5 + 127.5
-            orig_image = orig_image * 127.5 + 127.5
-            truth_image = truth_image * 127.5 + 127.5
+            voila = np.concatenate((X_train, y_train), axis=1)
+            truth_seq = arrange_images(voila)
+            pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
 
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_orig.png"), orig_image)
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_truth.png"), truth_image)
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(index) + "_pred.png"), pred_image)
+            # orig_image, truth_image, pred_image = combine_images_test(X_train, y_train, predicted_images)
+            # pred_image = pred_image * 127.5 + 127.5
+            # orig_image = orig_image * 127.5 + 127.5
+            # truth_image = truth_image * 127.5 + 127.5
+            truth_seq = truth_seq * 127.5 + 127.5
+            pred_seq = pred_seq * 127.5 + 127.5
+
+            # cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/orig/', str(index) + "_orig.png"), orig_image)
+            # cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_image)
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
+            # cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_image)
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)
@@ -556,6 +608,12 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     # avg_loss = sum(loss) / len(loss)
     print("\nAvg loss: " + str(avg_test_loss))
+    print("\n Std: " + str(np.std(np.asarray(test_loss))))
+    print("\n Variance: " + str(np.var(np.asarray(test_loss))))
+    print("\n Mean: " + str(np.mean(np.asarray(test_loss))))
+    print("\n Max: " + str(np.max(np.asarray(test_loss))))
+    print("\n Min: " + str(np.min(np.asarray(test_loss))))
+    np.save(os.path.join(TEST_RESULTS_DIR, 'L1_loss.npy'), test_loss)
 
 
 def get_args():
