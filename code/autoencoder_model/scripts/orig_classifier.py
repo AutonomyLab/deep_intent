@@ -67,7 +67,7 @@ def process_prec3d():
     model.load_weights(PRETRAINED_C3D_WEIGHTS)
     print("Loaded weights from disk")
     for layer in model.layers[:13]:
-        layer.trainable = True
+        layer.trainable = False
 
     # i = 0
     # for layer in model.layers:
@@ -178,7 +178,7 @@ def pretrained_c3d():
     #
     # model.add(Flatten())
 
-    dense = Dense(units=512, activation='tanh')(c3d_out)
+    dense = Dense(units=1024, activation='tanh')(c3d_out)
     x = BatchNormalization()(dense)
     x = Dropout(0.5)(x)
     x = Dense(units=512, activation='tanh')(x)
@@ -412,7 +412,7 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
+                frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
@@ -442,19 +442,17 @@ def map_to_simple(ped_action):
     elif (ped_action <= 3):
         return 1
     elif (ped_action <= 5):
-        return 2
+        return 0
     elif (ped_action <= 7):
-        return 3
+        return 2
     elif (ped_action == 8):
-        return 4
-    elif (ped_action == 9):
-        return 5
-    elif (ped_action == 10):
         return 3
-    elif (ped_action == 11):
-        return 6
-    elif (ped_action == 12):
-        return 7
+    elif (ped_action == 9):
+        return 0
+    elif (ped_action <= 11):
+        return 2
+    else:
+        return 4
 
 
 def get_action_classes(action_labels):
@@ -498,19 +496,31 @@ def get_action_classes(action_labels):
                         a_clean.append(splits[k])
                 else:
                     a_clean.append(value)
-        # print (a_clean)
+
+        if len(a_clean) == 0:
+            a_clean = ['unknown']
+
         ped_action_per_frame = list(set(a_clean))
-        encoded_ped_action = np.zeros(shape=(1, len(simple_ped_set)), dtype=np.float32)
+        # print(ped_action_per_frame)
+        encoded_ped_action = np.zeros(shape=(len(simple_ped_set)), dtype=np.float32)
         # print (ped_action_per_frame)
+        simple_ped_action_per_frame = []
         for action in ped_action_per_frame:
             # Get ped action number and map it to simple set
             ped_action = ped_actions.index(action)
             ped_action = map_to_simple(ped_action)
-            count[ped_action] = count[ped_action] + 1
+            simple_ped_action_per_frame.append(ped_action)
 
+
+        simple_ped_action_per_frame = set(simple_ped_action_per_frame)
+        for action in simple_ped_action_per_frame:
+            count[action] = count[action] + 1
             # Add all unique categorical one-hot vectors
-            encoded_ped_action = encoded_ped_action + to_categorical(ped_action, len(simple_ped_set))
+            encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
 
+        if (sum(encoded_ped_action) == 0):
+            print (simple_ped_action_per_frame)
+            print (a_clean)
         ped_action_class.append(encoded_ped_action.T)
         # action_class.append((encoded_driver_action + encoded_ped_action).T)
 
@@ -544,7 +554,7 @@ def load_to_RAM(frames_source):
         im_file = os.path.join(DATA_DIR, filename)
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
+            frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
             frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
             j = j + 1
         except AttributeError as e:
@@ -710,7 +720,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=10)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_128.hkl'))
     test_driver_action_classes, test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
@@ -724,11 +734,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
         # Build stacked classifier
     if CLASSIFIER:
-        # classifier = pretrained_c3d()
-        classifier = clstm_classifier()
+        classifier = pretrained_c3d()
+        # classifier = clstm_classifier()
         classifier.compile(loss="binary_crossentropy",
                            optimizer=OPTIM_C,
-                           metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy', metric_tp])
+                           metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
 
     run_utilities(classifier, CLA_WEIGHTS)
 
@@ -748,7 +758,6 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     print ("Beginning Training.")
     # Begin Training
-    # Train AAE
     if CLASSIFIER:
         # exit(0)
         print("Training Classifier...")
@@ -771,15 +780,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     X, y1, y2 = load_X_y(videos_list, index, DATA_DIR, [], ped_action_classes)
 
                 X_train = X
-                y2_true_class = y2[:, 10]
+                y2_true_class = y2[:, 8]
 
                 c_loss.append(classifier.train_on_batch(X_train, y2_true_class))
 
-                print (type(c_loss[len(c_loss) - 1][-1]))
-
                 arrow = int(index / (NB_ITERATIONS / 30))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1, 2, 3, 4, 5]]) + "  " +
+                             "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1, 2, 3, 4]]) + "  " +
                              "\t    [" + "{0}>".format("=" * (arrow)))
                 stdout.flush()
 
@@ -816,13 +823,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for index in range(NB_TEST_ITERATIONS):
                 X, y1, y2 = load_X_y(test_videos_list, index, TEST_DATA_DIR, [], test_ped_action_classes)
                 X_test = X
-                y2_true_class = y2[:, 10]
+                y2_true_class = y2[:, 8]
 
                 test_c_loss.append(classifier.test_on_batch(X_test, y2_true_class))
 
                 arrow = int(index / (NB_TEST_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, 1, 2, 3, 4, 5]]))
+                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, 1, 2, 3, 4]]))
                 stdout.flush()
 
             # Save generated images to file
