@@ -42,8 +42,8 @@ table, th, td {
     <td align="center">Past + Ground Truth</td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="100%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="100%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="70%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="80%"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="100%"></td>
