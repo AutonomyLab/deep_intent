@@ -10,7 +10,7 @@ Humans are constantly engaged in making predictions about our surroundings in or
 The encoder is a spatio-temporal neural network composed of three 3D convolutional layers.
 The decoder is composed of ConvLSTM layers. Unlike the encoder, the decoder layers up-sample steadily to facilitate fluid transforms.
 
-<img src="./public/abstract_net.png" align="middle" width="60%">
+<p style="text-align:center;"><img src="./public/abstract_net.png" align="middle" width="60%"></p>
 <img src="./public/network.png" width="150%">
 
 <style>
@@ -24,7 +24,7 @@ table, th, td {
 Fine-tuned a 3D Convolutional model C3D1, pretrained on Sports 1M dataset (487 classes). Baseline performance scores by learning to recognize actions in the original 16 frame sequences. Subsampling employed to battle skewed data distribution.
 
 
-<img src="./public/abstract_net_cla.png" align="middle" width="80%">
+<p style="text-align:center;"><img src="./public/abstract_net_cla.png" align="middle" width="80%"></p>
 <img src="./public/ped_action_set.png" width="70%">
 
 <style>
