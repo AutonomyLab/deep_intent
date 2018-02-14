@@ -43,7 +43,7 @@ table, th, td {
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="80%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="78.5%"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="60%"></td>
