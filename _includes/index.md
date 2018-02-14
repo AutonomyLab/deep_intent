@@ -44,12 +44,10 @@ table, th, td {
     <td align="center">Past + Ground Truth</td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/pred/vid_23.gif" width="150%"></td>
-    <td aligh="center"><img src="./public/truth/vid_91.gif" width="150%"></td>
-    <td align="center"><img align="left" src="./public/1_truth.gif"></td>
-    <td align="center"><img src="./public/2_orig.gif"></td>
-    <td aligh="center"><img src="./public/2_pred.gif"></td>
-    <td align="center"><img align="left" src="./public/2_truth.gif"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="150%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="150%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="150%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_91.gif" width="150%"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/3_orig.gif"></td>
