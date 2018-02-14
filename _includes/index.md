@@ -24,8 +24,8 @@ table, th, td {
 Fine-tuned a 3D Convolutional model C3D1, pretrained on Sports 1M dataset (487 classes). Baseline performance scores by learning to recognize actions in the original 16 frame sequences. Subsampling employed to battle skewed data distribution.
 
 
-<img src="./public/abstract_net_cla.png" align="middle" width="60%">
-<img src="./public/ped_action_set.png" width="150%">
+<img src="./public/abstract_net_cla.png" align="middle" width="80%">
+<img src="./public/ped_action_set.png" width="70%">
 
 <style>
 table, th, td {
