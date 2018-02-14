@@ -44,26 +44,28 @@ table, th, td {
     <td align="center">Past + Ground Truth</td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="150%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="150%"></td>
-    <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="150%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_91.gif" width="150%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="120%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_91.gif" width="120%"></td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/3_orig.gif"></td>
-    <td aligh="center"><img src="./public/3_pred.gif"></td>
-    <td align="center"><img align="left" src="./public/3_truth.gif"></td>
-    <td align="center"><img src="./public/4_orig.gif"></td>
-    <td aligh="center"><img src="./public/4_pred.gif"></td>
-    <td align="center"><img align="left" src="./public/4_truth.gif"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_165.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_165.gif" width="120%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_232.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_232.gif" width="120%"></td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/5_orig.gif"></td>
-    <td aligh="center"><img src="./public/5_pred.gif"></td>
-    <td align="center"><img align="left" src="./public/5_truth.gif"></td>
-    <td align="center"><img src="./public/6_orig.gif"></td>
-    <td aligh="center"><img src="./public/6_pred.gif"></td>
-    <td align="center"><img align="left" src="./public/6_truth.gif"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_306.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_306.gif" width="120%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_350.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_350.gif" width="120%"></td>
+  </tr>
+     <tr>
+    <td align="center"><img src="./public/gifs/pred/vid_417.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_417.gif" width="120%"></td>
+    <td align="center"><img src="./public/gifs/pred/vid_471.gif" width="120%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/vid_471.gif" width="120%"></td>
   </tr>
 </table>
 
