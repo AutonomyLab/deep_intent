@@ -2,8 +2,8 @@
 permalink:           pretty
 
 # Setup
-title:               DeepIntent
-tagline:             Learning to Model Pedestrian Intent in Autonomous Driving Scenarios
+title:               Look Before You Leap
+tagline:             Reasoning About Pedestrian Intent by Video Prediction
 url:                 http://autonomylab.org
 paginate:            1
 baseurl:             /deep_intent
