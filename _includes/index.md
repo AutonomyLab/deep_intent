@@ -40,30 +40,36 @@ table, th, td {
   <tr>
     <td align="center">Past + Predicted Frames</td>
     <td align="center">Past + Ground Truth</td>
-    <td align="center">Past + Predicted Frames</td>
-    <td align="center">Past + Ground Truth</td>
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="100%"></td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_91.gif" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_165.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_165.gif" width="100%"></td>
-    <td align="center"><img src="./public/gifs/pred/vid_232.gif" width="100%"></td>
+   </tr>
+   <tr>
+   <td align="center"><img src="./public/gifs/pred/vid_232.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_232.gif" width="100%"></td>
   </tr>
   <tr>
     <td align="center"><img src="./public/gifs/pred/vid_306.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_306.gif" width="100%"></td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/gifs/pred/vid_350.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_350.gif" width="100%"></td>
   </tr>
-     <tr>
+  <tr>
     <td align="center"><img src="./public/gifs/pred/vid_417.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_417.gif" width="100%"></td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/gifs/pred/vid_471.gif" width="100%"></td>
     <td aligh="center"><img src="./public/gifs/truth/vid_471.gif" width="100%"></td>
   </tr>
