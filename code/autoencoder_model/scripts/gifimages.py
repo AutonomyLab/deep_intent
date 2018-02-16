@@ -24,13 +24,13 @@ def strip(image, img_size, vid_len, vid_num=1):
     for i in range(n_vertical_imgs):
         for j in range(n_horizontal_imgs):
             img = image[i*img_size:(i+1)*img_size, j*img_size:(j+1)*img_size]
-            if (j>=10):
-                # img = cv2.blur(img, (5, 5), 0)
-                img = cv2.medianBlur(img, 7)
-                # img = cv2.bilateralFilter(img, 9, 150, 25)
-                img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # convert it to hsv
-                img[:, :, 2] -= 2
-                img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+            # if (j>=10):
+            #     # img = cv2.blur(img, (5, 5), 0)
+            #     img = cv2.medianBlur(img, 7)
+            #     # img = cv2.bilateralFilter(img, 9, 150, 25)
+            #     img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)  # convert it to hsv
+            #     img[:, :, 2] -= 2
+            #     img = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
             filename = "vid_" + str(vid_num) + "_frame_" + str(frame_num) + ".png"
             cv2.imwrite(os.path.join(GIF_IMG_DIR, filename), img)
             filenames.append(os.path.join(GIF_IMG_DIR, filename))

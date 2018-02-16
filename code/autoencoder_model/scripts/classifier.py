@@ -8,6 +8,7 @@ import numpy as np
 np.random.seed(2 ** 10)
 from keras import backend as K
 K.set_image_dim_ordering('tf')
+import tensorflow as tf
 from keras import regularizers
 from keras.layers import Dropout
 from keras.models import Sequential
@@ -172,7 +173,7 @@ def process_prec3d():
     model.load_weights(PRETRAINED_C3D_WEIGHTS)
     print("Loaded model from disk")
     for layer in model.layers[:13]:
-        layer.trainable = False
+        layer.trainable = RETRAIN_CLASSIFIER
 
     # i = 0
     # for layer in model.layers:
@@ -198,6 +199,13 @@ def process_prec3d():
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
+
+    # i = 0
+    # for layer in model.layers:
+    #     print(layer, i)
+    #     i = i + 1
+    #
+    # exit(0)
 
     return model
 
@@ -283,9 +291,7 @@ def arrange_images(video_stack):
 
     img_height = video_stack.shape[3]
     img_width = video_stack.shape[2]
-    # width = img_size x video_length
     width = img_width * video_stack.shape[1]
-    # height = img_size x batch_size
     height = img_height * BATCH_SIZE
     shape = frames.shape[1:]
     image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
@@ -296,11 +302,6 @@ def arrange_images(video_stack):
             frame_number = frame_number + 1
 
     return image
-
-
-
-def combine_images(X, y, generated_images):
-    return arrange_images(X), arrange_images(y), arrange_images(generated_images)
 
 
 def load_weights(weights_file, model):
@@ -500,6 +501,95 @@ def get_action_classes(action_labels):
     return ped_action_class, count
 
 
+def subsample_videos(videos_list, ped_action_labels):
+    print (videos_list.shape)
+    CR_MAX = 22
+    UK_MAX = 9
+    ST_MAX = 6
+    cr_count = 0
+    uk_count = 0
+    st_count = 0
+    r_indices = []
+
+    count = [0] * len(simple_ped_set)
+    for i in range(len(videos_list)):
+        # Crossing count
+        # print (list(driver_action_labels[videos_list[i, 8]]).index(1))
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 0):
+            count[0] = count[0] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 1):
+            count[1] = count[1] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 2):
+            count[2] = count[2] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 3):
+            count[3] = count[3] + 1
+
+        # Unknown count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 4):
+            count[4] = count[4] + 1
+
+    print('Before subsampling')
+    print(str(count))
+
+    for i in range(len(videos_list)):
+        # Crossing count
+        # print(list(driver_action_labels[videos_list[i, 8]]).index(1))
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 0):
+            cr_count = cr_count + 1
+            if (cr_count < CR_MAX):
+                r_indices.append(i)
+            else:
+                cr_count = 0
+
+        # Stopped count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 1):
+            st_count = st_count + 1
+            if (st_count < ST_MAX):
+                r_indices.append(i)
+            else:
+                st_count = 0
+
+        # Unknown count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 4):
+            uk_count = uk_count + 1
+            if (uk_count < UK_MAX):
+                r_indices.append(i)
+            else:
+                uk_count = 0
+
+
+    for i in sorted(r_indices, reverse=True):
+        videos_list = np.delete(videos_list, i, axis=0)
+
+    count = [0] * len(simple_ped_set)
+    for i in range(len(videos_list)):
+        # Crossing count
+        # print (list(driver_action_labels[videos_list[i, 8]]).index(1))
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 0):
+            count[0] = count[0] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 1):
+            count[1] = count[1] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 2):
+            count[2] = count[2] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 3):
+            count[3] = count[3] + 1
+
+        # Unknown count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 4):
+            count[4] = count[4] + 1
+
+    print ('After subsampling')
+    print (str(count))
+
+    return videos_list
+
+
 def metric_precision(y_true, y_pred):
     value, update_op = tf.metrics.precision(K.cast(y_true, 'int32'), K.cast(K.round(y_pred), 'int32'))
 
@@ -602,20 +692,25 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     print("Test Stats: " + str(test_ped_class_count))
 
+    videos_list = subsample_videos(videos_list=videos_list, ped_action_labels=ped_action_classes)
+
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
     encoder = encoder_model()
     decoder = decoder_model()
+
+    print (encoder.summary())
+    print (decoder.summary())
 
     # Build attention layer output
     intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
     mask_gen = Sequential()
     mask_gen.add(encoder)
     mask_gen.add(intermediate_decoder)
-    mask_gen.compile(loss='mean_squared_error', optimizer=OPTIM_G)
+    mask_gen.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
 
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
 
         # Build stacked classifier
     if CLASSIFIER:
@@ -629,19 +724,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                             metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
         print (sclassifier.summary())
 
-    run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
+    if CLASSIFIER:
+        run_utilities(encoder, decoder, autoencoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
+    else:
+        run_utilities(encoder, decoder, autoencoder, 'classifier', ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
 
     n_videos = videos_list.shape[0]
     n_test_videos = test_videos_list.shape[0]
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 1
     NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 1
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
     TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False, write_images=False)
-    LRS = lrs_callback.LearningRateScheduler(schedule=schedule)
-    LRS.set_model(sclassifier)
+    LRS_auto = lrs_callback.LearningRateScheduler(schedule=auto_schedule)
+    LRS_auto.set_model(autoencoder)
+    if CLASSIFIER:
+        LRS_clas = lrs_callback.LearningRateScheduler(schedule=clas_schedule)
+        LRS_clas.set_model(sclassifier)
 
 
     print ("Beginning Training.")
@@ -652,7 +754,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         test_loss = []
 
         # Set learning rate every epoch
-        LRS.on_epoch_begin(epoch=epoch)
+        LRS_auto.on_epoch_begin(epoch=epoch)
         lr = K.get_value(autoencoder.optimizer.lr)
         print ("Learning rate: " + str(lr))
 
@@ -688,6 +790,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_image)
 
         # Run over validation data
+        print ('')
         for index in range(NB_TEST_ITERATIONS):
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, [])
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
@@ -730,7 +833,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             test_c_loss = []
 
             # # Set learning rate every epoch
-            LRS.on_epoch_begin(epoch=epoch)
+            LRS_clas.on_epoch_begin(epoch=epoch)
             lr = K.get_value(sclassifier.optimizer.lr)
             print("Learning rate: " + str(lr))
             print("c_loss_metrics: " + str(classifier.metrics_names))
@@ -743,7 +846,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     X, y = load_X_y(videos_list, index, DATA_DIR, ped_action_classes)
 
                 X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-                y_true_class = y[:, 8]
+                y_true_class = y[:, CLASS_TARGET_INDEX]
+                y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+
 
                 c_loss.append(sclassifier.train_on_batch(X_train, y_true_class))
 
@@ -758,7 +863,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 predicted_images = autoencoder.predict(X_train)
                 ped_pred_class = sclassifier.predict(X_train, verbose=0)
                 orig_image = arrange_images(X_train)
-                truth_image = arrange_images(y_train)
+                truth_image = arrange_images(y_true_imgs)
                 pred_image = arrange_images(predicted_images)
                 orig_image = orig_image * 127.5 + 127.5
                 truth_image = truth_image * 127.5 + 127.5
@@ -766,17 +871,17 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 font = cv2.FONT_HERSHEY_SIMPLEX
                 if epoch == 0:
                     y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
-                    y_true_classes = y[: int(VIDEO_LENGTH / 2) :]
+                    y_true_classes = y[:, int(VIDEO_LENGTH / 2) :]
                     # Add labels as text to the image
                     for k in range(BATCH_SIZE):
                         for j in range(int(VIDEO_LENGTH / 2)):
                                 class_num_past = np.argmax(y_orig_classes[k, j])
                                 class_num_futr = np.argmax(y_true_classes[k, j])
-                                cv2.putText(orig_image, simple_ped_set[class_num_past],
+                                cv2.putText(orig_image, '',
                                             (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
-                                cv2.putText(truth_image, simple_ped_set[class_num_futr],
-                                            (2 + j * (128), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                                cv2.putText(truth_image, '',
+                                            (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
@@ -786,23 +891,22 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     class_num = np.argmax(ped_pred_class[k])
-                    cv2.putText(pred_image,  simple_ped_set[class_num],
-                                (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
-                                cv2.LINE_AA)
+                    for j in range(int(VIDEO_LENGTH / 2)):
+                        cv2.putText(pred_image,  '',
+                                    (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"),
                             pred_image)
 
             # Run over test data
             print('')
             for index in range(NB_TEST_ITERATIONS):
-                X, y1, y2 = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_driver_action_classes, [])
+                X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes)
                 X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
-                y1_true_classes = y1[:, int(VIDEO_LENGTH / 2):]
-                y1_true_class = y1[:, int(VIDEO_LENGTH/2) + 8]
-                # y2_true_classes = y2[:, int(VIDEO_LENGTH / 2):]
+                y_true_class = y[:, CLASS_TARGET_INDEX]
                 y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-                test_c_loss.append(sclassifier.test_on_batch(X_test, y1_true_class))
+                test_c_loss.append(sclassifier.test_on_batch(X_test, y_true_class))
 
                 arrow = int(index / (NB_TEST_ITERATIONS / 40))
                 stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
@@ -810,35 +914,29 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 stdout.flush()
 
             # Save generated images to file
-            predicted_images = autoencoder.predict(X_test)
-            driver_pred_class = sclassifier.predict(X_test, verbose=0)
-            orig_image, truth_image, pred_image = combine_images(X_test, y_true_imgs, predicted_images)
+            test_predicted_images = autoencoder.predict(X_test)
+            test_ped_pred_class = sclassifier.predict(X_test, verbose=0)
+            orig_image = arrange_images(X_test)
+            truth_image = arrange_images(y_true_imgs)
+            pred_image = arrange_images(test_predicted_images)
             pred_image = pred_image * 127.5 + 127.5
             orig_image = orig_image * 127.5 + 127.5
             truth_image = truth_image * 127.5 + 127.5
             font = cv2.FONT_HERSHEY_SIMPLEX
             if epoch == 0:
-                y1_orig_classes = y1[:, 0: int(VIDEO_LENGTH / 2)]
-                # y2_orig_classes = y2[:, 0: int(VIDEO_LENGTH / 2)]
+                y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
+                y_true_classes = y[:, int(VIDEO_LENGTH / 2):]
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH / 2)):
-                        class_num_past_y1 = np.argmax(y1_orig_classes[k, j])
-                        # class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
-                        class_num_futr_y1 = np.argmax(y1_true_classes[k, j])
-                        # class_num_futr_y2 = np.argmax(y2_true_classes[k, j])
-                        cv2.putText(orig_image, "Car: " + driver_actions[class_num_past_y1],
+                        class_num_past = np.argmax(y_orig_classes[k, j])
+                        class_num_futr = np.argmax(y_true_classes[k, j])
+                        cv2.putText(orig_image, simple_ped_set[class_num_past],
                                     (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
-                        # cv2.putText(orig_image, "Ped: " + ped_actions[class_num_past_y2],
-                        #             (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
-                        #             cv2.LINE_AA)
-                        cv2.putText(truth_image, "Car: " + driver_actions[class_num_futr_y1],
+                        cv2.putText(truth_image, simple_ped_set[class_num_futr],
                                     (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
-                        # cv2.putText(truth_image, "Ped: " + ped_actions[class_num_futr_y2],
-                        #             (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
-                        #             cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                          "_cla_test_orig.png"), orig_image)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
@@ -846,20 +944,17 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             # Add labels as text to the image
             for k in range(BATCH_SIZE):
-                class_num_y1 = np.argmax(driver_pred_class[k])
-                # class_num_y2 = np.argmax(ped_pred_classes[k, j])
-                cv2.putText(pred_image, "Car: " + driver_actions[class_num_y1],
-                            (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
-                            cv2.LINE_AA)
-                # cv2.putText(pred_image, "Ped: " + ped_actions[class_num_y2],
-                #             (2 + j * (128), 120 - 15 + k * 128), font, 0.3, (255, 255, 255), 1,
-                #             cv2.LINE_AA)
+                class_num_y = np.argmax(test_ped_pred_class[k])
+                for j in range(int(VIDEO_LENGTH / 2)):
+                    cv2.putText(pred_image, simple_ped_set[class_num_y],
+                                (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                                cv2.LINE_AA)
             cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_test_pred.png"),
                         pred_image)
 
-            predicted_attn = mask_gen_1.predict(X_train, verbose=0)
+            predicted_attn = mask_gen.predict(X_train, verbose=0)
             a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, 16, 14, 14, 1))
-            np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_gen1_' + str(epoch) + '.npy'), a_pred)
+            np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_cla_' + str(epoch) + '.npy'), a_pred)
 
             # then after each epoch/iteration
             avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)

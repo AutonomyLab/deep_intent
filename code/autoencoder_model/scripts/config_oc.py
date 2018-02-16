@@ -83,7 +83,9 @@ BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
 A_TRAIN_RATIO = 1
 C_TRAIN_RATIO = 1
-RAM_DECIMATE = True
+RAM_DECIMATE = False
+RETRAIN_CLASSIFIER = True
+CLASS_TARGET_INDEX = 8
 
 ped_actions = ['slow down', 'moving slow', 'standing', 'stopped',
                'speed up', 'moving fast', 'look', 'looking',  'clear path',
@@ -129,16 +131,7 @@ NB_EPOCHS_CLASS = 100
 # OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
 
-lr_schedule = [5, 10, 15]  # epoch_step
-
-# def schedule(epoch_idx):
-#     if (epoch_idx + 1) < lr_schedule[0]:
-#         return 0.0000001
-#     elif (epoch_idx + 1) < lr_schedule[1]:
-#         return 0.000000001  # lr_decay_ratio = 10
-#     elif (epoch_idx + 1) < lr_schedule[2]:
-#         return 0.0000000001
-#     return 0.0000000001
+lr_schedule = [50, 55, 60]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
@@ -148,3 +141,12 @@ def schedule(epoch_idx):
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.000001
     return 0.000001
+
+# def schedule(epoch_idx):
+#     if (epoch_idx + 1) < lr_schedule[0]:
+#         return 0.000001
+#     elif (epoch_idx + 1) < lr_schedule[1]:
+#         return 0.0000001  # lr_decay_ratio = 10
+#     elif (epoch_idx + 1) < lr_schedule[2]:
+#         return 0.00000001
+#     return 0.00000001
