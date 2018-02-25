@@ -40,7 +40,7 @@ from keras.layers import Input
 from keras.models import Model
 from custom_layers import AttnLossLayer
 from experience_memory import ExperienceMemory
-from config_aa import *
+from config_vm import *
 from sys import stdout
 
 import tb_callback
@@ -52,38 +52,37 @@ import os
 
 
 # def encoder_model():
-#     model = Sequential()
-#
-#     # 10x128x128
-#     model.add(Conv3D(filters=128,
-#                      strides=(1, 4, 4),
-#                      kernel_size=(3, 11, 11),
-#                      padding='same',
-#                      input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
-#     model.add(TimeDistributed(BatchNormalization()))
-#     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-#     model.add(TimeDistributed(Dropout(0.5)))
-#
-#     # 10x32x32
-#     model.add(Conv3D(filters=64,
-#                      strides=(1, 2, 2),
-#                      kernel_size=(3, 5, 5),
-#                      padding='same'))
-#     model.add(TimeDistributed(BatchNormalization()))
-#     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-#     model.add(TimeDistributed(Dropout(0.5)))
-#
-#     # 10x16x16
-#     model.add(Conv3D(filters=64,
-#                      strides=(1, 1, 1),
-#                      kernel_size=(3, 3, 3),
-#                      padding='same'))
-#     model.add(TimeDistributed(BatchNormalization()))
-#     model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-#     model.add(TimeDistributed(Dropout(0.5)))
-#
-#     return model
-
+    # model = Sequential()
+    #
+    # # 10x128x128
+    # model.add(Conv3D(filters=128,
+    #                  strides=(1, 4, 4),
+    #                  kernel_size=(3, 11, 11),
+    #                  padding='same',
+    #                  input_shape=(int(VIDEO_LENGTH/2), 128, 128, 3)))
+    # model.add(TimeDistributed(BatchNormalization()))
+    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    # model.add(TimeDistributed(Dropout(0.5)))
+    #
+    # # 10x32x32
+    # model.add(Conv3D(filters=64,
+    #                  strides=(1, 2, 2),
+    #                  kernel_size=(3, 5, 5),
+    #                  padding='same'))
+    # model.add(TimeDistributed(BatchNormalization()))
+    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    # model.add(TimeDistributed(Dropout(0.5)))
+    #
+    # # 10x16x16
+    # model.add(Conv3D(filters=64,
+    #                  strides=(1, 1, 1),
+    #                  kernel_size=(3, 3, 3),
+    #                  padding='same'))
+    # model.add(TimeDistributed(BatchNormalization()))
+    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
+    # model.add(TimeDistributed(Dropout(0.5)))
+    #
+    # return model
 
 def encoder_model():
     inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 128, 3))
@@ -91,11 +90,11 @@ def encoder_model():
     # 10x128x128
     conv_1 = TimeDistributed(Conv2D(filters=64,
                             strides=(4, 4),
-                            kernel_size=(11, 11),
+                            kernel_size=(7, 7),
                             padding='same'))(inputs)
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    x = TimeDistributed(Dropout(0.4))(x)
+    out_1 = TimeDistributed(Dropout(0.4))(x)
 
     # 10x32x32
     conv_2 = TimeDistributed(Conv2D(filters=128,
@@ -108,15 +107,23 @@ def encoder_model():
 
     # 10x16x16
     conv_3 = TimeDistributed(Conv2D(filters=128,
-                     strides=(1, 1),
+                     strides=(2, 2),
                      kernel_size=(3, 3),
                      padding='same'))(out_2)
     x = TimeDistributed(BatchNormalization())(conv_3)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = TimeDistributed(Dropout(0.5))(x)
+
+    conv_4 = TimeDistributed(Conv2D(filters=128,
+                                    strides=(1, 1),
+                                    kernel_size=(3, 3),
+                                    padding='same'))(out_3)
+    x = TimeDistributed(BatchNormalization())(conv_4)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     in_rep = TimeDistributed(Dropout(0.5))(x)
 
-    # res_1 = concatenate([out_2, in_rep])
-    #
+    res_1 = concatenate([out_3, in_rep])
+    flat_1 = TimeDistributed(Flatten())(res_1)
     # clstm_1 = ConvLSTM2D(filters=1,
     #                      kernel_size=(3, 3),
     #                      strides=(1, 1),
@@ -124,14 +131,35 @@ def encoder_model():
     #                      return_sequences=False,
     #                      activation='relu',
     #                      recurrent_dropout=0.2)(res_1)
-    # tr_in = add([in_rep, clstm_1])
-    model = Model(inputs=inputs, outputs=in_rep)
+    lstm_1 = LSTM(units=8 * 8,
+                  return_sequences=True,
+                  recurrent_dropout=0.2)(flat_1)
+    lstm_2 = LSTM(units=8 * 8,
+                  return_sequences=False,
+                  recurrent_dropout=0.2)(lstm_1)
+
+    repeat = RepeatVector(int(VIDEO_LENGTH/2))(lstm_2)
+    flat_2 = TimeDistributed(Flatten())(in_rep)
+    tr_in = concatenate([repeat, flat_2])
+
+    dense = TimeDistributed(Dense(units=128*8*8,
+                                  activation='tanh'))(tr_in)
+    x = BatchNormalization()(dense)
+    tr_out = TimeDistributed(Dropout(0.5))(x)
+    reshape = TimeDistributed(Reshape(target_shape=(8, 8, 128)))(tr_out)
+
+
+
+
+
+
+    model = Model(inputs=inputs, outputs=reshape)
 
     return model
 
 
 def decoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 16, 128))
+    inputs = Input(shape=(int(VIDEO_LENGTH / 2), 8, 8, 128))
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=128,
@@ -141,18 +169,8 @@ def decoder_model():
                             return_sequences=True,
                             recurrent_dropout=0.2)(inputs)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_1 = TimeDistributed(Dropout(0.5))(x)
-
-    # flat_1 = TimeDistributed(Flatten())(out_1)
-    # aclstm_1 = GRU(units=16 * 16,
-    #                recurrent_dropout=0.2,
-    #                return_sequences=True)(flat_1)
-    # x = TimeDistributed(BatchNormalization())(aclstm_1)
-    # dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    # a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 16, 16, 1))(dense_1)
-    # a1 = AttnLossLayer()(a1_reshape)
-    # dot_1 = multiply([out_1, a1])
+    h_1 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_1 = UpSampling3D(size=(1, 2, 2))(h_1)
 
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
@@ -168,7 +186,7 @@ def decoder_model():
     res_1 = concatenate([out_2, skip_upsamp_1])
 
     # 10x32x32
-    convlstm_3 = ConvLSTM2D(filters=128,
+    convlstm_3 = ConvLSTM2D(filters=32,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -182,7 +200,7 @@ def decoder_model():
     res_2 = concatenate([out_3, skip_upsamp_2])
 
     # 10x64x64
-    convlstm_4 = ConvLSTM2D(filters=32,
+    convlstm_4 = ConvLSTM2D(filters=16,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -382,7 +400,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # mask_gen_1 = Sequential()
     # mask_gen_1.add(encoder)
     # mask_gen_1.add(intermediate_decoder)
-    # mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    # mask_gen_1.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
