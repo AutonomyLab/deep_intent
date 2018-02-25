@@ -72,38 +72,23 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 16
+VIDEO_LENGTH = 32
 IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
 # KL coeff damages learning
 KL_COEFF = 0
 CLASSIFIER = True
-BUF_SIZE = 10
-LOSS_WEIGHTS = [1, 1]
-A_TRAIN_RATIO = 1
-C_TRAIN_RATIO = 1
-RAM_DECIMATE = False
-RETRAIN_CLASSIFIER = True
-CLASS_TARGET_INDEX = 8
+RAM_DECIMATE = True
+RETRAIN_CLASSIFIER = False
+CLASS_TARGET_INDEX = 24
+LOSS_WEIGHTS = [1., 0.5]
 
 ped_actions = ['slow down', 'moving slow', 'standing', 'stopped',
                'speed up', 'moving fast', 'look', 'looking',  'clear path',
                'crossing', 'nod', 'handwave', 'unknown']
-# simple_ped_set = ['moving slow', 'stopped', 'moving fast', 'looking', 'clear path', 'crossing',
-#                   'handwave', 'unknown']
 
 simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
-
-# ped_actions = ['slow down 0', 'moving slow 1', 'standing 2', 'stopped 3',
-#                'speed up 4', 'moving fast 5', 'look 6', 'looking 7',  'clear path 8',
-#                'crossing 9', 'nod 10', 'handwave 11', 'unknown 12']
-#
-#
-# simple_ped_set = ['moving slow 0', 'stopped 1', 'moving fast 2', 'looking 3', 'clear path 4', 'crossing 5',
-#                   'handwave 6', 'unknown 7']
-
-
 
 driver_actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
 simple_driver_set = ['slow down', 'stop', 'speed up']
@@ -125,30 +110,32 @@ formatted_joint_action_set = ['car moving slow', 'car slowing down', 'car standi
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 25
+BATCH_SIZE = 9
+NB_EPOCHS_AUTOENCODER = 0
 NB_EPOCHS_CLASS = 100
 
+OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
 
-# lr_schedule = [10, 20, 30]  # epoch_step
 
-# def schedule(epoch_idx):
-#     if (epoch_idx + 1) < lr_schedule[0]:
-#         return 0.00000001
-#     elif (epoch_idx + 1) < lr_schedule[1]:
-#         return 0.000000001  # lr_decay_ratio = 10
-#     elif (epoch_idx + 1) < lr_schedule[2]:
-#         return 0.000000001
-#     return 0.000000001
-
-
-lr_schedule = [2, 20, 40]  # epoch_step
-def schedule(epoch_idx):
-    if (epoch_idx + 1) < lr_schedule[0]:
+auto_lr_schedule = [25, 30, 35]  # epoch_step
+def auto_schedule(epoch_idx):
+    if (epoch_idx + 1) < auto_lr_schedule[0]:
+        return 0.0001
+    elif (epoch_idx + 1) < auto_lr_schedule[1]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx + 1) < auto_lr_schedule[2]:
         return 0.00001
-    elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.0000001
+    return 0.00001
+
+
+clas_lr_schedule = [10, 11, 12]  # epoch_step
+def clas_schedule(epoch_idx):
+    if (epoch_idx + 1) < clas_lr_schedule[0]:
+        return 0.0001
+    elif (epoch_idx + 1) < clas_lr_schedule[1]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx + 1) < clas_lr_schedule[2]:
+        return 0.000001
     return 0.0000001

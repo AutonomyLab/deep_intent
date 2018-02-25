@@ -29,7 +29,8 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -64,17 +65,18 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 20
+VIDEO_LENGTH = 32
 IMG_SIZE = (128, 128, 3)
 ATTN_COEFF = 0
 KL_COEFF = 0
+RAM_DECIMATE = True
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 1
+BATCH_SIZE = 20
 NB_EPOCHS_AUTOENCODER = 40
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
@@ -87,9 +89,9 @@ def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
         return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.000001
-    return 0.000001
+        return 0.0001
+    return 0.0001
 
 

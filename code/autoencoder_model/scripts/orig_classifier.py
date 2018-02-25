@@ -133,58 +133,10 @@ def pretrained_c3d():
     c3d = process_prec3d()
     print (c3d.summary())
 
-    inputs = Input(shape=(16, 112, 112, 3))
-    # conv_1 = Conv3D(filters=3,
-    #                 kernel_size=(3, 3, 3),
-    #                 activation='relu',
-    #                 padding='same',
-    #                 name='conv1')(inputs)
-    # print (conv_1.shape)
-    c3d_out = c3d(inputs)
+    inputs = Input(shape=(16, 128, 128, 3))
+    resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
 
-
-    # flat = TimeDistributed(Flatten())(c3d_out)
-
-    # gru1 = GRU(units=256,
-    #            return_sequences=True,
-    #            recurrent_dropout=0.5)(flat)
-    # x = BatchNormalization()(gru1)
-    # gru1_out = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    #
-    # gru_a = GRU(units=256,
-    #             return_sequences=True,
-    #             recurrent_dropout=0.5)(gru1_out)
-    # x = BatchNormalization()(gru_a)
-    # gru_a_out = TimeDistributed(Activation('softmax'))(x)
-    #
-    # dot = multiply([gru1_out, gru_a_out])
-    #
-    # gru2 = GRU(units=256,
-    #            return_sequences=False,
-    #            recurrent_dropout=0.5)(dot)
-    # x = BatchNormalization()(gru2)
-    # x = LeakyReLU(alpha=0.2)(x)
-
-    # model.add(ConvLSTM2D(filters=256,
-    #                     kernel_size=(3, 3),
-    #                     strides=(1, 1),
-    #                     padding="same",
-    #                     return_sequences=True,
-    #                     recurrent_dropout=0.5))
-    # model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    # model.add(TimeDistributed(Dropout(0.5)))
-    #
-    # model.add(ConvLSTM2D(filters=256,
-    #                     kernel_size=(3, 3),
-    #                     strides=(1, 1),
-    #                     padding="same",
-    #                     recurrent_dropout=0.5))
-    # model.add(TimeDistributed(BatchNormalization()))
-    # model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    # model.add(TimeDistributed(Dropout(0.5)))
-    #
-    # model.add(Flatten())
+    c3d_out = c3d(resized)
 
     dense = Dense(units=1024, activation='tanh')(c3d_out)
     x = BatchNormalization()(dense)
@@ -194,6 +146,7 @@ def pretrained_c3d():
     x = Dropout(0.5)(x)
     actions = Dense(units=len(simple_ped_set), activation='sigmoid')(x)
     model = Model(inputs=inputs, outputs=actions)
+
     # i=0
     # for layer in model.layers:
     #     print (layer, i)
@@ -271,132 +224,6 @@ def c3d_scratch():
     model.add(BatchNormalization())
     model.add(Dropout(.5))
     model.add(Dense(len(simple_ped_set), activation='sigmoid', name='fc8'))
-
-    return model
-
-
-def clstm_classifier():
-    inputs = Input(shape=(20, 128, 128, 3))
-
-    conv_1 = TimeDistributed(Conv2D(filters=32,
-                                    kernel_size=(3, 3),
-                                    strides=(1, 1),
-                                    padding="same"))(inputs)
-    conv_1 = TimeDistributed(BatchNormalization())(conv_1)
-    conv_1 = TimeDistributed(Activation('relu'))(conv_1)
-
-    conv_2 = TimeDistributed(Conv2D(filters=32,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_1)
-    conv_2 = TimeDistributed(BatchNormalization())(conv_2)
-    conv_2 = TimeDistributed(Activation('relu'))(conv_2)
-    conv_2 = TimeDistributed(Dropout(0.5))(conv_2)
-
-    conv_3 = TimeDistributed(Conv2D(filters=64,
-                                    kernel_size=(3, 3),
-                                    strides=(1, 1),
-                                    padding="same"))(conv_2)
-    conv_3 = TimeDistributed(BatchNormalization())(conv_3)
-    conv_3 = TimeDistributed(Activation('relu'))(conv_3)
-
-    conv_4 = TimeDistributed(Conv2D(filters=64,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_3)
-    conv_4 = TimeDistributed(BatchNormalization())(conv_4)
-    conv_4 = TimeDistributed(Activation('relu'))(conv_4)
-    conv_4 = TimeDistributed(Dropout(0.5))(conv_4)
-
-    conv_5 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(3, 3),
-                                    strides=(1, 1),
-                                    padding="same"))(conv_4)
-    conv_5 = TimeDistributed(BatchNormalization())(conv_5)
-    conv_5 = TimeDistributed(Activation('relu'))(conv_5)
-
-    conv_6 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_5)
-    conv_6 = TimeDistributed(BatchNormalization())(conv_6)
-    conv_6 = TimeDistributed(Activation('relu'))(conv_6)
-    conv_6 = TimeDistributed(Dropout(0.5))(conv_6)
-
-    conv_7 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(3, 3),
-                                    strides=(1, 1),
-                                    padding="same"))(conv_6)
-    conv_7 = TimeDistributed(BatchNormalization())(conv_7)
-    conv_7 = TimeDistributed(Activation('relu'))(conv_7)
-
-    conv_8 = TimeDistributed(Conv2D(filters=128,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_7)
-    conv_8 = TimeDistributed(BatchNormalization())(conv_8)
-    conv_8 = TimeDistributed(Activation('relu'))(conv_8)
-    conv_8 = TimeDistributed(Dropout(0.5))(conv_8)
-
-    conv_9 = TimeDistributed(Conv2D(filters=256,
-                                    kernel_size=(3, 3),
-                                    strides=(1, 1),
-                                    padding="same"))(conv_8)
-    conv_9 = TimeDistributed(BatchNormalization())(conv_9)
-    conv_9 = TimeDistributed(Activation('relu'))(conv_9)
-
-    conv_10 = TimeDistributed(Conv2D(filters=256,
-                                    kernel_size=(3, 3),
-                                    strides=(2, 2),
-                                    padding="same"))(conv_9)
-    conv_10 = TimeDistributed(BatchNormalization())(conv_10)
-    conv_10 = TimeDistributed(Activation('relu'))(conv_10)
-    conv_10 = TimeDistributed(Dropout(0.5))(conv_10)
-
-    lstm_1 = ConvLSTM2D(filters=256,
-                        kernel_size=(3, 3),
-                        strides=(1, 1),
-                        padding='same',
-                        return_sequences=True,
-                        recurrent_dropout=0.5)(conv_10)
-    lstm_1 = TimeDistributed(BatchNormalization())(lstm_1)
-    lstm_1 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_1)
-
-    lstm_2 = ConvLSTM2D(filters=256,
-                        kernel_size=(3, 3),
-                        strides=(1, 1),
-                        padding='same',
-                        return_sequences=True,
-                        recurrent_dropout=0.5)(lstm_1)
-    lstm_2 = TimeDistributed(BatchNormalization())(lstm_2)
-    lstm_2 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_2)
-
-    lstm_3 = ConvLSTM2D(filters=256,
-                        kernel_size=(3, 3),
-                        strides=(1, 1),
-                        padding='same',
-                        return_sequences=False,
-                        recurrent_dropout=0.5)(lstm_2)
-    lstm_3 = BatchNormalization()(lstm_3)
-    lstm_3 = LeakyReLU(alpha=0.2)(lstm_3)
-
-    flat_1 = Flatten()(lstm_3)
-    dense = Dense(units=1024, activation='tanh')(flat_1)
-    x = BatchNormalization()(dense)
-    x = Dropout(0.5)(x)
-    x = Dense(units=512, activation='tanh')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    actions = Dense(units=len(simple_ped_set), activation='sigmoid')(x)
-    # model = Model(inputs=inputs, outputs=actions)
-
-    # flat_1 = Flatten()(lstm_3)
-    # x = Dense(units=512, activation='tanh')(flat_1)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
-    # dense = Dense(units=len(simple_ped_set), activation='sigmoid')(x)
-
-    model = Model(inputs=inputs, outputs=actions)
 
     return model
 
@@ -568,8 +395,8 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
-                frame = cv2.medianBlur(frame, 7)
+                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
+                frame = cv2.medianBlur(frame, 5)
                 frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
                 frame[:, :, 2] -= 2
                 frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
@@ -699,8 +526,8 @@ def load_to_RAM(frames_source):
         im_file = os.path.join(DATA_DIR, filename)
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
-            frame = cv2.medianBlur(frame, 7)
+            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
+            frame = cv2.medianBlur(frame, 5)
             frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
             frame[:, :, 2] -= 2
             frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
@@ -925,8 +752,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     for k in range(BATCH_SIZE):
                         for j in range(VIDEO_LENGTH):
                                 class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
-                                cv2.putText(orig_image, "Ped: " + simple_ped_set[class_num_past_y2],
-                                            (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
+                                cv2.putText(orig_image, simple_ped_set[class_num_past_y2],
+                                            (2 + j * (128), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
@@ -934,8 +761,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 # Add labels as text to the image
                 for k in range(BATCH_SIZE):
                     class_num_y2 = np.argmax(ped_pred_class[k])
-                    cv2.putText(pred_image,  "Ped: " + simple_ped_set[class_num_y2],
-                                (2, 104 + k * 112), font, 0.5, (255, 255, 255), 0.5,
+                    cv2.putText(pred_image,  simple_ped_set[class_num_y2],
+                                (2, 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                 cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"),
                             pred_image)
@@ -966,8 +793,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 for k in range(BATCH_SIZE):
                     for j in range(VIDEO_LENGTH):
                         class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
-                        cv2.putText(orig_image, "Ped: " + simple_ped_set[class_num_past_y2],
-                                    (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 0.5,
+                        cv2.putText(orig_image, simple_ped_set[class_num_past_y2],
+                                    (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                          "_cla_test_orig.png"), orig_image)
@@ -975,7 +802,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             # Add labels as text to the image
             for k in range(BATCH_SIZE):
                 class_num_y2 = np.argmax(ped_pred_class[k])
-                cv2.putText(pred_image, "Ped: " + simple_ped_set[class_num_y2],
+                cv2.putText(pred_image, simple_ped_set[class_num_y2],
                             (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
                             cv2.LINE_AA)
             cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_test_pred.png"),

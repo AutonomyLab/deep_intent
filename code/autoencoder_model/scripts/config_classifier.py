@@ -73,7 +73,7 @@ PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
-IMG_SIZE = (112, 112, 3)
+IMG_SIZE = (128, 128, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
 # KL coeff damages learning
@@ -129,7 +129,7 @@ def auto_schedule(epoch_idx):
     return 0.00001
 
 
-clas_lr_schedule = [50, 55, 60]  # epoch_step
+clas_lr_schedule = [10, 11, 12]  # epoch_step
 def clas_schedule(epoch_idx):
     if (epoch_idx + 1) < clas_lr_schedule[0]:
         return 0.0001
@@ -137,4 +137,4 @@ def clas_schedule(epoch_idx):
         return 0.00001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < clas_lr_schedule[2]:
         return 0.000001
-    return 0.000001
+    return 0.0000001

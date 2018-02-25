@@ -86,7 +86,7 @@ def encoder_model():
 
 
 def decoder_model():
-    inputs = Input(shape=(10, 16, 16, 64))
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 16, 64))
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
@@ -94,19 +94,18 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(inputs)
+                            recurrent_dropout=0.2)(inputs)
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
     flat_1 = TimeDistributed(Flatten())(out_1)
     aclstm_1 = GRU(units=16 * 16,
-                   recurrent_dropout=0.5,
+                   recurrent_dropout=0.2,
                    return_sequences=True)(flat_1)
     x = TimeDistributed(BatchNormalization())(aclstm_1)
-    x = TimeDistributed(Activation(activation='softmax'))(x)
     dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    a1_reshape = Reshape(target_shape=(10, 16, 16, 1))(dense_1)
+    a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 16, 16, 1))(dense_1)
     a1 = AttnLossLayer()(a1_reshape)
     dot_1 = multiply([out_1, a1])
 
@@ -115,10 +114,13 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(dot_1)
+                            recurrent_dropout=0.2)(dot_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
+
+    skip_upsamp_1 = UpSampling3D(size=(1, 2, 2))(dot_1)
+    res_1 = concatenate([out_2, skip_upsamp_1])
 
     # 10x32x32
     convlstm_3 = ConvLSTM2D(filters=128,
@@ -126,10 +128,13 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_2)
+                            recurrent_dropout=0.2)(res_1)
     x = TimeDistributed(BatchNormalization())(convlstm_3)
     h_3 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
+
+    skip_upsamp_2 = UpSampling3D(size=(1, 2, 2))(out_2)
+    res_2 = concatenate([out_3, skip_upsamp_2])
 
     # 10x64x64
     convlstm_4 = ConvLSTM2D(filters=32,
@@ -137,7 +142,7 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_3)
+                            recurrent_dropout=0.2)(res_2)
     x = TimeDistributed(BatchNormalization())(convlstm_4)
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
@@ -148,12 +153,13 @@ def decoder_model():
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.5)(out_4)
+                            recurrent_dropout=0.2)(out_4)
     predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
 
     model = Model(inputs=inputs, outputs=predictions)
 
     return model
+
 
 def set_trainability(model, trainable):
     model.trainable = trainable
@@ -168,66 +174,31 @@ def autoencoder_model(encoder, decoder):
     return model
 
 
-def combine_images(X, y, generated_images):
-    # Unroll all generated video frames
-    n_frames = generated_images.shape[0] * generated_images.shape[1]
-    frames = np.zeros((n_frames,) + generated_images.shape[2:], dtype=generated_images.dtype)
+def arrange_images(video_stack):
+    n_frames = video_stack.shape[0] * video_stack.shape[1]
+    frames = np.zeros((n_frames,) + video_stack.shape[2:], dtype=video_stack.dtype)
 
     frame_index = 0
-    for i in range(generated_images.shape[0]):
-        for j in range(generated_images.shape[1]):
-            frames[frame_index] = generated_images[i, j]
+    for i in range(video_stack.shape[0]):
+        for j in range(video_stack.shape[1]):
+            frames[frame_index] = video_stack[i, j]
             frame_index += 1
 
-    num = frames.shape[0]
-    width = int(math.sqrt(num))
-    height = int(math.ceil(float(num) / width))
+    img_height = video_stack.shape[3]
+    img_width = video_stack.shape[2]
+    # width = img_size x video_length
+    width = img_width * video_stack.shape[1]
+    # height = img_size x batch_size
+    height = img_height * BATCH_SIZE
     shape = frames.shape[1:]
-    image = np.zeros((height * shape[0], width * shape[1], shape[2]), dtype=generated_images.dtype)
-    for index, img in enumerate(frames):
-        i = int(index / width)
-        j = index % width
-        image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
+    image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
+    frame_number = 0
+    for i in range(BATCH_SIZE):
+        for j in range(video_stack.shape[1]):
+            image[(i * img_height):((i + 1) * img_height), (j * img_width):((j + 1) * img_width)] = frames[frame_number]
+            frame_number = frame_number + 1
 
-    n_frames = X.shape[0] * X.shape[1]
-    orig_frames = np.zeros((n_frames,) + X.shape[2:], dtype=X.dtype)
-
-    # Original frames
-    frame_index = 0
-    for i in range(X.shape[0]):
-        for j in range(X.shape[1]):
-            orig_frames[frame_index] = X[i, j]
-            frame_index += 1
-
-    num = orig_frames.shape[0]
-    width = int(math.sqrt(num))
-    height = int(math.ceil(float(num) / width))
-    shape = orig_frames.shape[1:]
-    orig_image = np.zeros((height * shape[0], width * shape[1], shape[2]), dtype=X.dtype)
-    for index, img in enumerate(orig_frames):
-        i = int(index / width)
-        j = index % width
-        orig_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
-
-    # Ground truth
-    truth_frames = np.zeros((n_frames,) + y.shape[2:], dtype=y.dtype)
-    frame_index = 0
-    for i in range(y.shape[0]):
-        for j in range(y.shape[1]):
-            truth_frames[frame_index] = y[i, j]
-            frame_index += 1
-
-    num = truth_frames.shape[0]
-    width = int(math.sqrt(num))
-    height = int(math.ceil(float(num) / width))
-    shape = truth_frames.shape[1:]
-    truth_image = np.zeros((height * shape[0], width * shape[1], shape[2]), dtype=y.dtype)
-    for index, img in enumerate(truth_frames):
-        i = int(index / width)
-        j = index % width
-        truth_image[i * shape[0]:(i + 1) * shape[0], j * shape[1]:(j + 1) * shape[1], :] = img
-
-    return orig_image, truth_image, image
+    return image
 
 
 def load_weights(weights_file, model):
@@ -269,6 +240,36 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
         load_weights(DEC_WEIGHTS, decoder)
 
 
+def load_to_RAM(frames_source):
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+    print ("Decimating RAM!")
+    j = 1
+    for i in range(1, len(frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
+            frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
+            j = j + 1
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
+    return frames
+
+
+def load_X_RAM(videos_list, index, frames):
+    X = []
+    for i in range(BATCH_SIZE):
+        start_index = videos_list[(index*BATCH_SIZE + i), 0]
+        end_index = videos_list[(index*BATCH_SIZE + i), -1]
+        X.append(frames[start_index:end_index+1])
+    X = np.asarray(X)
+
+    return X
+
+
 def load_X(videos_list, index, data_dir, img_size):
     X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + img_size)
     for i in range(BATCH_SIZE):
@@ -277,6 +278,7 @@ def load_X(videos_list, index, data_dir, img_size):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
@@ -308,13 +310,16 @@ def get_video_lists(frames_source, stride):
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     print ("Loading data definitions...")
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
-    videos_list = get_video_lists(frames_source=frames_source, stride=1)
+    videos_list = get_video_lists(frames_source=frames_source, stride=4)
     n_videos = videos_list.shape[0]
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(VIDEO_LENGTH - 10))
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(int(VIDEO_LENGTH/2)))
     n_test_videos = test_videos_list.shape[0]
+
+    if RAM_DECIMATE:
+        frames = load_to_RAM(frames_source=frames_source)
 
     if SHUFFLE:
         # Shuffle images to aid generalization
@@ -325,14 +330,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
 
     # Build attention layer output
     intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
     mask_gen_1 = Sequential()
     mask_gen_1.add(encoder)
     mask_gen_1.add(intermediate_decoder)
-    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    mask_gen_1.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
@@ -359,7 +364,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
         for index in range(NB_ITERATIONS):
             # Train Autoencoder
-            X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
+            if RAM_DECIMATE:
+                X = load_X_RAM(videos_list, index, frames)
+            else:
+                X = load_X(videos_list, index, DATA_DIR, (128, 128, 3))
             X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
@@ -373,16 +381,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
             predicted_images = autoencoder.predict(X_train, verbose=0)
-            orig_image, truth_image, pred_image = combine_images(X_train, y_train, predicted_images)
-            pred_image = pred_image * 127.5 + 127.5
+            orig_image = arrange_images(X_train)
+            truth_image = arrange_images(y_train)
+            pred_image = arrange_images(predicted_images)
             orig_image = orig_image * 127.5 + 127.5
             truth_image = truth_image * 127.5 + 127.5
+            pred_image = pred_image * 127.5 + 127.5
             if epoch == 0 :
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_orig.png"), orig_image)
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_image)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_image)
 
         # Run over test data
+        print ('')
         for index in range(NB_TEST_ITERATIONS):
             X = load_X(test_videos_list, index, TEST_DATA_DIR, (128, 128, 3))
             X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
@@ -413,42 +424,35 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
         # Save predicted attention mask per epoch
         predicted_attn = mask_gen_1.predict(X_train, verbose=0)
-        a_pred = np.reshape(predicted_attn, newshape=(10, 10, 16, 16, 1))
+        a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, int(VIDEO_LENGTH/2), 16, 16, 1))
         np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred)
 
     # End TensorBoard Callback
     # TC.on_train_end('_')
 
 
-def arrange_images(video_stack):
-    n_frames = video_stack.shape[0] * video_stack.shape[1]
-    frames = np.zeros((n_frames,) + video_stack.shape[2:], dtype=video_stack.dtype)
 
-    frame_index = 0
-    for i in range(video_stack.shape[0]):
-        for j in range(video_stack.shape[1]):
-            frames[frame_index] = video_stack[i, j]
-            frame_index += 1
-
-    img_height = video_stack.shape[3]
-    img_width = video_stack.shape[2]
-    # width = img_size x video_length
-    width = img_width * video_stack.shape[1]
-    # height = img_size x batch_size
-    height = img_height * BATCH_SIZE
-    shape = frames.shape[1:]
-    image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
-    frame_number = 0
-    for i in range(BATCH_SIZE):
-        for j in range(video_stack.shape[1]):
-            image[(i * img_height):((i + 1) * img_height), (j * img_width):((j + 1) * img_width)] = frames[frame_number]
-            frame_number = frame_number + 1
-
-    return image
 
 
 def combine_images_test(X, y, generated_images):
     return arrange_images(X), arrange_images(y), arrange_images(generated_images)
+
+def load_X_test(index, data_dir, img_size):
+    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + img_size)
+    for i in range(BATCH_SIZE):
+        for j in range(1, VIDEO_LENGTH+1):
+            file_num = str((index*BATCH_SIZE) + (i*BATCH_SIZE) + j)
+            filename = file_num + ".png"
+            im_file = os.path.join(data_dir, filename)
+            try:
+                frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
+                X[i, j-1] = (frame.astype(np.float32) - 127.5) / 127.5
+            except AttributeError as e:
+                print (im_file)
+                print (e)
+
+    return X
 
 
 def test(ENC_WEIGHTS, DEC_WEIGHTS):
@@ -476,15 +480,17 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     autoencoder.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
 
     # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(VIDEO_LENGTH - 10))
-    n_test_videos = test_videos_list.shape[0]
+    # test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(VIDEO_LENGTH - 10))
+    # n_test_videos = test_videos_list.shape[0]
 
-    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    # NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    NB_TEST_ITERATIONS = 30
 
     test_loss = []
+    print (TEST_DATA_DIR)
     for index in range(NB_TEST_ITERATIONS):
-        X = load_X(test_videos_list, index, TEST_DATA_DIR, (128, 128, 3))
+        X = load_X_test(index, TEST_DATA_DIR, (128, 128, 3))
         X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
         y_train = X[:, int(VIDEO_LENGTH / 2):]
         test_loss.append(autoencoder.test_on_batch(X_train, y_train))
@@ -517,94 +523,6 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)
-
-
-    # for i in range(len(decoder.layers)):
-    #     print (decoder.layers[i], str(i))
-    #
-    # exit(0)
-    #
-    # def build_intermediate_model(encoder, decoder):
-    #     # convlstm-13, conv3d-25
-    #     intermediate_decoder_1 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[21].output)
-    #     intermediate_decoder_2 = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[27].output)
-    #
-    #     imodel_1 = Sequential()
-    #     imodel_1.add(encoder)
-    #     imodel_1.add(intermediate_decoder_1)
-    #
-    #     imodel_2 = Sequential()
-    #     imodel_2.add(encoder)
-    #     imodel_2.add(intermediate_decoder_2)
-    #
-    #     return imodel_1, imodel_2
-    #
-    # imodel_1, imodel_2 = build_intermediate_model(encoder, decoder)
-    # imodel_1.compile(loss='mean_squared_error', optimizer=OPTIM)
-    # imodel_2.compile(loss='mean_squared_error', optimizer=OPTIM)
-
-    # Build video progressions
-    # frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
-    # videos_list = []
-    # start_frame_index = 1
-    # end_frame_index = VIDEO_LENGTH + 1
-    # while (end_frame_index <= len(frames_source)):
-    #     frame_list = frames_source[start_frame_index:end_frame_index]
-    #     if (len(set(frame_list)) == 1):
-    #         videos_list.append(range(start_frame_index, end_frame_index))
-    #         start_frame_index = start_frame_index + VIDEO_LENGTH
-    #         end_frame_index = end_frame_index + VIDEO_LENGTH
-    #     else:
-    #         start_frame_index = end_frame_index - 1
-    #         end_frame_index = start_frame_index + VIDEO_LENGTH
-    #
-    # videos_list = np.asarray(videos_list, dtype=np.int32)
-    # n_videos = videos_list.shape[0]
-    #
-    # # Test model by making predictions
-    # loss = []
-    # NB_ITERATIONS = int(n_videos / BATCH_SIZE)
-    # for index in range(NB_ITERATIONS):
-    #     # Test Autoencoder
-    #     X = load_X(videos_list, index, TEST_DATA_DIR)
-    #     X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
-    #     y_test = X[:, int(VIDEO_LENGTH / 2):]
-    #     loss.append(autoencoder.test_on_batch(X_test, y_test))
-    #     y_pred = autoencoder.predict_on_batch(X_test)
-    #     a_pred_1 = imodel_1.predict_on_batch(X_test)
-    #     a_pred_2 = imodel_2.predict_on_batch(X_test)
-    #
-    #     arrow = int(index / (NB_ITERATIONS / 40))
-    #     stdout.write("\rIteration: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-    #                  "loss: " + str(loss[len(loss) - 1]) +
-    #                  "\t    [" + "{0}>".format("=" * (arrow)))
-    #     stdout.flush()
-    #
-    #     orig_image, truth_image, pred_image = combine_images(X_test, y_test, y_pred)
-    #     pred_image = pred_image * 127.5 + 127.5
-    #     orig_image = orig_image * 127.5 + 127.5
-    #     truth_image = truth_image * 127.5 + 127.5
-    #
-    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_orig.png"), orig_image)
-    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_truth.png"), truth_image)
-    #     cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_pred.png"), pred_image)
-
-        # #------------------------------------------
-        # a_pred_1 = np.reshape(a_pred_1, newshape=(10, 10, 64, 64, 1))
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_1_' + str(index) +'.npy'), a_pred_1)
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_2_' + str(index) + '.npy'), a_pred_2)
-        # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_1)
-        # pred_image = (pred_image*100) * 127.5 + 127.5
-        # y_pred = y_pred * 127.5 + 127.5
-        # np.save(os.path.join(TEST_RESULTS_DIR, 'attention_weights_' + str(index) + '.npy'), y_pred)
-        # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_1.png"), pred_image)
-
-        # a_pred_2 = np.reshape(a_pred_2, newshape=(10, 10, 16, 16, 1))
-        # with open('attention_weights.txt', mode='w') as file:
-        #     file.write(str(a_pred_2[0, 4]))
-        # orig_image, truth_image, pred_image = combine_images(X_test, y_test, a_pred_2)
-        # pred_image = (pred_image*100) * 127.5 + 127.5
-        # cv2.imwrite(os.path.join(TEST_RESULTS_DIR, str(index) + "_attn_2.png"), pred_image)
 
     # avg_loss = sum(loss) / len(loss)
     print("\nAvg loss: " + str(avg_test_loss))

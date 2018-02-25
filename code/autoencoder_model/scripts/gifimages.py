@@ -45,7 +45,7 @@ def strip(image, img_size, vid_len, vid_num=1):
 def gifmax(folder):
     for i in range(880):
         im_pred = cv2.imread(folder+'/truth/' + str(i) + '_truth.png', cv2.IMREAD_COLOR)
-        strip(im_pred, 128, 20, i)
+        strip(im_pred, 128, 32, i)
 
 
 def get_args():
