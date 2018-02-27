@@ -29,8 +29,8 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
-# TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):

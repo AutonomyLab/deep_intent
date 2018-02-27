@@ -38,9 +38,7 @@ from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Input
 from keras.models import Model
-from custom_layers import AttnLossLayer
-from experience_memory import ExperienceMemory
-from config_vm import *
+from config_r10 import *
 from sys import stdout
 
 import tb_callback
@@ -348,7 +346,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     # Build attention layer output
     # intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
@@ -480,7 +478,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
 
-
+    if not os.path.exists(TEST_RESULTS_DIR + '/orig/'):
+            os.mkdir(TEST_RESULTS_DIR + '/orig/')
     if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
         os.mkdir(TEST_RESULTS_DIR + '/truth/')
     if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):

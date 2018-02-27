@@ -11,11 +11,11 @@ def create_gif(filenames, duration, vid_num):
     imageio.mimsave(os.path.join(GIF_DIR, video_name), images, duration=duration)
 
 
-def strip(image, img_size, vid_len, vid_num=1):
+def strip(image, img_height, img_width, vid_len, vid_num=1):
     n_rows = image.shape[0]
     n_cols = image.shape[1]
-    n_horizontal_imgs = n_cols/img_size
-    n_vertical_imgs = n_rows/img_size
+    n_horizontal_imgs = n_cols/img_width
+    n_vertical_imgs = n_rows/img_height
     frame_num = 1
     fps = 30
     duration = 1 / fps
@@ -23,7 +23,7 @@ def strip(image, img_size, vid_len, vid_num=1):
 
     for i in range(n_vertical_imgs):
         for j in range(n_horizontal_imgs):
-            img = image[i*img_size:(i+1)*img_size, j*img_size:(j+1)*img_size]
+            img = image[i*img_height:(i+1)*img_height, j*img_width:(j+1)*img_width]
             # if (j>=10):
             #     # img = cv2.blur(img, (5, 5), 0)
             #     img = cv2.medianBlur(img, 7)
@@ -54,7 +54,8 @@ def get_args():
     parser.add_argument("--folder", type=str, default="None")
 
     parser.add_argument("--file", type=str, default="None")
-    parser.add_argument("--img_size", type=int, default=128)
+    parser.add_argument("--img_height", type=int, default=128)
+    parser.add_argument("--img_width", type=int, default=128)
     parser.add_argument("--vid_len", type=int, default=10)
     args = parser.parse_args()
     return args
@@ -83,4 +84,4 @@ if __name__ == "__main__":
         except IOError as e:
             print (e)
 
-        strip(image=im, img_size=args.img_size, vid_len=args.vid_len)
+        strip(image=im, img_height=args.img_height, img_width=args.img_width, vid_len=args.vid_len)

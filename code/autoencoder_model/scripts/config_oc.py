@@ -21,12 +21,12 @@ elif hostname == 'bender':
 else:
     path_var = 'zhora/'
 
-DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
 
-VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
 
 PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
 PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
@@ -73,35 +73,33 @@ PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 16
-IMG_SIZE = (128, 128, 3)
+IMG_SIZE = (128, 208, 3)
 VIS_ATTN = True
-ATTN_COEFF = 0
-# KL coeff damages learning
-KL_COEFF = 0
 CLASSIFIER = True
 BUF_SIZE = 10
 LOSS_WEIGHTS = [1, 1]
 A_TRAIN_RATIO = 1
 C_TRAIN_RATIO = 1
 RAM_DECIMATE = False
-RETRAIN_CLASSIFIER = True
+RETRAIN_CLASSIFIER = False
 CLASS_TARGET_INDEX = 8
 
-ped_actions = ['slow down', 'moving slow', 'standing', 'stopped',
-               'speed up', 'moving fast', 'look', 'looking',  'clear path',
-               'crossing', 'nod', 'handwave', 'unknown']
+
+# ped_actions = ['standing 0', 'moving slow 1', 'moving fast 2', 'look 3', 'looking 4',
+#                'slow down 5', 'speed up 6', 'crossing 7', 'stopped 8', 'clear path 9',
+#                 'nod 10', 'handwave 11', 'unknown 12']
+ped_actions = ['standing', 'moving slow', 'moving fast', 'look', 'looking',
+               'slow down', 'speed up', 'crossing', 'stopped', 'clear path',
+                'nod', 'handwave', 'unknown']
 # simple_ped_set = ['moving slow', 'stopped', 'moving fast', 'looking', 'clear path', 'crossing',
 #                   'handwave', 'unknown']
 
-simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
+# simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
 
-# ped_actions = ['slow down 0', 'moving slow 1', 'standing 2', 'stopped 3',
-#                'speed up 4', 'moving fast 5', 'look 6', 'looking 7',  'clear path 8',
-#                'crossing 9', 'nod 10', 'handwave 11', 'unknown 12']
-#
-#
-# simple_ped_set = ['moving slow 0', 'stopped 1', 'moving fast 2', 'looking 3', 'clear path 4', 'crossing 5',
-#                   'handwave 6', 'unknown 7']
+# simple_ped_set = ['standing 0', 'approaching 1', 'looking 2', 'crossing 3', 'stopped 4', 'clear path 5', 'unknown 6']
+simple_ped_set = ['standing', 'approaching', 'looking', 'crossing', 'stopped', 'clear path', 'unknown']
+
+
 
 
 
@@ -128,8 +126,8 @@ print ("Config file: " + str(__name__))
 BATCH_SIZE = 25
 NB_EPOCHS_CLASS = 100
 
-# OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
-OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
+OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
+# OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
 
 # lr_schedule = [10, 20, 30]  # epoch_step
 

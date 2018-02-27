@@ -43,7 +43,6 @@ from keras.losses import kullback_leibler_divergence
 from keras.losses import mean_squared_error
 from keras.layers import Input
 from keras.models import Model
-from custom_layers import AttnLossLayer
 from keras.models import model_from_json
 from keras.metrics import top_k_categorical_accuracy
 from experience_memory import ExperienceMemory
@@ -96,36 +95,6 @@ def process_prec3d():
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
 
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # model.layers.pop()
-    # model.outputs = [model.layers[-1].output]
-    # model.layers[-1].outbound_nodes = []
-    #
-    # i=0
-    # for layer in model.layers:
-    #     print (layer, i)
-    #     i = i+1
-    # # exit(0)
-
     return model
 
 
@@ -133,7 +102,7 @@ def pretrained_c3d():
     c3d = process_prec3d()
     print (c3d.summary())
 
-    inputs = Input(shape=(16, 128, 128, 3))
+    inputs = Input(shape=(16, 128, 208, 3))
     resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
 
     c3d_out = c3d(resized)
@@ -244,8 +213,8 @@ def arrange_images(video_stack):
             frames[frame_index] = video_stack[i, j]
             frame_index += 1
 
-    img_height = video_stack.shape[3]
-    img_width = video_stack.shape[2]
+    img_height = video_stack.shape[2]
+    img_width = video_stack.shape[3]
     # width = img_size x video_length
     width = img_width * VIDEO_LENGTH
     # height = img_size x batch_size
@@ -396,10 +365,10 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
                 # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
-                frame = cv2.medianBlur(frame, 5)
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
-                frame[:, :, 2] -= 2
-                frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
+                # frame = cv2.medianBlur(frame, 5)
+                # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
+                # frame[:, :, 2] -= 2
+                # frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
@@ -424,22 +393,34 @@ def load_X_y(videos_list, index, data_dir, driver_action_cats, ped_action_cats):
 
 
 def map_to_simple(ped_action):
-    if (ped_action <= 1):
+    if (ped_action == 0):
         return 0
-    elif (ped_action <= 3):
+    elif (ped_action == 1):
         return 1
-    elif (ped_action <= 5):
-        return 0
-    elif (ped_action <= 7):
+    elif (ped_action == 2):
+        return 1
+    elif (ped_action == 3):
         return 2
-    elif (ped_action == 8):
+    elif (ped_action == 4):
+        return 2
+    elif (ped_action == 5):
         return 3
-    elif (ped_action == 9):
-        return 0
-    elif (ped_action <= 11):
-        return 2
-    else:
+    elif (ped_action == 6):
+        return 3
+    elif (ped_action == 7):
+        return 3
+    elif (ped_action == 8):
         return 4
+    elif (ped_action == 9):
+        return 5
+    elif (ped_action == 10):
+        return 3
+    elif (ped_action == 11):
+        return 3
+    elif (ped_action == 12):
+        return 6
+    else:
+        print (ped_action)
 
 
 def get_action_classes(action_labels):
@@ -527,10 +508,10 @@ def load_to_RAM(frames_source):
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
             # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
-            frame = cv2.medianBlur(frame, 5)
-            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
-            frame[:, :, 2] -= 2
-            frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
+            # frame = cv2.medianBlur(frame, 5)
+            # frame = cv2.cvtColor(frame, cv2.COLOR_BGR2HSV)  # convert it to hsv
+            # frame[:, :, 2] -= 2
+            # frame = cv2.cvtColor(frame, cv2.COLOR_HSV2BGR)
             frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
             j = j + 1
         except AttributeError as e:
@@ -562,18 +543,20 @@ def get_video_lists(frames_source, stride):
 
 def subsample_videos(videos_list, ped_action_labels):
     print (videos_list.shape)
-    CR_MAX = 22
-    UK_MAX = 9
-    ST_MAX = 6
+    AP_MAX = 5
+    LK_MAX = 4
+    CR_MAX = 12
+    UK_MAX = 4
+
+    ap_count = 0
+    lk_count = 0
     cr_count = 0
     uk_count = 0
-    st_count = 0
+
     r_indices = []
 
     count = [0] * len(simple_ped_set)
     for i in range(len(videos_list)):
-        # Crossing count
-        # print (list(driver_action_labels[videos_list[i, 8]]).index(1))
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 0):
             count[0] = count[0] + 1
 
@@ -586,33 +569,46 @@ def subsample_videos(videos_list, ped_action_labels):
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 3):
             count[3] = count[3] + 1
 
-        # Unknown count
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 4):
             count[4] = count[4] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 5):
+            count[5] = count[5] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 6):
+            count[6] = count[6] + 1
+
 
     print('Before subsampling')
     print(str(count))
 
     for i in range(len(videos_list)):
+        # Approaching count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 1):
+            ap_count = ap_count + 1
+            if (ap_count < AP_MAX):
+                r_indices.append(i)
+            else:
+                ap_count = 0
+
+        # Looking count
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 2):
+            lk_count = lk_count + 1
+            if (lk_count < LK_MAX):
+                r_indices.append(i)
+            else:
+                lk_count = 0
+
         # Crossing count
-        # print(list(driver_action_labels[videos_list[i, 8]]).index(1))
-        if (list(ped_action_labels[videos_list[i, 8]]).index(1) == 0):
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 3):
             cr_count = cr_count + 1
             if (cr_count < CR_MAX):
                 r_indices.append(i)
             else:
                 cr_count = 0
 
-        # Stopped count
-        if (list(ped_action_labels[videos_list[i, 8]]).index(1) == 1):
-            st_count = st_count + 1
-            if (st_count < ST_MAX):
-                r_indices.append(i)
-            else:
-                st_count = 0
-
         # Unknown count
-        if (list(ped_action_labels[videos_list[i, 8]]).index(1) == 4):
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 6):
             uk_count = uk_count + 1
             if (uk_count < UK_MAX):
                 r_indices.append(i)
@@ -625,8 +621,6 @@ def subsample_videos(videos_list, ped_action_labels):
 
     count = [0] * len(simple_ped_set)
     for i in range(len(videos_list)):
-        # Crossing count
-        # print (list(driver_action_labels[videos_list[i, 8]]).index(1))
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 0):
             count[0] = count[0] + 1
 
@@ -639,9 +633,14 @@ def subsample_videos(videos_list, ped_action_labels):
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 3):
             count[3] = count[3] + 1
 
-        # Unknown count
         if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 4):
             count[4] = count[4] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 5):
+            count[5] = count[5] + 1
+
+        if (list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1) == 6):
+            count[6] = count[6] + 1
 
     print ('After subsampling')
     print (str(count))
@@ -651,11 +650,11 @@ def subsample_videos(videos_list, ped_action_labels):
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Loading data definitions.")
-    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_128.hkl'))
+    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_208.hkl'))
     videos_list = get_video_lists(frames_source=frames_source, stride=1)
 
     # Load actions from annotations
-    action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_128.hkl'))
+    action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_208.hkl'))
     driver_action_classes, ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
     print("Training Stats: " + str(ped_class_count))
 
@@ -667,10 +666,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         videos_list = np.random.permutation(videos_list)
 
     # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
     test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8)
     # Load test action annotations
-    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_128.hkl'))
+    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_driver_action_classes, test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     print ("Test Stats: " + str(test_ped_class_count))
 
@@ -753,7 +752,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                         for j in range(VIDEO_LENGTH):
                                 class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
                                 cv2.putText(orig_image, simple_ped_set[class_num_past_y2],
-                                            (2 + j * (128), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                            (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                             cv2.LINE_AA)
                     cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) +
                                              "_cla_orig.png"), orig_image)
@@ -844,10 +843,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     run_utilities(classifier, CLA_WEIGHTS)
 
     # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
     test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8)
     # Load test action annotations
-    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_128.hkl'))
+    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_driver_action_classes, test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     print("Test Stats: " + str(test_ped_class_count))
 

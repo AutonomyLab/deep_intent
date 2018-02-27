@@ -29,8 +29,8 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
 
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
 
-# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -65,11 +65,11 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
-VIDEO_LENGTH = 32
+VIDEO_LENGTH = 20
 IMG_SIZE = (128, 208, 3)
 ATTN_COEFF = 0
 KL_COEFF = 0
-RAM_DECIMATE = False
+RAM_DECIMATE = True
 
 # -------------------------------------------------
 # Network configuration:
