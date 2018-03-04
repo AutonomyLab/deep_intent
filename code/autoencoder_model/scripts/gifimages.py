@@ -34,7 +34,10 @@ def strip(image, img_height, img_width, vid_len, vid_num=1):
             filename = "vid_" + str(vid_num) + "_frame_" + str(frame_num) + ".png"
             cv2.imwrite(os.path.join(GIF_IMG_DIR, filename), img)
             filenames.append(os.path.join(GIF_IMG_DIR, filename))
+            if frame_num == (int(vid_len/2)):
+                filenames = list(reversed(filenames))
             if frame_num == vid_len:
+
                 create_gif(filenames=filenames, duration=duration, vid_num=vid_num)
                 filenames = []
                 vid_num = vid_num + 1

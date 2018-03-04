@@ -99,22 +99,22 @@ def decoder_model():
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    # flat_1 = TimeDistributed(Flatten())(out_1)
-    # aclstm_1 = GRU(units=16 * 16,
-    #                recurrent_dropout=0.2,
-    #                return_sequences=True)(flat_1)
-    # x = TimeDistributed(BatchNormalization())(aclstm_1)
-    # dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
-    # a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 16, 16, 1))(dense_1)
-    # a1 = AttnLossLayer()(a1_reshape)
-    # dot_1 = multiply([out_1, a1])
+    flat_1 = TimeDistributed(Flatten())(out_1)
+    aclstm_1 = GRU(units=16 * 16,
+                   recurrent_dropout=0.2,
+                   return_sequences=True)(flat_1)
+    x = TimeDistributed(BatchNormalization())(aclstm_1)
+    dense_1 = TimeDistributed(Dense(units=16 * 16, activation='softmax'))(x)
+    a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 16, 16, 1))(dense_1)
+    a1 = AttnLossLayer()(a1_reshape)
+    dot_1 = multiply([out_1, a1])
 
     convlstm_2 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.2)(out_1)
+                            recurrent_dropout=0.2)(dot_1)
     x = TimeDistributed(BatchNormalization())(convlstm_2)
     h_2 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
@@ -147,29 +147,13 @@ def decoder_model():
     h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_4 = UpSampling3D(size=(1, 2, 2))(h_4)
 
-    aclstm_1 = ConvLSTM2D(filters=1,
-                          kernel_size=(3, 3),
-                          strides=(1, 1),
-                          padding='same',
-                          return_sequences=True,
-                          recurrent_dropout=0.2)(h_4)
-    x = TimeDistributed(BatchNormalization())(aclstm_1)
-    flat_1 = TimeDistributed(Flatten())(x)
-    dense_1 = TimeDistributed(Dense(units=128 * 128, activation='softmax'))(flat_1)
-    x = TimeDistributed(BatchNormalization())(dense_1)
-    x = TimeDistributed(Dropout(0.2))(x)
-    print (x.shape)
-    a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 128, 128, 1))(x)
-    a1 = AttnLossLayer()(a1_reshape)
-    dot_1 = multiply([out_4, a1])
-
     # 10x128x128
     convlstm_5 = ConvLSTM2D(filters=3,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
                             return_sequences=True,
-                            recurrent_dropout=0.2)(dot_1)
+                            recurrent_dropout=0.2)(out_4)
     predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
 
     model = Model(inputs=inputs, outputs=predictions)
@@ -479,8 +463,6 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
 
-    if not os.path.exists(TEST_RESULTS_DIR + '/orig/'):
-            os.mkdir(TEST_RESULTS_DIR + '/orig/')
     if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
         os.mkdir(TEST_RESULTS_DIR + '/truth/')
     if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
@@ -501,7 +483,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     # n_test_videos = test_videos_list.shape[0]
 
     # NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
-    NB_TEST_ITERATIONS = 30
+    path, dirs, files = os.walk(TEST_DATA_DIR).next()
+    file_count = len(files)
+    NB_TEST_ITERATIONS = int((file_count/int(VIDEO_LENGTH/2))/BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 30
 
     test_loss = []
     print (TEST_DATA_DIR)

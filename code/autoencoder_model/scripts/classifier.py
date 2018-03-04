@@ -487,12 +487,36 @@ def get_action_classes(action_labels):
 
 
         simple_ped_action_per_frame = set(simple_ped_action_per_frame)
-        for action in simple_ped_action_per_frame:
-            count[action] = count[action] + 1
-            # Add all unique categorical one-hot vectors
-            encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
+
+        if 7 in simple_ped_action_per_frame:
+            action = 7
+        if 6 in simple_ped_action_per_frame:
+            action = 6
+        if 2 in simple_ped_action_per_frame:
+            action = 2
+        if 0 in simple_ped_action_per_frame:
+            action = 0
+        if 1 in simple_ped_action_per_frame:
+            action = 1
+        if 5 in simple_ped_action_per_frame:
+            action = 5
+        if 3 in simple_ped_action_per_frame:
+            action = 3
+        if 4 in simple_ped_action_per_frame:
+            action = 4
+
+        encoded_ped_action = to_categorical(action, len(simple_ped_set))
+        count[action] = count[action] + 1
+
+        # for action in simple_ped_action_per_frame:
+        #     count[action] = count[action] + 1
+        #     # Add all unique categorical one-hot vectors
+        #     encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
 
         if (sum(encoded_ped_action) == 0):
+            print (simple_ped_action_per_frame)
+            print (a_clean)
+        if (sum(encoded_ped_action) > 1):
             print (simple_ped_action_per_frame)
             print (a_clean)
         ped_action_class.append(encoded_ped_action.T)

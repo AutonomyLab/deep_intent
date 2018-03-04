@@ -4,6 +4,7 @@ from __future__ import print_function
 
 from keras.optimizers import SGD
 from keras.optimizers import Adam
+from keras.optimizers import RMSprop
 from keras import backend as K
 K.set_image_dim_ordering('tf')
 import socket
@@ -69,7 +70,7 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = True
+PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 16
@@ -87,17 +88,17 @@ CLASS_TARGET_INDEX = 8
 
 # ped_actions = ['standing 0', 'moving slow 1', 'moving fast 2', 'look 3', 'looking 4',
 #                'slow down 5', 'speed up 6', 'crossing 7', 'stopped 8', 'clear path 9',
-#                 'nod 10', 'handwave 11', 'unknown 12']
+#                 'nod 10', 'handwave 11', 'unknown 12', 'no ped 13']
 ped_actions = ['standing', 'moving slow', 'moving fast', 'look', 'looking',
                'slow down', 'speed up', 'crossing', 'stopped', 'clear path',
-                'nod', 'handwave', 'unknown']
+                'nod', 'handwave', 'unknown', 'no ped']
 # simple_ped_set = ['moving slow', 'stopped', 'moving fast', 'looking', 'clear path', 'crossing',
 #                   'handwave', 'unknown']
 
 # simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
 
-# simple_ped_set = ['standing 0', 'approaching 1', 'looking 2', 'crossing 3', 'stopped 4', 'clear path 5', 'unknown 6']
-simple_ped_set = ['standing', 'approaching', 'looking', 'crossing', 'stopped', 'clear path', 'unknown']
+# simple_ped_set = ['standing 0', 'approaching 1', 'looking 2', 'crossing 3', 'stopped 4', 'clear path 5', 'unknown 6', 'no ped 7']
+simple_ped_set = ['standing', 'approaching', 'looking', 'crossing', 'stopped', 'clear path', 'unknown', 'no ped']
 
 
 
@@ -126,8 +127,9 @@ print ("Config file: " + str(__name__))
 BATCH_SIZE = 25
 NB_EPOCHS_CLASS = 100
 
-OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
-# OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
+# OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
+OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
+# OPTIM_C = RMSprop(lr=0.0001, rho=0.9)
 
 # lr_schedule = [10, 20, 30]  # epoch_step
 
@@ -141,7 +143,7 @@ OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 #     return 0.000000001
 
 
-lr_schedule = [2, 20, 40]  # epoch_step
+lr_schedule = [5, 10, 15]  # epoch_step
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
         return 0.00001

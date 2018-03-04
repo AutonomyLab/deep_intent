@@ -24,12 +24,12 @@ elif hostname == 'bender':
 else:
     path_var = 'zhora/'
 
-DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
-VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
 
-# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
 MODEL_DIR = './../' + path_var + 'models'
@@ -66,7 +66,7 @@ PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 20
-IMG_SIZE = (128, 208, 3)
+IMG_SIZE = (128, 128, 3)
 ATTN_COEFF = 0
 KL_COEFF = 0
 RAM_DECIMATE = False
@@ -93,22 +93,5 @@ def schedule(epoch_idx):
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.0001
     return 0.0001
-
- # aclstm_1 = ConvLSTM2D(filters=1,
-    #                       kernel_size=(3, 3),
-    #                       strides=(1, 1),
-    #                       padding='same',
-    #                       return_sequences=True,
-    #                       recurrent_dropout=0.2)(h_4)
-    # x = TimeDistributed(BatchNormalization())(aclstm_1)
-    #
-    # flat_1 = TimeDistributed(Flatten())(x)
-    # dense_1 = TimeDistributed(Dense(units=128 * 208, activation='softmax'))(flat_1)
-    # x = TimeDistributed(BatchNormalization())(dense_1)
-    # x = TimeDistributed(Dropout(0.2))(x)
-    # print (x.shape)
-    # a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 128, 208, 1))(x)
-    # a1 = AttnLossLayer()(a1_reshape)
-    # dot_1 = multiply([out_4, a1])
 
 

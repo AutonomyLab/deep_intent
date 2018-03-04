@@ -40,7 +40,7 @@ from keras.layers import Input
 from keras.models import Model
 from custom_layers import AttnLossLayer
 from experience_memory import ExperienceMemory
-from config_r10 import *
+from config_r16 import *
 from sys import stdout
 
 import tb_callback
@@ -386,7 +386,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
                 X = load_X_RAM(videos_list, index, frames)
             else:
                 X = load_X(videos_list, index, DATA_DIR, IMG_SIZE)
-            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
+            X_train = np.flip(X[:, 0 : int(VIDEO_LENGTH/2)], axis=1)
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
@@ -406,16 +406,17 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
             truth_seq = truth_seq * 127.5 + 127.5
             pred_seq = pred_seq * 127.5 + 127.5
 
-            cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_seq)
+            if epoch == 0:
+                cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_seq)
 
         # Run over test data
         print ('')
         for index in range(NB_TEST_ITERATIONS):
             X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE)
-            X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-            y_train = X[:, int(VIDEO_LENGTH / 2):]
-            test_loss.append(autoencoder.test_on_batch(X_train, y_train))
+            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            y_test = X[:, int(VIDEO_LENGTH / 2):]
+            test_loss.append(autoencoder.test_on_batch(X_test, y_test))
 
             arrow = int(index / (NB_TEST_ITERATIONS / 40))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
@@ -457,8 +458,8 @@ def combine_images_test(X, y, generated_images):
 def load_X_test(index, data_dir, img_size):
     X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + img_size)
     for i in range(BATCH_SIZE):
-        for j in range(1, VIDEO_LENGTH+1):
-            file_num = str(int(((index*BATCH_SIZE*(VIDEO_LENGTH/2)) + (i*BATCH_SIZE) + j)))
+        for j in range(1, int(VIDEO_LENGTH/2)+1):
+            file_num = str(int(((index * BATCH_SIZE * (VIDEO_LENGTH / 2)) + (i * BATCH_SIZE) + j)))
             filename = file_num + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
@@ -493,7 +494,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         return mse_loss + mae_loss
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
-    autoencoder.compile(loss='mean_absolute_error', optimizer=OPTIM_A)
+    autoencoder.compile(loss='mean_squared_error', optimizer=OPTIM_A)
 
     # Setup test
     # test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_128.hkl'))
@@ -503,7 +504,6 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     # NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
     path, dirs, files = os.walk(TEST_DATA_DIR).next()
     file_count = len(files)
-    print (file_count)
     NB_TEST_ITERATIONS = int((file_count / int(VIDEO_LENGTH / 2)) / BATCH_SIZE)
 
     test_loss = []

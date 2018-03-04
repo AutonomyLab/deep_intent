@@ -29,8 +29,8 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
 
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
 
-# TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
 MODEL_DIR = './../' + path_var + 'models'
 if not os.path.exists(MODEL_DIR):
@@ -62,14 +62,15 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = True
+PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
 IMG_SIZE = (128, 208, 3)
 ATTN_COEFF = 0
 KL_COEFF = 0
-RAM_DECIMATE = False
+RAM_DECIMATE = True
+REVERSE = True
 
 # -------------------------------------------------
 # Network configuration:
@@ -83,7 +84,7 @@ OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
 # OPTIM_A = rmsprop(lr=0.00001)
 
-lr_schedule = [10, 20, 30]  # epoch_step
+lr_schedule = [10, 15, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
@@ -91,7 +92,7 @@ def schedule(epoch_idx):
     elif (epoch_idx + 1) < lr_schedule[1]:
         return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.0001
+        return 0.00001
     return 0.0001
 
  # aclstm_1 = ConvLSTM2D(filters=1,
