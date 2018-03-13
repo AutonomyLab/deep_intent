@@ -11,7 +11,7 @@ def create_gif(filenames, duration, vid_num):
     imageio.mimsave(os.path.join(GIF_DIR, video_name), images, duration=duration)
 
 
-def strip(image, img_height, img_width, vid_len, vid_num=1):
+def strip(image, img_height, img_width, vid_len, vid_num=1, rev=False):
     n_rows = image.shape[0]
     n_cols = image.shape[1]
     n_horizontal_imgs = n_cols/img_width
@@ -34,8 +34,9 @@ def strip(image, img_height, img_width, vid_len, vid_num=1):
             filename = "vid_" + str(vid_num) + "_frame_" + str(frame_num) + ".png"
             cv2.imwrite(os.path.join(GIF_IMG_DIR, filename), img)
             filenames.append(os.path.join(GIF_IMG_DIR, filename))
-            if frame_num == (int(vid_len/2)):
-                filenames = list(reversed(filenames))
+            if rev:
+                if frame_num == (int(vid_len/2)):
+                    filenames = list(reversed(filenames))
             if frame_num == vid_len:
 
                 create_gif(filenames=filenames, duration=duration, vid_num=vid_num)
@@ -60,6 +61,7 @@ def get_args():
     parser.add_argument("--img_height", type=int, default=128)
     parser.add_argument("--img_width", type=int, default=128)
     parser.add_argument("--vid_len", type=int, default=10)
+    parser.add_argument("--rev", type=bool, default=False)
     args = parser.parse_args()
     return args
 
@@ -87,4 +89,4 @@ if __name__ == "__main__":
         except IOError as e:
             print (e)
 
-        strip(image=im, img_height=args.img_height, img_width=args.img_width, vid_len=args.vid_len)
+        strip(image=im, img_height=args.img_height, img_width=args.img_width, vid_len=args.vid_len, rev=args.rev)

@@ -52,41 +52,75 @@ import os
 
 
 def encoder_model():
-    model = Sequential()
+    inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
 
     # 10x128x128
-    model.add(Conv3D(filters=128,
+    conv_1a = Conv3D(filters=64,
                      strides=(1, 4, 4),
-                     kernel_size=(3, 11, 11),
-                     padding='same',
-                     input_shape=(int(VIDEO_LENGTH/2), 128, 208, 3)))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+                     kernel_size=(3, 7, 7),
+                     padding='same')(inputs)
+    x = TimeDistributed(BatchNormalization())(conv_1a)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_1a = TimeDistributed(Dropout(0.5))(x)
+
+    conv_1b = Conv3D(filters=64,
+                     strides=(1, 1, 1),
+                     kernel_size=(3, 5, 5),
+                     padding='same')(out_1a)
+    x = TimeDistributed(BatchNormalization())(conv_1b)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_1b = TimeDistributed(Dropout(0.5))(x)
+
+    res_1 = add([out_1a, out_1b])
+    res_1 = Activation('relu')(res_1)
 
     # 10x32x32
-    model.add(Conv3D(filters=64,
+    conv_2a = Conv3D(filters=64,
                      strides=(1, 2, 2),
                      kernel_size=(3, 5, 5),
-                     padding='same'))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+                     padding='same')(res_1)
+    x = TimeDistributed(BatchNormalization())(conv_2a)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2a = TimeDistributed(Dropout(0.5))(x)
 
-    # 10x16x16
-    model.add(Conv3D(filters=64,
+    conv_2b = Conv3D(filters=64,
                      strides=(1, 1, 1),
                      kernel_size=(3, 3, 3),
-                     padding='same'))
-    model.add(TimeDistributed(BatchNormalization()))
-    model.add(TimeDistributed(LeakyReLU(alpha=0.2)))
-    model.add(TimeDistributed(Dropout(0.5)))
+                     padding='same')(out_2a)
+    x = TimeDistributed(BatchNormalization())(conv_2b)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2b = TimeDistributed(Dropout(0.5))(x)
+
+    res_2 = add([out_2a, out_2b])
+    res_2 = Activation('relu')(res_2)
+
+    # 10x16x16
+    conv_3a = Conv3D(filters=128,
+                     strides=(1, 1, 1),
+                     kernel_size=(3, 3, 3),
+                     padding='same')(res_2)
+    x = TimeDistributed(BatchNormalization())(conv_3a)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3a = TimeDistributed(Dropout(0.5))(x)
+
+    conv_3b = Conv3D(filters=128,
+                     strides=(1, 1, 1),
+                     kernel_size=(3, 3, 3),
+                     padding='same')(out_3a)
+    x = TimeDistributed(BatchNormalization())(conv_3b)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3b = TimeDistributed(Dropout(0.5))(x)
+
+    res_3 = add([out_3a, out_3b])
+    z = Activation('relu')(res_3)
+
+    model = Model(inputs=inputs, outputs=z)
 
     return model
 
 
 def decoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 64))
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 128))
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=128,
@@ -111,6 +145,7 @@ def decoder_model():
     # out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
 
     res_1 = add([out_1, out_2])
+    res_1 = Activation('relu')(res_1)
     res_1 = UpSampling3D(size=(1, 2, 2))(res_1)
 
     # 10x32x32
@@ -137,6 +172,7 @@ def decoder_model():
     # out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
 
     res_2 = add([out_3a, out_3b])
+    res_2 = Activation('relu')(res_2)
     res_2 = UpSampling3D(size=(1, 2, 2))(res_2)
 
     # 10x64x64
@@ -161,6 +197,7 @@ def decoder_model():
     # h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
 
     res_3 = add([out_4a, out_4b])
+    res_3 = Activation('relu')(res_3)
     res_3 = UpSampling3D(size=(1, 2, 2))(res_3)
 
     # 10x128x128
@@ -348,7 +385,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     # Build attention layer output
     # intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
@@ -510,9 +547,9 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print (TEST_DATA_DIR)
     for index in range(NB_TEST_ITERATIONS):
         X = load_X_test(index, TEST_DATA_DIR, (128, 208, 3))
-        X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
-        y_train = X[:, int(VIDEO_LENGTH / 2):]
-        test_loss.append(autoencoder.test_on_batch(X_train, y_train))
+        X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+        y_test = X[:, int(VIDEO_LENGTH / 2):]
+        test_loss.append(autoencoder.test_on_batch(X_test, y_test))
 
         arrow = int(index / (NB_TEST_ITERATIONS / 40))
         stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
@@ -522,10 +559,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            predicted_images = autoencoder.predict(X_train, verbose=0)
-            voila = np.concatenate((X_train, y_train), axis=1)
+            predicted_images = autoencoder.predict(X_test, verbose=0)
+            voila = np.concatenate((X_test, y_test), axis=1)
             truth_seq = arrange_images(voila)
-            pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
+            pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
 
             # orig_image, truth_image, pred_image = combine_images_test(X_train, y_train, predicted_images)
             # pred_image = pred_image * 127.5 + 127.5

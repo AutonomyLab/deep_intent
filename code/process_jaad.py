@@ -23,7 +23,9 @@ test_recordings = ['video_0227', 'video_0075', 'video_0127', 'video_0176', 'vide
                    'video_0227', 'video_0276', 'video_0325', 'video_0029', 'video_0078', 'video_0130',
                    'video_0179', 'video_0228', 'video_0277', 'video_0326', 'video_0030', 'video_0079',
                    'video_0131', 'video_0180', 'video_0229', 'video_0278', 'video_0327', 'video_0031',
-                   'video_0080', 'video_0132', 'video_0181', 'video_0230', 'video_0279', 'video_0328']
+                   'video_0080', 'video_0132', 'video_0181', 'video_0230', 'video_0279', 'video_0328',
+                   'video_0027', 'video_0028', 'video_0029', 'video_0030', 'video_0031', 'video_0032',
+                   'video_0010', 'video_0022']
 
 if not os.path.exists(DATA_DIR):
     os.mkdir(DATA_DIR)
@@ -119,7 +121,7 @@ def process_data():
             except IOError as e:
                 print (e)
 
-        hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_208' + '.hkl'))
+        # hkl.dump(X, os.path.join(RESIZED_IMGS_DIR, 'X_' + split + '_208' + '.hkl'))
         hkl.dump(source_list, os.path.join(RESIZED_IMGS_DIR, 'sources_' + split + '_208' + '.hkl'))
         hkl.dump(annotation_list, os.path.join(RESIZED_IMGS_DIR, 'annotations_' + split + '_208' + '.hkl'))
 
