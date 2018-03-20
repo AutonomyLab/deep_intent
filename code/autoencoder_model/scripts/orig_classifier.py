@@ -74,14 +74,13 @@ def process_prec3d():
     # for layer in model.layers[:13]:
     #     layer.trainable = RETRAIN_CLASSIFIER
 
-    for layer in model.layers[:13]:
+    for layer in model.layers[:17]:
         layer.trainable = RETRAIN_CLASSIFIER
 
     # i = 0
     # for layer in model.layers:
     #     print(layer, i)
     #     i = i + 1
-
     # model.layers.pop()
     # model.outputs = [model.layers[-1].output]
     # model.layers[-1].outbound_nodes = []
@@ -114,13 +113,14 @@ def pretrained_c3d():
 
     c3d_out = c3d(resized)
 
-    dense = Dense(units=1024, activation='relu', regularizers=regularizers.l2(0.01))(c3d_out)
-    x = BatchNormalization()(dense)
-    x = Dropout(0.5)(x)
-    x = Dense(units=512, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    actions = Dense(units=len(simple_ped_set), activation='sigmoid', regularizers=regularizers.l2(0.01))(x)
+    # dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(c3d_out)
+    # x = BatchNormalization()(dense)
+    # x = Dropout(0.5)(x)
+    # x = Dense(units=512, activation='relu')(x)
+    # x = BatchNormalization()(x)
+    # x = Dropout(0.5)(x)
+    # actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
+    actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.001))(c3d_out)
     model = Model(inputs=inputs, outputs=actions)
 
     # i=0
@@ -270,11 +270,13 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         X = []
         y = []
         for i in range(BATCH_SIZE):
-            start_index = videos_list[(index*BATCH_SIZE + i), 0]
-            end_index = videos_list[(index*BATCH_SIZE + i), -1]
-            X.append(frames[start_index:end_index+1])
+            # start_index = videos_list[(index*BATCH_SIZE + i), 0]
+            # end_index = videos_list[(index*BATCH_SIZE + i), -1]
+            # X.append(frames[start_index:end_index+1])
+            X.append(np.take(frames, videos_list[(index*BATCH_SIZE + i)], axis=0))
             if (len(ped_action_cats) != 0):
-                y.append(ped_action_cats[start_index:end_index+1])
+                # y.append(ped_action_cats[start_index:end_index+1])
+                y.append(np.take(ped_action_cats, videos_list[(index*BATCH_SIZE + i)], axis=0))
 
         X = np.asarray(X)
         y = np.asarray(y)
@@ -439,25 +441,53 @@ def load_to_RAM(frames_source):
     return frames
 
 
-def get_video_lists(frames_source, stride):
+def get_video_lists(frames_source, stride, frame_skip=0):
     # Build video progressions
     videos_list = []
     start_frame_index = 1
-    end_frame_index = VIDEO_LENGTH + 1
+    end_frame_index = ((frame_skip + 1) * VIDEO_LENGTH) + 1 - frame_skip
     while (end_frame_index <= len(frames_source)):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
-            videos_list.append(range(start_frame_index, end_frame_index))
+            videos_list.append(range(start_frame_index, end_frame_index, frame_skip+1))
             start_frame_index = start_frame_index + stride
             end_frame_index = end_frame_index + stride
         else:
             start_frame_index = end_frame_index - 1
-            end_frame_index = start_frame_index + VIDEO_LENGTH
+            end_frame_index = start_frame_index + (frame_skip+1)*VIDEO_LENGTH -frame_skip
 
     videos_list = np.asarray(videos_list, dtype=np.int32)
 
     return np.asarray(videos_list)
 
+
+def get_classwise_data(videos_list, ped_action_labels):
+    classwise_videos_list = [[] for _ in range(len(simple_ped_set))]
+    count = [0] * len(simple_ped_set)
+    for i in range(len(videos_list)):
+        labels = np.where(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]] == 1)
+        for j in labels[0]:
+            count[j] += 1
+            classwise_videos_list[j].append(np.asarray(videos_list[i]))
+
+    print('Before subsampling')
+    print(str(count))
+
+    return classwise_videos_list, count
+
+
+def prob_subsample(classwise_videos_list, count):
+    train_videos_list = []
+    sample_size = min(count)
+
+    for i in range(len(classwise_videos_list)):
+        indices = np.random.choice(count[i], sample_size, replace=False)
+        videos_list = np.asarray(np.take(classwise_videos_list[i], indices, axis=0))
+        train_videos_list.extend(np.asarray(videos_list))
+
+    train_videos_list = np.random.permutation(train_videos_list)
+
+    return np.asarray(train_videos_list)
 
 def subsample_videos(videos_list, ped_action_labels):
     print (videos_list.shape)
@@ -473,13 +503,11 @@ def subsample_videos(videos_list, ped_action_labels):
 
     r_indices = []
 
-    count = [0] * len(simple_ped_set)
-    for i in range(len(videos_list)):
-        count[list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1)] = \
-            count[list(ped_action_labels[videos_list[i, CLASS_TARGET_INDEX]]).index(1)] +1
+    classwise_videos_list, count = get_classwise_data(videos_list, ped_action_labels)
+    videos_list = prob_subsample(classwise_videos_list, count)
 
-    print('Before subsampling')
-    print(str(count))
+    exit(0)
+
 
     for i in range(len(videos_list)):
         # Approaching count
@@ -594,18 +622,25 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Loading data definitions.")
 
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_208.hkl'))
-    videos_list = get_video_lists(frames_source=frames_source, stride=1)
+    videos_list_1 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=0)
+    videos_list_2 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=1)
+    videos_list_3 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=2)
+    videos_list = np.concatenate((videos_list_1, videos_list_2, videos_list_3), axis=0)
+
     # Load actions from annotations
     action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_208.hkl'))
     ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
     print("Training Stats: " + str(ped_class_count))
 
+    classwise_videos_list, count = get_classwise_data(videos_list, ped_action_classes)
+    videos_list = prob_subsample(classwise_videos_list, count)
+
     if RAM_DECIMATE:
         frames = load_to_RAM(frames_source=frames_source)
 
-    if SHUFFLE:
-        # Shuffle images to aid generalization
-        videos_list = np.random.permutation(videos_list)
+    # if SHUFFLE:
+    #     # Shuffle images to aid generalization
+    #     videos_list = np.random.permutation(videos_list)
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
@@ -614,8 +649,6 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     print("Test Stats: " + str(test_ped_class_count))
-
-    videos_list = subsample_videos(videos_list=videos_list, ped_action_labels=ped_action_classes)
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
@@ -662,8 +695,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
                 if RAM_DECIMATE:
+                    videos_list = prob_subsample(classwise_videos_list, count)
                     X, y = load_X_y_RAM(videos_list, index, frames, ped_action_classes)
                 else:
+                    videos_list = prob_subsample(classwise_videos_list, count)
                     X, y = load_X_y(videos_list, index, DATA_DIR, ped_action_classes)
 
                 X_train = X

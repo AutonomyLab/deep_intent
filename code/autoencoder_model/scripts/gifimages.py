@@ -46,10 +46,10 @@ def strip(image, img_height, img_width, vid_len, vid_num=1, rev=False):
             frame_num = frame_num + 1
 
 
-def gifmax(folder):
+def gifmax(folder, rev=False):
     for i in range(880):
-        im_pred = cv2.imread(folder+'/truth/' + str(i) + '_truth.png', cv2.IMREAD_COLOR)
-        strip(im_pred, 128, 32, i)
+        im_pred = cv2.imread(folder+'/pred/' + str(i) + '_pred.png', cv2.IMREAD_COLOR)
+        strip(im_pred, 128, 208, 32, i, rev=rev)
 
 
 def get_args():
@@ -79,7 +79,7 @@ if __name__ == "__main__":
     args = get_args()
     if args.mode == 'gifmax':
         print ('going into gifmax')
-        gifmax(args.folder)
+        gifmax(args.folder, args.rev)
     else:
         try:
             im = cv2.imread(args.file, cv2.IMREAD_COLOR)

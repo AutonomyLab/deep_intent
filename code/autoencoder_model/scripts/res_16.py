@@ -22,6 +22,7 @@ from keras.layers.convolutional import Conv3D
 from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional import UpSampling3D
 from keras.layers.convolutional_recurrent import ConvLSTM2D
+from keras.layers.pooling import MaxPooling3D
 from keras.layers.merge import multiply
 from keras.layers.merge import add
 from keras.layers.merge import concatenate
@@ -52,67 +53,69 @@ import os
 
 
 def encoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 208, 3))
 
     # 10x128x128
-    conv_1a = Conv3D(filters=64,
+    conv_1 = Conv3D(filters=128,
                      strides=(1, 4, 4),
-                     kernel_size=(3, 7, 7),
+                     dilation_rate=(1, 1, 1),
+                     kernel_size=(3, 11, 11),
                      padding='same')(inputs)
-    x = TimeDistributed(BatchNormalization())(conv_1a)
+    x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_1a = TimeDistributed(Dropout(0.5))(x)
+    out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    conv_1b = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
-                     padding='same')(out_1a)
-    x = TimeDistributed(BatchNormalization())(conv_1b)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_1b = TimeDistributed(Dropout(0.5))(x)
-
-    res_1 = add([out_1a, out_1b])
-    res_1 = Activation('relu')(res_1)
-
-    # 10x32x32
     conv_2a = Conv3D(filters=64,
-                     strides=(1, 2, 2),
-                     kernel_size=(3, 5, 5),
-                     padding='same')(res_1)
+                     strides=(1, 1, 1),
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 5, 5),
+                     padding='same')(out_1)
     x = TimeDistributed(BatchNormalization())(conv_2a)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2a = TimeDistributed(Dropout(0.5))(x)
 
     conv_2b = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
-                     padding='same')(out_2a)
+                    strides=(1, 1, 1),
+                    dilation_rate=(2, 1, 1),
+                    kernel_size=(2, 5, 5),
+                    padding='same')(out_2a)
     x = TimeDistributed(BatchNormalization())(conv_2b)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_2b = TimeDistributed(Dropout(0.5))(x)
 
-    res_2 = add([out_2a, out_2b])
-    res_2 = Activation('relu')(res_2)
+    res_1 = add([out_2a, out_2b])
+    # res_1 = LeakyReLU(alpha=0.2)(res_1)
+
+    conv_3 = Conv3D(filters=64,
+                     strides=(1, 2, 2),
+                     dilation_rate=(1, 1, 1),
+                     kernel_size=(3, 5, 5),
+                     padding='same')(res_1)
+    x = TimeDistributed(BatchNormalization())(conv_3)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_3 = TimeDistributed(Dropout(0.5))(x)
 
     # 10x16x16
-    conv_3a = Conv3D(filters=128,
+    conv_4a = Conv3D(filters=64,
                      strides=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
-                     padding='same')(res_2)
-    x = TimeDistributed(BatchNormalization())(conv_3a)
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 3, 3),
+                     padding='same')(out_3)
+    x = TimeDistributed(BatchNormalization())(conv_4a)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_3a = TimeDistributed(Dropout(0.5))(x)
+    out_4a = TimeDistributed(Dropout(0.5))(x)
 
-    conv_3b = Conv3D(filters=128,
+    conv_4b = Conv3D(filters=64,
                      strides=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
-                     padding='same')(out_3a)
-    x = TimeDistributed(BatchNormalization())(conv_3b)
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 3, 3),
+                     padding='same')(out_4a)
+    x = TimeDistributed(BatchNormalization())(conv_4b)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_3b = TimeDistributed(Dropout(0.5))(x)
+    out_4b = TimeDistributed(Dropout(0.5))(x)
 
-    res_3 = add([out_3a, out_3b])
-    z = Activation('relu')(res_3)
+    z = add([out_4a, out_4b])
+    # res_1 = LeakyReLU(alpha=0.2)(res_1)
 
     model = Model(inputs=inputs, outputs=z)
 
@@ -120,7 +123,7 @@ def encoder_model():
 
 
 def decoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 128))
+    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 64))
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=128,
@@ -145,7 +148,7 @@ def decoder_model():
     # out_2 = UpSampling3D(size=(1, 2, 2))(h_2)
 
     res_1 = add([out_1, out_2])
-    res_1 = Activation('relu')(res_1)
+    # res_1 = LeakyReLU(alpha=0.2)(res_1)
     res_1 = UpSampling3D(size=(1, 2, 2))(res_1)
 
     # 10x32x32
@@ -172,7 +175,7 @@ def decoder_model():
     # out_3 = UpSampling3D(size=(1, 2, 2))(h_3)
 
     res_2 = add([out_3a, out_3b])
-    res_2 = Activation('relu')(res_2)
+    # res_2 = LeakyReLU(alpha=0.2)(res_2)
     res_2 = UpSampling3D(size=(1, 2, 2))(res_2)
 
     # 10x64x64
@@ -197,7 +200,7 @@ def decoder_model():
     # h_4 = TimeDistributed(LeakyReLU(alpha=0.2))(x)
 
     res_3 = add([out_4a, out_4b])
-    res_3 = Activation('relu')(res_3)
+    # res_3 = LeakyReLU(alpha=0.2)(res_3)
     res_3 = UpSampling3D(size=(1, 2, 2))(res_3)
 
     # 10x128x128
@@ -486,17 +489,74 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # TC.on_train_end('_')
 
 
+def test(ENC_WEIGHTS, DEC_WEIGHTS):
+    print('')
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(int(VIDEO_LENGTH / 2)))
+    n_test_videos = test_videos_list.shape[0]
 
+    print("Creating models...")
+    encoder = encoder_model()
+    print(encoder.summary())
+
+    if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
+        os.mkdir(TEST_RESULTS_DIR + '/truth/')
+    if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
+        os.mkdir(TEST_RESULTS_DIR + '/pred/')
+
+    decoder = decoder_model()
+    autoencoder = autoencoder_model(encoder, decoder)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+
+    run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
+
+    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    test_loss = []
+    for index in range(NB_TEST_ITERATIONS):
+        X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE)
+        X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+        y_test = X[:, int(VIDEO_LENGTH / 2):]
+        test_loss.append(autoencoder.test_on_batch(X_test, y_test))
+
+        arrow = int(index / (NB_TEST_ITERATIONS / 40))
+        stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
+                     "test_loss: " + str(test_loss[len(test_loss) - 1]) +
+                     "\t    [" + "{0}>".format("=" * (arrow)))
+        stdout.flush()
+
+        if SAVE_GENERATED_IMAGES:
+            # Save generated images to file
+            predicted_images = autoencoder.predict(X_test, verbose=0)
+            voila = np.concatenate((X_test, y_test), axis=1)
+            truth_seq = arrange_images(voila)
+            pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
+
+            truth_seq = truth_seq * 127.5 + 127.5
+            pred_seq = pred_seq * 127.5 + 127.5
+
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
+
+    # then after each epoch/iteration
+    avg_test_loss = sum(test_loss) / len(test_loss)
+    print("\nAvg loss: " + str(avg_test_loss))
+    print("\n Std: " + str(np.std(np.asarray(test_loss))))
+    print("\n Variance: " + str(np.var(np.asarray(test_loss))))
+    print("\n Mean: " + str(np.mean(np.asarray(test_loss))))
+    print("\n Max: " + str(np.max(np.asarray(test_loss))))
+    print("\n Min: " + str(np.min(np.asarray(test_loss))))
 
 
 def combine_images_test(X, y, generated_images):
     return arrange_images(X), arrange_images(y), arrange_images(generated_images)
 
+
 def load_X_test(index, data_dir, img_size):
-    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + img_size)
+    X = np.zeros((BATCH_SIZE, int(VIDEO_LENGTH/2),) + img_size)
     for i in range(BATCH_SIZE):
         for j in range(1, int(VIDEO_LENGTH/2)+1):
-            file_num = str(int(((index * BATCH_SIZE * (VIDEO_LENGTH / 2)) + (i * BATCH_SIZE) + j)))
+            file_num = str(int(((index * BATCH_SIZE * (VIDEO_LENGTH / 2)) + (i * BATCH_SIZE) + j))+4)
             filename = file_num + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
@@ -510,7 +570,7 @@ def load_X_test(index, data_dir, img_size):
     return X
 
 
-def test(ENC_WEIGHTS, DEC_WEIGHTS):
+def test_ind(ENC_WEIGHTS, DEC_WEIGHTS):
 
     # Create models
     print ("Creating models...")
@@ -547,8 +607,9 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print (TEST_DATA_DIR)
     for index in range(NB_TEST_ITERATIONS):
         X = load_X_test(index, TEST_DATA_DIR, (128, 208, 3))
-        X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
-        y_test = X[:, int(VIDEO_LENGTH / 2):]
+        X_test = np.flip(X, axis=1)
+        # X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
+        y_test = load_X_test(index+1, TEST_DATA_DIR, (128, 208, 3))
         test_loss.append(autoencoder.test_on_batch(X_test, y_test))
 
         arrow = int(index / (NB_TEST_ITERATIONS / 40))
@@ -614,3 +675,7 @@ if __name__ == "__main__":
     if args.mode == "test":
         test(ENC_WEIGHTS=args.enc_weights,
              DEC_WEIGHTS=args.dec_weights)
+
+    if args.mode == "test_ind":
+        test_ind(ENC_WEIGHTS=args.enc_weights,
+                 DEC_WEIGHTS=args.dec_weights)

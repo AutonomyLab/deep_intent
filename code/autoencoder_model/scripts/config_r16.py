@@ -62,7 +62,7 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = False
+PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
@@ -77,7 +77,7 @@ REVERSE = True
 print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
+BATCH_SIZE = 9
 NB_EPOCHS_AUTOENCODER = 30
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
