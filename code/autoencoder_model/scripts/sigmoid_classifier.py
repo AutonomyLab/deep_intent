@@ -7,8 +7,6 @@ from matplotlib.pyplot import axes
 import hickle as hkl
 import numpy as np
 
-from config import VIDEO_LENGTH
-
 np.random.seed(2 ** 10)
 import tensorflow as tf
 import itertools
@@ -60,7 +58,7 @@ from image_utils import random_shift
 from image_utils import random_zoom
 from image_utils import flip_axis
 from image_utils import random_brightness
-from config_oc import *
+from config_sigc import *
 from sys import stdout
 
 import tb_callback
@@ -128,7 +126,7 @@ def pretrained_c3d():
     x = Dense(units=1024, activation='relu')(x)
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
-    actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.01))(x)
+    actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
     # actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.001))(c3d_out)
     model = Model(inputs=inputs, outputs=actions)
 
@@ -380,10 +378,6 @@ def map_to_simple(ped_action):
         return 1
     elif (ped_action == 2):
         return 1
-    elif (ped_action == 3):
-        return 5
-    elif (ped_action == 4):
-        return 5
     elif (ped_action == 5):
         return 2
     elif (ped_action == 6):
@@ -391,31 +385,28 @@ def map_to_simple(ped_action):
     elif (ped_action == 7):
         return 2
     elif (ped_action == 8):
-        return 3
+        return 0
     elif (ped_action == 9):
-        return 4
-    elif (ped_action == 10):
-        return 5
-    elif (ped_action == 11):
-        return 5
+        return 1
     elif (ped_action == 12):
-        return 5
+        return 3
     elif (ped_action == 13):
-        return 6
+        return 4
     else:
+        print ("Irrelevant ped_action found. Exiting.")
         print (ped_action)
+        exit(0)
 
 
 def get_action_classes(action_labels):
-    # Load labesl into categorical 1-hot vectors
+    # Load labels into per frame numerical indices from the action set
     print("Loading annotations.")
+
+    ped_action_classes = []
     count = [0] * len(simple_ped_set)
-    ped_action_class = []
-    # action_class = []
     for i in range(len(action_labels)):
         action_dict = dict(ele.split(':') for ele in action_labels[i].split(', ')[2:])
         # Settle pedestrian classes
-        # print (action_dict)
         a_clean = []
         for key, value in action_dict.iteritems():
             if 'pedestrian' in key:
@@ -429,57 +420,82 @@ def get_action_classes(action_labels):
         if len(a_clean) == 0:
             a_clean = ['no ped']
 
-        ped_action_per_frame = list(set(a_clean))
-        # print(ped_action_per_frame)
-        # encoded_ped_action = np.zeros(shape=(len(simple_ped_set)), dtype=np.float32)
-        # print (ped_action_per_frame)
-        simple_ped_action_per_frame = []
-        for action in ped_action_per_frame:
+        ped_actions_per_frame = list(set(a_clean))
+        simple_ped_actions_per_frame = []
+        encoded_ped_action = np.zeros(shape=(len(simple_ped_set)), dtype=np.float32)
+        for action in ped_actions_per_frame:
             # Get ped action number and map it to simple set
             if action not in ped_actions:
+                print ("Unknown action in labels. Exiting.")
                 print (action)
+                exit(0)
+            if action.lower() == 'standing':
+                ped_action = simple_ped_set.index('standing')
+                simple_ped_actions_per_frame.append(ped_action)
+            if action.lower() == 'crossing':
+                ped_action = simple_ped_set.index('standing')
+                simple_ped_actions_per_frame.append(ped_action)
+            if action.lower() == 'no ped':
+                ped_action = simple_ped_set.index('standing')
+                simple_ped_actions_per_frame.append(ped_action)
+
             ped_action = ped_actions.index(action)
-            ped_action = map_to_simple(ped_action)
-            simple_ped_action_per_frame.append(ped_action)
+            if ((ped_action == ped_actions.index('nod')) or
+                (ped_action == ped_actions.index('looking')) or
+                (ped_action == ped_actions.index('nod')) or
+                (ped_action == ped_actions.index('handwave'))):
+                continue
+            else:
+                ped_action = map_to_simple(ped_action)
+                simple_ped_actions_per_frame.append(ped_action)
 
-        simple_ped_action_per_frame = set(simple_ped_action_per_frame)
+        simple_ped_actions_per_frame = set(simple_ped_actions_per_frame)
+        print (a_clean)
+        # if 5 in simple_ped_action_per_frame:
+        #     action = 5
+        # if 6 in simple_ped_action_per_frame:
+        #     action = 6
+        # if 1 in simple_ped_action_per_frame:
+        #     action = 1
+        # if 4 in simple_ped_action_per_frame:
+        #     action = 4
+        # if 0 in simple_ped_action_per_frame:
+        #     action = 0
+        # if 2 in simple_ped_action_per_frame:
+        #     action = 2
+        # if 3 in simple_ped_action_per_frame:
+        #     action = 3
+        #
+        # encoded_ped_action = to_categorical(action, len(simple_ped_set))
+        # count[action] = count[action] + 1
 
-        if 5 in simple_ped_action_per_frame:
-            action = 5
-        if 6 in simple_ped_action_per_frame:
-            action = 6
-        if 1 in simple_ped_action_per_frame:
-            action = 1
-        if 4 in simple_ped_action_per_frame:
-            action = 4
-        if 0 in simple_ped_action_per_frame:
-            action = 0
-        if 2 in simple_ped_action_per_frame:
-            action = 2
-        if 3 in simple_ped_action_per_frame:
-            action = 3
-
-        encoded_ped_action = to_categorical(action, len(simple_ped_set))
-        count[action] = count[action] + 1
-
-        # for action in simple_ped_action_per_frame:
-        #     count[action] = count[action] + 1
-        #     # Add all unique categorical one-hot vectors
-        #     encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
+        for action in simple_ped_actions_per_frame:
+            count[action] = count[action] + 1
+            # Add all unique categorical one-hot vectors
+            encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
 
         if (sum(encoded_ped_action) == 0):
-            print (simple_ped_action_per_frame)
-            print (a_clean)
+            print(simple_ped_actions_per_frame)
+            print(a_clean)
+
         # if (sum(encoded_ped_action) > 1):
         #     print (simple_ped_action_per_frame)
         #     print (a_clean)
-        ped_action_class.append(encoded_ped_action.T)
+        ped_action_classes.append(encoded_ped_action.T)
 
-    ped_action_class = np.asarray(ped_action_class)
-    ped_action_class = np.reshape(ped_action_class, newshape=(ped_action_class.shape[0:2]))
+    ped_action_classes = np.asarray(ped_action_classes)
+    ped_action_classes = np.reshape(ped_action_classes, newshape=(ped_action_classes.shape[0:2]))
+    exit(0)
+    return ped_action_classes, count
 
 
-    return ped_action_class, count
+def remove_zero_classes(videos_list, simple_ped_actions_per_frame):
+    for i in range(len(videos_list)):
+        # Approaching count
+        if (len(list(simple_ped_actions_per_frame[videos_list[i, CLASS_TARGET_INDEX]])) == 0):
+            np.delete(videos_list, i, axis=0)
+
+    return videos_list
 
 
 def load_to_RAM(frames_source):
@@ -693,6 +709,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
     print("Training Stats: " + str(ped_class_count))
 
+    videos_list = remove_zero_classes(videos_list, ped_action_classes)
     classwise_videos_list, count = get_classwise_data(videos_list, ped_action_classes)
     videos_list = prob_subsample(classwise_videos_list, count)
 
@@ -705,7 +722,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=1)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=4)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
@@ -715,7 +732,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print ("Creating models.")
     # Build stacked classifier
     classifier = pretrained_c3d()
-    classifier.compile(loss="categorical_crossentropy",
+    classifier.compile(loss="binary_crossentropy",
                        optimizer=OPTIM_C,
                        # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
                        metrics=['accuracy'])

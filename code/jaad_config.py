@@ -3,20 +3,20 @@ import os
 # Where JAAD data will be saved if you run process_jaad.py
 DATA_DIR = '/local_home/JAAD_Dataset/'
 
-XML_DIR = '/local_home/JAAD_Dataset/JAAD_behavioral_data_xml/'
+XML_DIR = '/local_home/JAAD_Dataset/JAAD_behavioral_data_xml_new/'
 
-RESIZED_IMGS_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208'
+RESIZED_IMGS_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/'
 if not os.path.exists(RESIZED_IMGS_DIR):
     os.mkdir(RESIZED_IMGS_DIR)
 
-TEST_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+TEST_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/test/'
 if not os.path.exists(TEST_DIR):
     os.mkdir(TEST_DIR)
 
-TRAIN_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
+TRAIN_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/train/'
 if not os.path.exists(TRAIN_DIR):
     os.mkdir(TRAIN_DIR)
 
-VAL_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
-if not os.path.exists(VAL_DIR):
-    os.mkdir(VAL_DIR)
+# VAL_DIR = '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/val/'
+# if not os.path.exists(VAL_DIR):
+#     os.mkdir(VAL_DIR)

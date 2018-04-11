@@ -22,12 +22,12 @@ elif hostname == 'bender':
 else:
     path_var = 'zhora/'
 
-DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/test/'
 
-VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/val/'
 
 PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
 PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
@@ -91,19 +91,10 @@ ZOOM_MAX = 0.2
 BRIGHT_RANGE_L = 0.5
 BRIGHT_RANGE_H = 1.5
 
-# ped_actions = ['standing 0', 'moving slow 1', 'moving fast 2', 'look 3', 'looking 4',
-#                'slow down 5', 'speed up 6', 'crossing 7', 'stopped 8', 'clear path 9',
-#                 'nod 10', 'handwave 11', 'unknown 12', 'no ped 13']
-ped_actions = ['standing', 'moving slow', 'moving fast', 'look', 'looking',
-               'slow down', 'speed up', 'crossing', 'stopped', 'clear path',
-                'nod', 'handwave', 'unknown', 'no ped']
-# simple_ped_set = ['moving slow', 'stopped', 'moving fast', 'looking', 'clear path', 'crossing',
-#                   'handwave', 'unknown']
+ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
+               'clear path', 'handwave', 'crossing', 'looking', 'no ped']
 
-# simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
-
-# simple_ped_set = ['standing 0', 'approaching 1', 'crossing 2', 'stopped 3', 'clear path 4', 'unknown 5', 'no ped 6']
-simple_ped_set = ['standing', 'approaching', 'crossing', 'stopped', 'clear path', 'unknown', 'no ped']
+simple_ped_set = ['standing' ,'crossing', 'no ped']
 
 
 
@@ -148,7 +139,9 @@ OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 #     return 0.000000001
 
 
-lr_schedule = [15, 25, 40]  # epoch_step
+lr_schedule = [7, 15, 22]  # epoch_step
+
+
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
         return 0.00001

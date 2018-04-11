@@ -38,7 +38,7 @@ if pil_image is not None:
         _PIL_INTERPOLATION_METHODS['lanczos'] = pil_image.LANCZOS
 
 
-def random_rotation(x, rg, row_axis=1, col_axis=2, channel_axis=0,
+def random_rotation(x, theta_deg, row_axis=1, col_axis=2, channel_axis=0,
                     fill_mode='nearest', cval=0.):
     """Performs a random rotation of a Numpy image tensor.
     # Arguments
@@ -55,7 +55,7 @@ def random_rotation(x, rg, row_axis=1, col_axis=2, channel_axis=0,
     # Returns
         Rotated Numpy image tensor.
     """
-    theta = np.deg2rad(np.random.uniform(-rg, rg))
+    theta = np.deg2rad(theta_deg)
     rotation_matrix = np.array([[np.cos(theta), -np.sin(theta), 0],
                                 [np.sin(theta), np.cos(theta), 0],
                                 [0, 0, 1]])
@@ -108,7 +108,7 @@ def apply_transform(x,
     return x
 
 
-def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
+def random_shift(x, tx, ty, row_axis=1, col_axis=2, channel_axis=0,
                  fill_mode='nearest', cval=0.):
     """Performs a random spatial shift of a Numpy image tensor.
     # Arguments
@@ -126,9 +126,9 @@ def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
     # Returns
         Shifted Numpy image tensor.
     """
-    h, w = x.shape[row_axis], x.shape[col_axis]
-    tx = np.random.uniform(-hrg, hrg) * h
-    ty = np.random.uniform(-wrg, wrg) * w
+    # h, w = x.shape[row_axis], x.shape[col_axis]
+    # tx = np.random.uniform(-hrg, hrg) * h
+    # ty = np.random.uniform(-wrg, wrg) * w
     translation_matrix = np.array([[1, 0, tx],
                                    [0, 1, ty],
                                    [0, 0, 1]])
@@ -138,7 +138,7 @@ def random_shift(x, wrg, hrg, row_axis=1, col_axis=2, channel_axis=0,
     return x
 
 
-def random_zoom(x, zoom_range, row_axis=1, col_axis=2, channel_axis=0,
+def random_zoom(x, zx, zy, row_axis=1, col_axis=2, channel_axis=0,
                 fill_mode='nearest', cval=0.):
     """Performs a random spatial zoom of a Numpy image tensor.
     # Arguments
@@ -157,14 +157,16 @@ def random_zoom(x, zoom_range, row_axis=1, col_axis=2, channel_axis=0,
     # Raises
         ValueError: if `zoom_range` isn't a tuple.
     """
-    if len(zoom_range) != 2:
-        raise ValueError('`zoom_range` should be a tuple or list of two floats. '
-                         'Received arg: ', zoom_range)
-
-    if zoom_range[0] == 1 and zoom_range[1] == 1:
-        zx, zy = 1, 1
-    else:
-        zx, zy = np.random.uniform(zoom_range[0], zoom_range[1], 2)
+    # if len(zoom_range) != 2:
+    #     raise ValueError('`zoom_range` should be a tuple or list of two floats. '
+    #                      'Received arg: ', zoom_range)
+    #
+    # if zoom_range[0] == 1 and zoom_range[1] == 1:
+    #     zx, zy = 1, 1
+    # else:
+    #     zx, zy = np.random.uniform(zoom_range[0], zoom_range[1], 2)
+    print (x.shape)
+    print (zx)
     zoom_matrix = np.array([[zx, 0, 0],
                             [0, zy, 0],
                             [0, 0, 1]])
@@ -261,14 +263,14 @@ def img_to_array(img, data_format=None):
 
 
 
-def random_brightness(x, brightness_range):
-    if len(brightness_range) != 2:
-        raise ValueError('`brightness_range should be tuple or list of two floats. '
-                         'Received arg: ', brightness_range)
-
+def random_brightness(x, u):
+    # if len(brightness_range) != 2:
+    #     raise ValueError('`brightness_range should be tuple or list of two floats. '
+    #                      'Received arg: ', brightness_range)
+    #
     x = array_to_img(x)
-    x = imgenhancer_Brightness = ImageEnhance.Brightness(x)
-    u = np.random.uniform(brightness_range[0], brightness_range[1])
+    imgenhancer_Brightness = ImageEnhance.Brightness(x)
+    # u = np.random.uniform(brightness_range[0], brightness_range[1])
     x = imgenhancer_Brightness.enhance(u)
     x = img_to_array(x)
     return x
