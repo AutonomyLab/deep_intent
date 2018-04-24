@@ -84,9 +84,9 @@ C_TRAIN_RATIO = 1
 RAM_DECIMATE = True
 RETRAIN_CLASSIFIER = True
 CLASS_TARGET_INDEX = 8
-ROT_MAX = 10
-SFT_H_MAX = 0.05
-SFT_V_MAX = 0.05
+ROT_MAX = 5
+SFT_H_MAX = 0.02
+SFT_V_MAX = 0.02
 ZOOM_MAX = 0.2
 BRIGHT_RANGE_L = 0.5
 BRIGHT_RANGE_H = 1.5
@@ -94,26 +94,7 @@ BRIGHT_RANGE_H = 1.5
 ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
                'clear path', 'handwave', 'crossing', 'looking', 'no ped']
 
-simple_ped_set = ['standing' ,'crossing', 'no ped']
-
-
-
-
-
-driver_actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
-simple_driver_set = ['slow down', 'stop', 'speed up']
-
-joint_action_set = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast',
-                    'slow down', 'standing', 'moving fast', 'speed up', 'look', 'nod', 'unknown',
-                    'moving slow', 'flasher signal', 'looking' , 'handwave', 'clear path',
-                    'stopped', 'slowing down', 'crossing', 'speeding up']
-
-formatted_joint_action_set = ['car moving slow', 'car slowing down', 'car standing', 'car speeding up', 'car moving fast',
-                              'ped slow down', 'ped standing', 'ped moving fast', 'ped speed up', 'ped look',
-                              'ped nod', 'ped unknown', 'ped moving slow', 'ped flasher signal', 'ped looking' ,
-                              'ped handwave', 'ped clear path', 'ped stopped', 'ped slowing down', 'ped crossing',
-                              'ped speeding up']
-
+simple_ped_set = ['standing', 'crossing', 'no ped']
 
 # -------------------------------------------------
 # Network configuration:
@@ -144,9 +125,9 @@ lr_schedule = [7, 15, 22]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.00001
+        return 0.0001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000001  # lr_decay_ratio = 10
+        return 0.00001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
-        return 0.0000001
-    return 0.0000001
+        return 0.000001
+    return 0.000001

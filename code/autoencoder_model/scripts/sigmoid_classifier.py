@@ -116,9 +116,37 @@ def pretrained_c3d():
     print (c3d.summary())
 
     inputs = Input(shape=(16, 128, 208, 3))
-    resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
 
-    c3d_out = c3d(resized)
+    # lstm_1 = ConvLSTM2D(filters=256,
+    #                     kernel_size=(3, 3),
+    #                     strides=(1, 1),
+    #                     padding='same',
+    #                     return_sequences=True,
+    #                     recurrent_dropout=0.5)(conv_10)
+    # lstm_1 = TimeDistributed(BatchNormalization())(lstm_1)
+    # lstm_1 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_1)
+    #
+    # lstm_2 = ConvLSTM2D(filters=256,
+    #                     kernel_size=(3, 3),
+    #                     strides=(1, 1),
+    #                     padding='same',
+    #                     return_sequences=True,
+    #                     recurrent_dropout=0.5)(lstm_1)
+    # lstm_2 = TimeDistributed(BatchNormalization())(lstm_2)
+    # lstm_2 = TimeDistributed(LeakyReLU(alpha=0.2))(lstm_2)
+    #
+    # lstm_3 = ConvLSTM2D(filters=256,
+    #                     kernel_size=(3, 3),
+    #                     strides=(1, 1),
+    #                     padding='same',
+    #                     return_sequences=False,
+    #                     recurrent_dropout=0.5)(lstm_2)
+    # lstm_3 = BatchNormalization()(lstm_3)
+    # lstm_3 = LeakyReLU(alpha=0.2)(lstm_3)
+    #
+    # resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
+
+    c3d_out = c3d(inputs)
 
     dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(c3d_out)
     x = BatchNormalization()(dense)
@@ -135,6 +163,78 @@ def pretrained_c3d():
     #     print (layer, i)
     #     i = i+1
     # exit(0)
+
+    return model
+
+
+def c3d_scratch():
+    model = Sequential()
+    model.add(Conv3D(filters=64,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv1',
+                     input_shape=(16, 128, 208, 3)))
+    model.add(MaxPooling3D(pool_size=(1, 2, 2), strides=(1, 2, 2),
+                           padding='valid', name='pool1'))
+    # 2nd layer group
+    model.add(Conv3D(filters=64,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv2'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                           padding='valid', name='pool2'))
+    # 3rd layer group
+    model.add(Conv3D(filters=128,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv3a'))
+    model.add(Conv3D(filters=256,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv3b'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                           padding='valid', name='pool3'))
+    # 4th layer group
+    model.add(Conv3D(filters=512,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv4a'))
+    model.add(Conv3D(filters=512,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv4b'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                           padding='valid', name='pool4'))
+    # 5th layer group
+    model.add(Conv3D(filters=512,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv5a'))
+    model.add(Conv3D(filters=512,
+                     kernel_size=(3, 3, 3),
+                     activation='relu',
+                     padding='same',
+                     name='conv5b'))
+    model.add(ZeroPadding3D(padding=((0, 0), (0, 1), (0, 1)), name='zeropad5'))
+    model.add(MaxPooling3D(pool_size=(2, 2, 2), strides=(2, 2, 2),
+                           padding='valid', name='pool5'))
+    model.add(Flatten())
+
+    # FC layers group
+    model.add(Dense(512, activation='relu', name='fc6'))
+    model.add(BatchNormalization())
+    model.add(Dropout(0.5))
+    model.add(Dense(256, activation='relu', name='fc7'))
+    model.add(BatchNormalization())
+    model.add(Dropout(.5))
+    model.add(Dense(len(simple_ped_set), activation='sigmoid', name='fc8'))
 
     return model
 
@@ -420,12 +520,12 @@ def get_action_classes(action_labels):
         if len(a_clean) == 0:
             a_clean = ['no ped']
 
-        ped_actions_per_frame = list(set(a_clean))
+        ped_actions_per_frame = list(set([a.lower() for a in a_clean]))
         simple_ped_actions_per_frame = []
         encoded_ped_action = np.zeros(shape=(len(simple_ped_set)), dtype=np.float32)
         for action in ped_actions_per_frame:
             # Get ped action number and map it to simple set
-            if action not in ped_actions:
+            if action.lower() not in ped_actions:
                 print ("Unknown action in labels. Exiting.")
                 print (action)
                 exit(0)
@@ -433,24 +533,22 @@ def get_action_classes(action_labels):
                 ped_action = simple_ped_set.index('standing')
                 simple_ped_actions_per_frame.append(ped_action)
             if action.lower() == 'crossing':
-                ped_action = simple_ped_set.index('standing')
+                ped_action = simple_ped_set.index('crossing')
                 simple_ped_actions_per_frame.append(ped_action)
             if action.lower() == 'no ped':
-                ped_action = simple_ped_set.index('standing')
+                ped_action = simple_ped_set.index('no ped')
                 simple_ped_actions_per_frame.append(ped_action)
 
-            ped_action = ped_actions.index(action)
-            if ((ped_action == ped_actions.index('nod')) or
-                (ped_action == ped_actions.index('looking')) or
-                (ped_action == ped_actions.index('nod')) or
-                (ped_action == ped_actions.index('handwave'))):
-                continue
-            else:
-                ped_action = map_to_simple(ped_action)
-                simple_ped_actions_per_frame.append(ped_action)
+            # ped_action = ped_actions.index(action)
+            # if ((ped_action == ped_actions.index('nod')) or
+            #     (ped_action == ped_actions.index('looking')) or
+            #     (ped_action == ped_actions.index('nod')) or
+            #     (ped_action == ped_actions.index('handwave'))):
+            #     continue
+            # else:
+            #     ped_action = map_to_simple(ped_action)
+            #     simple_ped_actions_per_frame.append(ped_action)
 
-        simple_ped_actions_per_frame = set(simple_ped_actions_per_frame)
-        print (a_clean)
         # if 5 in simple_ped_action_per_frame:
         #     action = 5
         # if 6 in simple_ped_action_per_frame:
@@ -459,24 +557,25 @@ def get_action_classes(action_labels):
         #     action = 1
         # if 4 in simple_ped_action_per_frame:
         #     action = 4
-        # if 0 in simple_ped_action_per_frame:
-        #     action = 0
-        # if 2 in simple_ped_action_per_frame:
-        #     action = 2
-        # if 3 in simple_ped_action_per_frame:
-        #     action = 3
+
+        # if 2 in simple_ped_actions_per_frame:
+        #     act = 2
+        # if 0 in simple_ped_actions_per_frame:
+        #     act = 0
+        # if 1 in simple_ped_actions_per_frame:
+        #     act = 1
         #
-        # encoded_ped_action = to_categorical(action, len(simple_ped_set))
-        # count[action] = count[action] + 1
+        # encoded_ped_action = to_categorical(act, len(simple_ped_set))
+        # count[act] = count[act] + 1
 
         for action in simple_ped_actions_per_frame:
             count[action] = count[action] + 1
             # Add all unique categorical one-hot vectors
             encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
 
-        if (sum(encoded_ped_action) == 0):
-            print(simple_ped_actions_per_frame)
-            print(a_clean)
+        # if (sum(encoded_ped_action) == 0):
+        #     print (ped_actions_per_frame)
+        #     print (encoded_ped_action)
 
         # if (sum(encoded_ped_action) > 1):
         #     print (simple_ped_action_per_frame)
@@ -485,15 +584,18 @@ def get_action_classes(action_labels):
 
     ped_action_classes = np.asarray(ped_action_classes)
     ped_action_classes = np.reshape(ped_action_classes, newshape=(ped_action_classes.shape[0:2]))
-    exit(0)
     return ped_action_classes, count
 
 
 def remove_zero_classes(videos_list, simple_ped_actions_per_frame):
+    r_indices = []
     for i in range(len(videos_list)):
-        # Approaching count
-        if (len(list(simple_ped_actions_per_frame[videos_list[i, CLASS_TARGET_INDEX]])) == 0):
-            np.delete(videos_list, i, axis=0)
+        # if (len(list(simple_ped_actions_per_frame[videos_list[i, CLASS_TARGET_INDEX]])) == 0):
+        if sum(simple_ped_actions_per_frame[videos_list[i, CLASS_TARGET_INDEX]]) == 0:
+            r_indices.append(i)
+
+    for i in sorted(r_indices, reverse=True):
+        videos_list = np.delete(videos_list, i, axis=0)
 
     return videos_list
 
@@ -709,7 +811,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
     print("Training Stats: " + str(ped_class_count))
 
-    videos_list = remove_zero_classes(videos_list, ped_action_classes)
+    # videos_list = remove_zero_classes(videos_list, ped_action_classes)
     classwise_videos_list, count = get_classwise_data(videos_list, ped_action_classes)
     videos_list = prob_subsample(classwise_videos_list, count)
 
@@ -726,12 +828,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
+    test_videos_list = remove_zero_classes(test_videos_list, test_ped_action_classes)
     print("Test Stats: " + str(test_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
     # Build stacked classifier
     classifier = pretrained_c3d()
+    # classifier = c3d_scratch()
     classifier.compile(loss="binary_crossentropy",
                        optimizer=OPTIM_C,
                        # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
@@ -742,9 +846,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     n_videos = videos_list.shape[0]
     n_test_videos = test_videos_list.shape[0]
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
-    # NB_ITERATIONS = 1
+    # NB_ITERATIONS = 5
     NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
-    # NB_TEST_ITERATIONS = 1
+    # NB_TEST_ITERATIONS = 5
 
     # Setup TensorBoard Callback
     TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -807,10 +911,26 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     for j in range(int(VIDEO_LENGTH )):
                         class_num_past = np.argmax(y_orig_classes[k, j])
                         class_num_y = np.argmax(ped_pred_class[k])
-                        cv2.putText(pred_seq, 'truth: ' + simple_ped_set[class_num_past],
+                        # label_true = simple_ped_set[class_num_past]
+                        # label_pred = simple_ped_set[class_num_y]
+
+                        label_true = str(y_orig_classes[k, j])
+                        label_pred = str([round(float(i), 2) for i in ped_pred_class[k]])
+
+                        # if (y_orig_classes[k, j] > 0.5):
+                        #     label_true = "crossing"
+                        # else:
+                        #     label_true = "not crossing"
+                        #
+                        # if (ped_pred_class[k] > 0.5):
+                        #     label_pred = "crossing"
+                        # else:
+                        #     label_pred = "not crossing"
+
+                        cv2.putText(pred_seq, 'truth: ' + label_true,
                                     (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
-                        cv2.putText(pred_seq, simple_ped_set[class_num_y],
+                        cv2.putText(pred_seq, label_pred,
                                     (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
 
@@ -849,18 +969,37 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     for j in range(int(VIDEO_LENGTH)):
                         class_num_past = np.argmax(y_orig_classes[k, j])
                         class_num_y = np.argmax(test_ped_pred_class[k])
-                        cv2.putText(pred_seq, 'truth: ' + simple_ped_set[class_num_past],
+                        # label_true = simple_ped_set[class_num_past]
+                        # label_pred = simple_ped_set[class_num_y]
+                        label_true = str(y_orig_classes[k, j])
+                        label_pred = str([round(float(i), 2) for i in ped_pred_class[k]])
+
+                        #
+                        # if (y_orig_classes[k, j] > 0.5):
+                        #     label_true = "crossing"
+                        # else:
+                        #     label_true = "not crossing"
+                        #
+                        # if (test_ped_pred_class[k] > 0.5):
+                        #     label_pred = "crossing"
+                        # else:
+                        #     label_pred = "not crossing"
+
+                        cv2.putText(pred_seq, 'truth: ' + label_true,
                                     (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
-                        cv2.putText(pred_seq, simple_ped_set[class_num_y],
+                        cv2.putText(pred_seq, label_pred,
                                     (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
 
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_test_pred.png"), pred_seq)
 
-            # then after each epoch/iteration
+            # then after each epoch
             avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
             avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
+
+            print (np.asarray(y_train_true))
+            print (np.asarray(y_train_pred))
 
             train_prec, train_rec, train_fbeta, train_support = get_sklearn_metrics(np.asarray(y_train_true),
                                                                                     np.asarray(y_train_pred),
