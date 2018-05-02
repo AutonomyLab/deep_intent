@@ -70,7 +70,7 @@ if not os.path.exists(TEST_RESULTS_DIR):
 
 PRINT_MODEL_SUMMARY = True
 SAVE_MODEL = True
-PLOT_MODEL = True
+PLOT_MODEL = False
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 16
@@ -82,7 +82,7 @@ LOSS_WEIGHTS = [1, 1]
 A_TRAIN_RATIO = 1
 C_TRAIN_RATIO = 1
 RAM_DECIMATE = True
-RETRAIN_CLASSIFIER = False
+RETRAIN_CLASSIFIER = True
 CLASS_TARGET_INDEX = 8
 ROT_MAX = 5
 SFT_H_MAX = 0.02
@@ -101,8 +101,8 @@ simple_ped_set = ['standing', 'crossing', 'no ped']
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
-NB_EPOCHS_CLASS = 30
+BATCH_SIZE = 25
+NB_EPOCHS_CLASS = 100
 
 OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
 # OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
@@ -130,4 +130,4 @@ def schedule(epoch_idx):
         return 0.000001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.0000001
-    return 0.0000001
+    return 0.000001

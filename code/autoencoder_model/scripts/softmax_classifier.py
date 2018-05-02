@@ -31,7 +31,6 @@ from keras.layers.convolutional import ZeroPadding3D
 from keras.layers.merge import multiply
 from keras.layers.merge import add
 from keras.layers.merge import concatenate
-from keras.layers.merge import average
 from keras.layers.core import Permute
 from keras.layers.core import RepeatVector
 from keras.layers.core import Dense
@@ -59,7 +58,7 @@ from image_utils import random_shift
 from image_utils import random_zoom
 from image_utils import flip_axis
 from image_utils import random_brightness
-from config_sigc import *
+from config_softc import *
 from sys import stdout
 
 import tb_callback
@@ -116,73 +115,24 @@ def pretrained_c3d():
     c3d = process_prec3d()
     print (c3d.summary())
 
-    inputs = Input(shape=(16, 128, 112, 3))
-
+    inputs = Input(shape=(16, 128, 208, 3))
     resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
-
     c3d_out = c3d(resized)
 
-
-    model = Model(inputs=inputs, outputs=c3d_out)
+    dense = Dense(units=1024, activation='tanh', kernel_regularizer=regularizers.l2(0.01))(c3d_out)
+    x = BatchNormalization()(dense)
+    x = Dropout(0.5)(x)
+    x = Dense(units=1024, activation='tanh')(x)
+    x = BatchNormalization()(x)
+    x = Dropout(0.5)(x)
+    actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.01))(x)
+    # actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.001))(c3d_out)
+    model = Model(inputs=inputs, outputs=actions)
 
     # i=0
     # for layer in model.layers:
     #     print (layer, i)
     #     i = i+1
-    # exit(0)
-
-    return model
-
-
-def ensemble_c3d():
-    inputs = Input(shape=(16, 128, 208, 3))
-
-    def sliceA(x):
-        print (x.shape)
-        return x[:, :, :, 0:112, :]
-
-    def sliceB(x):
-        return x[:, :, :, 48:160, :]
-
-    def sliceC(x):
-        return x[:, :, :, 96:208, :]
-
-    A = Lambda(sliceA)(inputs)
-    B = Lambda(sliceB)(inputs)
-    C = Lambda(sliceC)(inputs)
-
-    c3d_A = pretrained_c3d()
-    c3d_B = pretrained_c3d()
-    c3d_C = pretrained_c3d()
-    c3d_A.compile(loss="binary_crossentropy",
-                optimizer=OPTIM_C)
-    c3d_B.compile(loss="binary_crossentropy",
-                  optimizer=OPTIM_C)
-    c3d_C.compile(loss="binary_crossentropy",
-                  optimizer=OPTIM_C)
-
-    A_out = c3d_A(A)
-    B_out = c3d_B(B)
-    C_out = c3d_C(C)
-
-    features = concatenate([A_out, B_out, C_out])
-    dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(features)
-    x = BatchNormalization()(dense)
-    x = Dropout(0.5)(x)
-    x = Dense(units=512, activation='relu')(x)
-    x = BatchNormalization()(x)
-    x = Dropout(0.5)(x)
-    actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
-    # actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.001))(c3d_out)
-
-    # actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
-
-    model = Model(inputs=inputs, outputs=actions)
-
-    i=0
-    for layer in model.layers:
-        print (layer, i)
-        i = i+1
     # exit(0)
 
     return model
@@ -295,6 +245,18 @@ def random_augmentation(video):
             video[i] = random_brightness(video[i], u)
             video[i] = (video[i].astype(np.float32) - 127.5) / 127.5
 
+    #Extend the video to three sequences of 112x112 crops
+    # extended_video = np.zeros(shape=(3, 16, 128, 112, 3), dtype=np.float32)
+    # for j in range(VIDEO_LENGTH):
+    #     extended_video[0, j] = video[j, :, 0:112, :]
+    # for j in range(VIDEO_LENGTH):
+    #     extended_video[1, j] = video[j, :, 48:160, :]
+    # for j in range(VIDEO_LENGTH):
+    #     extended_video[2, j] = video[j, :, 96:, :]
+
+    # print (extended_video.shape)
+    # print (video.shape)
+
     return video
 
 
@@ -380,7 +342,7 @@ def map_to_simple(ped_action):
         exit(0)
 
 
-def get_action_classes(action_labels, mode='softmax'):
+def get_action_classes(action_labels):
     # Load labels into per frame numerical indices from the action set
     print("Loading annotations.")
 
@@ -421,27 +383,47 @@ def get_action_classes(action_labels, mode='softmax'):
                 ped_action = simple_ped_set.index('no ped')
                 simple_ped_actions_per_frame.append(ped_action)
 
-        if mode=='softmax':
-            if 2 in simple_ped_actions_per_frame:
-                act = 2
-            if 0 in simple_ped_actions_per_frame:
-                act = 0
-            if 1 in simple_ped_actions_per_frame
-                act = 1
+            # ped_action = ped_actions.index(action)
+            # if ((ped_action == ped_actions.index('nod')) or
+            #     (ped_action == ped_actions.index('looking')) or
+            #     (ped_action == ped_actions.index('nod')) or
+            #     (ped_action == ped_actions.index('handwave'))):
+            #     continue
+            # else:
+            #     ped_action = map_to_simple(ped_action)
+            #     simple_ped_actions_per_frame.append(ped_action)
 
-            encoded_ped_action = to_categorical(act, len(simple_ped_set))
-            count[act] = count[act] + 1
+        # if 5 in simple_ped_action_per_frame:
+        #     action = 5
+        # if 6 in simple_ped_action_per_frame:
+        #     action = 6
+        # if 1 in simple_ped_action_per_frame:
+        #     action = 1
+        # if 4 in simple_ped_action_per_frame:
+        #     action = 4
 
-        elif mode=='sigmoid':
-            for action in simple_ped_actions_per_frame:
-                count[action] = count[action] + 1
-                # Add all unique categorical one-hot vectors
-                encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
+        if 2 in simple_ped_actions_per_frame:
+            act = 2
+        if 0 in simple_ped_actions_per_frame:
+            act = 0
+        if 1 in simple_ped_actions_per_frame:
+            act = 1
 
-        else:
-            print ("No mode selected to determine action labels. Exiting.")
-            exit(0)
+        encoded_ped_action = to_categorical(act, len(simple_ped_set))
+        count[act] = count[act] + 1
 
+        # for action in simple_ped_actions_per_frame:
+        #     count[action] = count[action] + 1
+        #     # Add all unique categorical one-hot vectors
+        #     encoded_ped_action = encoded_ped_action + to_categorical(action, len(simple_ped_set))
+
+        # if (sum(encoded_ped_action) == 0):
+        #     print (ped_actions_per_frame)
+        #     print (encoded_ped_action)
+
+        # if (sum(encoded_ped_action) > 1):
+        #     print (simple_ped_action_per_frame)
+        #     print (a_clean)
         ped_action_classes.append(encoded_ped_action.T)
 
     ped_action_classes = np.asarray(ped_action_classes)
@@ -602,6 +584,49 @@ def subsample_videos(videos_list, ped_action_labels):
     return videos_list
 
 
+def plot_confusion_matrix(cm, classes,
+                          normalize=False,
+                          title='Confusion matrix',
+                          cmap=plt.cm.Blues):
+    """
+    This function prints and plots the confusion matrix.
+    Normalization can be applied by setting `normalize=True`.
+    """
+    if normalize:
+        cm = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
+        print("Normalized confusion matrix")
+    else:
+        print('Confusion matrix, without normalization')
+
+    print(cm)
+
+    plt.imshow(cm, interpolation='nearest', cmap=cmap)
+    plt.title(title)
+    plt.colorbar()
+    tick_marks = np.arange(len(classes))
+    plt.xticks(tick_marks, classes, rotation=45)
+    plt.yticks(tick_marks, classes)
+
+    fmt = '.2f' if normalize else 'd'
+    thresh = cm.max() / 2.
+    for i, j in itertools.product(range(cm.shape[0]), range(cm.shape[1])):
+        plt.text(j, i, format(cm[i, j], fmt),
+                 horizontalalignment="center",
+                 color="white" if cm[i, j] > thresh else "black")
+
+    plt.tight_layout()
+    plt.ylabel('True label')
+    plt.xlabel('Predicted label')
+
+
+def get_confusion_matrix(y_true, y_pred):
+    cnf_matrix = confusion_matrix(y_true, np.round(y_pred), labels=simple_ped_set)
+    plt.figure()
+    plot_confusion_matrix(cnf_matrix, classes=simple_ped_set, normalize=True,
+                      title='Normalized confusion matrix')
+    plt.show()
+
+
 def get_sklearn_metrics(y_true, y_pred, avg=None):
     # y_true_labels = []
     # y_pred_labels = []
@@ -628,7 +653,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Load actions from annotations
     action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_208.hkl'))
-    ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels, mode='sigmoid')
+    ped_action_classes, ped_class_count = get_action_classes(action_labels=action_labels)
     print("Training Stats: " + str(ped_class_count))
 
     # videos_list = remove_zero_classes(videos_list, ped_action_classes)
@@ -647,34 +672,24 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     test_videos_list = get_video_lists(frames_source=test_frames_source, stride=4)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
-    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
+    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     test_videos_list = remove_zero_classes(test_videos_list, test_ped_action_classes)
     print("Test Stats: " + str(test_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
     # Build stacked classifier
-    # classifier = pretrained_c3d()
-    classifier = ensemble_c3d()
-    # classifier = c3d_scratch()
-    classifier.compile(loss="binary_crossentropy",
+    classifier = pretrained_c3d()
+    classifier.compile(loss="categorical_crossentropy",
                        optimizer=OPTIM_C,
                        # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
                        metrics=['accuracy'])
-
-    # Build attention layer output
-    intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[3].output)
-    mask_gen_1 = Sequential()
-    # mask_gen_1.add(encoder)
-    mask_gen_1.add(intermediate_classifier)
-    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_C)
 
     run_utilities(classifier, CLA_WEIGHTS)
 
     n_videos = videos_list.shape[0]
     n_test_videos = test_videos_list.shape[0]
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
-
     # NB_ITERATIONS = 5
     NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
     # NB_TEST_ITERATIONS = 5
@@ -716,16 +731,6 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 y_true_class = y[:, CLASS_TARGET_INDEX]
 
                 c_loss.append(classifier.train_on_batch(X_train, y_true_class))
-
-                slices = mask_gen_1.predict(X_train)
-                print(slices.shape)
-                print (slices)
-                slice_images = arrange_images(slices)
-                slice_images = slice_images * 127.5 + 127.5
-                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_slice_pred.png"), slice_images)
-                exit(0)
-
-
                 y_train_true.extend(y_true_class)
                 y_train_pred.extend(classifier.predict(X_train, verbose=0))
 
