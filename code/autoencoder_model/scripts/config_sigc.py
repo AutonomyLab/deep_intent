@@ -82,7 +82,7 @@ LOSS_WEIGHTS = [1, 1]
 A_TRAIN_RATIO = 1
 C_TRAIN_RATIO = 1
 RAM_DECIMATE = True
-RETRAIN_CLASSIFIER = False
+RETRAIN_CLASSIFIER = True
 CLASS_TARGET_INDEX = 8
 ROT_MAX = 5
 SFT_H_MAX = 0.02
@@ -90,18 +90,20 @@ SFT_V_MAX = 0.02
 ZOOM_MAX = 0.2
 BRIGHT_RANGE_L = 0.5
 BRIGHT_RANGE_H = 1.5
+KL_COEFF = 0
+ATTN_COEFF = 10
 
 ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
                'clear path', 'handwave', 'crossing', 'looking', 'no ped']
 
-simple_ped_set = ['standing', 'crossing', 'no ped']
+simple_ped_set = ['crossing']
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 10
+BATCH_SIZE = 15
 NB_EPOCHS_CLASS = 30
 
 OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
@@ -125,9 +127,9 @@ lr_schedule = [7, 15, 22]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx + 1) < lr_schedule[0]:
-        return 0.00001
+        return 0.000001
     elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.000001  # lr_decay_ratio = 10
+        return 0.0000001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < lr_schedule[2]:
         return 0.0000001
-    return 0.0000001
+    return 0.000001

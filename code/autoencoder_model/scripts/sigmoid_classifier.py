@@ -58,6 +58,7 @@ from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import random_zoom
 from image_utils import flip_axis
+from custom_layers import AttnLossLayer
 from image_utils import random_brightness
 from config_sigc import *
 from sys import stdout
@@ -89,6 +90,7 @@ def process_prec3d():
     # for layer in model.layers:
     #     print(layer, i)
     #     i = i + 1
+
     model.layers.pop()
     model.outputs = [model.layers[-1].output]
     model.layers[-1].outbound_nodes = []
@@ -114,22 +116,59 @@ def process_prec3d():
 
 def pretrained_c3d():
     c3d = process_prec3d()
-    print (c3d.summary())
-
-    inputs = Input(shape=(16, 128, 112, 3))
-
+    inputs = Input(shape=(16, 128, 208, 3))
     resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
 
+    # conv_1a = ConvLSTM2D(filters=16,
+    #                  strides=(1, 1, 1),
+    #                  dilation_rate=(2, 1, 1),
+    #                  kernel_size=(2, 11, 11),
+    #                  padding='same')(resized)
+    # x = TimeDistributed(BatchNormalization())(conv_1a)
+    # x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    # out_1a = TimeDistributed(Dropout(0.5))(x)
+    #
+    # conv_1b = ConvLSTM2D(filters=16,
+    #                  strides=(1, 1, 1),
+    #                  dilation_rate=(4, 1, 1),
+    #                  kernel_size=(2, 5, 5),
+    #                  padding='same')(out_1a)
+    # x = TimeDistributed(BatchNormalization())(conv_1b)
+    # x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    # out_1b = TimeDistributed(Dropout(0.5))(x)
+    #
+    # res_1 = add([out_1a, out_1b])
+    #
+    # conv_2 = ConvLSTM2D(filters=1,
+    #                  strides=(1, 1, 1),
+    #                  dilation_rate=(2, 1, 1),
+    #                  kernel_size=(2, 3, 3),
+    #                  padding='same')(res_1)
+    # x = TimeDistributed(BatchNormalization())(conv_2)
+    # a = TimeDistributed(Activation(activation='softmax'))(x)
+    # a = AttnLossLayer()(a)
+    #
+    # scaled = multiply([resized, a])
+    # c3d_out = c3d(scaled)
     c3d_out = c3d(resized)
-
+    # dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(c3d_out)
+    # x = BatchNormalization()(dense)
+    # x = Dropout(0.5)(x)
+    # x = Dense(units=512, activation='tanh')(x)
+    # x = BatchNormalization()(x)
+    # x = Dropout(0.5)(x)
+    # actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
+    #
+    # model = Model(inputs=inputs, outputs=actions)
 
     model = Model(inputs=inputs, outputs=c3d_out)
 
-    # i=0
+    # i = 0
     # for layer in model.layers:
-    #     print (layer, i)
-    #     i = i+1
-    # exit(0)
+    #     print(layer, i)
+    #     i = i + 1
+
+    print (c3d.summary())
 
     return model
 
@@ -138,34 +177,33 @@ def ensemble_c3d():
     inputs = Input(shape=(16, 128, 208, 3))
 
     def sliceA(x):
-        print (x.shape)
         return x[:, :, :, 0:112, :]
 
-    def sliceB(x):
-        return x[:, :, :, 48:160, :]
+    # def sliceB(x):
+    #     return x[:, :, :, 48:160, :]
 
     def sliceC(x):
         return x[:, :, :, 96:208, :]
 
     A = Lambda(sliceA)(inputs)
-    B = Lambda(sliceB)(inputs)
+    # B = Lambda(sliceB)(inputs)
     C = Lambda(sliceC)(inputs)
 
     c3d_A = pretrained_c3d()
-    c3d_B = pretrained_c3d()
+    # c3d_B = pretrained_c3d()
     c3d_C = pretrained_c3d()
     c3d_A.compile(loss="binary_crossentropy",
                 optimizer=OPTIM_C)
-    c3d_B.compile(loss="binary_crossentropy",
-                  optimizer=OPTIM_C)
+    # c3d_B.compile(loss="binary_crossentropy",
+    #               optimizer=OPTIM_C)
     c3d_C.compile(loss="binary_crossentropy",
                   optimizer=OPTIM_C)
 
     A_out = c3d_A(A)
-    B_out = c3d_B(B)
+    # B_out = c3d_B(B)
     C_out = c3d_C(C)
 
-    features = concatenate([A_out, B_out, C_out])
+    features = concatenate([A_out, C_out])
     dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(features)
     x = BatchNormalization()(dense)
     x = Dropout(0.5)(x)
@@ -173,16 +211,13 @@ def ensemble_c3d():
     x = BatchNormalization()(x)
     x = Dropout(0.5)(x)
     actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
-    # actions = Dense(units=len(simple_ped_set), activation='softmax', kernel_regularizer=regularizers.l2(0.001))(c3d_out)
-
-    # actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
 
     model = Model(inputs=inputs, outputs=actions)
 
-    i=0
-    for layer in model.layers:
-        print (layer, i)
-        i = i+1
+    # i=0
+    # for layer in model.layers:
+    #     print (layer, i)
+    #     i = i+1
     # exit(0)
 
     return model
@@ -275,13 +310,6 @@ def random_augmentation(video):
                                     col_axis=1, channel_axis=2, fill_mode="nearest")
             video[i] = (video[i].astype(np.float32) - 127.5) / 127.5
 
-    # elif k == 3:
-    #     # Random zoom
-    #     z = np.random.uniform(0, ZOOM_MAX, 1)
-    #     for i in range(VIDEO_LENGTH):
-    #         video[i] = random_zoom(video[i], ((i * z) / VIDEO_LENGTH), ((i * z) / VIDEO_LENGTH),
-    #                                    row_axis=0, col_axis=1, channel_axis=2, fill_mode="nearest")
-
     elif k == 3:
         # Horizontal Flip
         for i in range(VIDEO_LENGTH):
@@ -303,20 +331,11 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         X = []
         y = []
         for i in range(BATCH_SIZE):
-            # start_index = videos_list[(index*BATCH_SIZE + i), 0]
-            # end_index = videos_list[(index*BATCH_SIZE + i), -1]
-            # X.append(frames[start_index:end_index+1])
             video = np.take(frames, videos_list[(index*BATCH_SIZE + i)], axis=0)
             video = random_augmentation(video)
             X.append(video)
-            # for j in range (video.shape[0]):
-            #     X.append(video[i])
             if (len(ped_action_cats) != 0):
-                # y.append(ped_action_cats[start_index:end_index+1])
                 y.append(np.take(ped_action_cats, videos_list[(index * BATCH_SIZE + i)], axis=0))
-                # for j in range(video.shape[0]):
-                #     y.append(np.take(ped_action_cats, videos_list[(index*BATCH_SIZE + i)], axis=0))
-
 
         X = np.asarray(X)
         y = np.asarray(y)
@@ -337,7 +356,6 @@ def load_X_y(videos_list, index, data_dir, ped_action_cats):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)
@@ -411,22 +429,22 @@ def get_action_classes(action_labels, mode='softmax'):
                 print ("Unknown action in labels. Exiting.")
                 print (action)
                 exit(0)
-            if action.lower() == 'standing':
-                ped_action = simple_ped_set.index('standing')
-                simple_ped_actions_per_frame.append(ped_action)
             if action.lower() == 'crossing':
                 ped_action = simple_ped_set.index('crossing')
                 simple_ped_actions_per_frame.append(ped_action)
-            if action.lower() == 'no ped':
-                ped_action = simple_ped_set.index('no ped')
-                simple_ped_actions_per_frame.append(ped_action)
+            # if action.lower() == 'standing':
+            #     ped_action = simple_ped_set.index('standing')
+            #     simple_ped_actions_per_frame.append(ped_action)
+            # if action.lower() == 'no ped':
+            #     ped_action = simple_ped_set.index('no ped')
+            #     simple_ped_actions_per_frame.append(ped_action)
 
         if mode=='softmax':
             if 2 in simple_ped_actions_per_frame:
                 act = 2
             if 0 in simple_ped_actions_per_frame:
                 act = 0
-            if 1 in simple_ped_actions_per_frame
+            if 1 in simple_ped_actions_per_frame:
                 act = 1
 
             encoded_ped_action = to_categorical(act, len(simple_ped_set))
@@ -471,9 +489,7 @@ def load_to_RAM(frames_source):
         im_file = os.path.join(DATA_DIR, filename)
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
             frames[i] = frame.astype(np.float32)
-            # frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
             j = j + 1
         except AttributeError as e:
             print(im_file)
@@ -603,13 +619,6 @@ def subsample_videos(videos_list, ped_action_labels):
 
 
 def get_sklearn_metrics(y_true, y_pred, avg=None):
-    # y_true_labels = []
-    # y_pred_labels = []
-    # for i in range(y_true.shape[0]):
-    #     y_true_labels.append(np.argmax(y_true[i]))
-    #     y_pred_labels.append(np.argmax(y_pred[i]))
-
-    # return precision_recall_fscore_support(y_true_labels, y_pred_labels, average=avg)
     return precision_recall_fscore_support(y_true, np.round(y_pred), average=avg)
 
 
@@ -621,10 +630,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Loading data definitions.")
 
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_208.hkl'))
-    videos_list_1 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=0)
-    videos_list_2 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=1)
+    videos_list = get_video_lists(frames_source=frames_source, stride=1, frame_skip=0)
+    # videos_list_2 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=1)
     # videos_list_3 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=2)
-    videos_list = np.concatenate((videos_list_1, videos_list_2), axis=0)
+    # videos_list = np.concatenate((videos_list_1, videos_list_2), axis=0)
 
     # Load actions from annotations
     action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_208.hkl'))
@@ -632,15 +641,15 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Training Stats: " + str(ped_class_count))
 
     # videos_list = remove_zero_classes(videos_list, ped_action_classes)
-    classwise_videos_list, count = get_classwise_data(videos_list, ped_action_classes)
-    videos_list = prob_subsample(classwise_videos_list, count)
+    # classwise_videos_list, count = get_classwise_data(videos_list, ped_action_classes)
+    # videos_list = prob_subsample(classwise_videos_list, count)
 
     if RAM_DECIMATE:
         frames = load_to_RAM(frames_source=frames_source)
 
-    # if SHUFFLE:
-    #     # Shuffle images to aid generalization
-    #     videos_list = np.random.permutation(videos_list)
+    if SHUFFLE:
+        # Shuffle images to aid generalization
+        videos_list = np.random.permutation(videos_list)
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
@@ -648,7 +657,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
-    test_videos_list = remove_zero_classes(test_videos_list, test_ped_action_classes)
+    # test_videos_list = remove_zero_classes(test_videos_list, test_ped_action_classes)
     print("Test Stats: " + str(test_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
@@ -663,18 +672,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                        metrics=['accuracy'])
 
     # Build attention layer output
-    intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[3].output)
+    intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[1].output)
     mask_gen_1 = Sequential()
     # mask_gen_1.add(encoder)
     mask_gen_1.add(intermediate_classifier)
-    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_C)
+    mask_gen_1.compile(loss='binary_crossentropy', optimizer=OPTIM_C)
 
     run_utilities(classifier, CLA_WEIGHTS)
 
     n_videos = videos_list.shape[0]
     n_test_videos = test_videos_list.shape[0]
-    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
 
+    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 5
     NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
     # NB_TEST_ITERATIONS = 5
@@ -706,25 +715,16 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             for index in range(NB_ITERATIONS):
                 # Train Autoencoder
                 if RAM_DECIMATE:
-                    videos_list = prob_subsample(classwise_videos_list, count)
+                    # videos_list = prob_subsample(classwise_videos_list, count)
                     X, y = load_X_y_RAM(videos_list, index, frames, ped_action_classes)
                 else:
-                    videos_list = prob_subsample(classwise_videos_list, count)
+                    # videos_list = prob_subsample(classwise_videos_list, count)
                     X, y = load_X_y(videos_list, index, DATA_DIR, ped_action_classes)
 
                 X_train = X
                 y_true_class = y[:, CLASS_TARGET_INDEX]
 
                 c_loss.append(classifier.train_on_batch(X_train, y_true_class))
-
-                slices = mask_gen_1.predict(X_train)
-                print(slices.shape)
-                print (slices)
-                slice_images = arrange_images(slices)
-                slice_images = slice_images * 127.5 + 127.5
-                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_slice_pred.png"), slice_images)
-                exit(0)
-
 
                 y_train_true.extend(y_true_class)
                 y_train_pred.extend(classifier.predict(X_train, verbose=0))
@@ -775,6 +775,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_pred.png"), pred_seq)
 
+                slices = mask_gen_1.predict(X_train)
+                slice_images = arrange_images(slices)
+                slice_images = slice_images * 127.5 + 127.5
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_slice_pred.png"), slice_images)
+
             # Run over test data
             print('')
             y_test_pred = []
@@ -808,6 +813,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     for j in range(int(VIDEO_LENGTH)):
                         class_num_past = np.argmax(y_orig_classes[k, j])
                         class_num_y = np.argmax(test_ped_pred_class[k])
+
                         # label_true = simple_ped_set[class_num_past]
                         # label_pred = simple_ped_set[class_num_y]
                         label_true = str(y_orig_classes[k, j])
@@ -842,15 +848,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             train_prec, train_rec, train_fbeta, train_support = get_sklearn_metrics(np.asarray(y_train_true),
                                                                                     np.asarray(y_train_pred),
-                                                                                    avg=None)
+                                                                                    avg='micro')
             test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
                                                                                 np.asarray(y_test_pred),
-                                                                                avg=None)
+                                                                                avg='micro')
 
-            loss_values = np.asarray(avg_c_loss.tolist() + train_prec.tolist() +
-                                     train_rec.tolist() +
-                                     avg_test_c_loss.tolist() + test_prec.tolist() +
-                                     test_rec.tolist(), dtype=np.float32)
+            loss_values = np.asarray(avg_c_loss.tolist() + [train_prec.tolist()] +
+                                     [train_rec.tolist()] +
+                                     avg_test_c_loss.tolist() + [test_prec.tolist()] +
+                                     [test_rec.tolist()], dtype=np.float32)
+            # loss_values = np.asarray(avg_c_loss.tolist() + train_prec.tolist() +
+            #                          train_rec.tolist() +
+            #                          avg_test_c_loss.tolist() + test_prec.tolist() +
+            #                          test_rec.tolist(), dtype=np.float32)
             precs = ['prec_' + action for action in simple_ped_set]
             recs = ['rec_' + action for action in simple_ped_set]
             fbeta = ['fbeta_' + action for action in simple_ped_set]

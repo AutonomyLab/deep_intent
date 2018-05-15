@@ -5,7 +5,7 @@ from __future__ import print_function
 from keras.layers import Layer
 from keras import backend as K
 K.set_image_dim_ordering('tf')
-from config_aa import KL_COEFF, ATTN_COEFF
+from config_sigc import KL_COEFF, ATTN_COEFF
 
 # Custom loss layer
 class AttnLossLayer(Layer):
