@@ -83,9 +83,6 @@ def process_prec3d():
     for layer in model.layers[:13]:
         layer.trainable = RETRAIN_CLASSIFIER
 
-    # for layer in model.layers[:17]:
-    #     layer.trainable = RETRAIN_CLASSIFIER
-
     # i = 0
     # for layer in model.layers:
     #     print(layer, i)
@@ -116,51 +113,9 @@ def process_prec3d():
 
 def pretrained_c3d():
     c3d = process_prec3d()
-    inputs = Input(shape=(16, 128, 208, 3))
+    inputs = Input(shape=(16, 128, 112, 3))
     resized = TimeDistributed(Lambda(lambda image: tf.image.resize_images(image, (112, 112))))(inputs)
-
-    # conv_1a = ConvLSTM2D(filters=16,
-    #                  strides=(1, 1, 1),
-    #                  dilation_rate=(2, 1, 1),
-    #                  kernel_size=(2, 11, 11),
-    #                  padding='same')(resized)
-    # x = TimeDistributed(BatchNormalization())(conv_1a)
-    # x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    # out_1a = TimeDistributed(Dropout(0.5))(x)
-    #
-    # conv_1b = ConvLSTM2D(filters=16,
-    #                  strides=(1, 1, 1),
-    #                  dilation_rate=(4, 1, 1),
-    #                  kernel_size=(2, 5, 5),
-    #                  padding='same')(out_1a)
-    # x = TimeDistributed(BatchNormalization())(conv_1b)
-    # x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    # out_1b = TimeDistributed(Dropout(0.5))(x)
-    #
-    # res_1 = add([out_1a, out_1b])
-    #
-    # conv_2 = ConvLSTM2D(filters=1,
-    #                  strides=(1, 1, 1),
-    #                  dilation_rate=(2, 1, 1),
-    #                  kernel_size=(2, 3, 3),
-    #                  padding='same')(res_1)
-    # x = TimeDistributed(BatchNormalization())(conv_2)
-    # a = TimeDistributed(Activation(activation='softmax'))(x)
-    # a = AttnLossLayer()(a)
-    #
-    # scaled = multiply([resized, a])
-    # c3d_out = c3d(scaled)
     c3d_out = c3d(resized)
-    # dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(c3d_out)
-    # x = BatchNormalization()(dense)
-    # x = Dropout(0.5)(x)
-    # x = Dense(units=512, activation='tanh')(x)
-    # x = BatchNormalization()(x)
-    # x = Dropout(0.5)(x)
-    # actions = Dense(units=len(simple_ped_set), activation='sigmoid', kernel_regularizer=regularizers.l2(0.01))(x)
-    #
-    # model = Model(inputs=inputs, outputs=actions)
-
     model = Model(inputs=inputs, outputs=c3d_out)
 
     # i = 0
@@ -179,31 +134,23 @@ def ensemble_c3d():
     def sliceA(x):
         return x[:, :, :, 0:112, :]
 
-    # def sliceB(x):
-    #     return x[:, :, :, 48:160, :]
-
-    def sliceC(x):
+    def sliceB(x):
         return x[:, :, :, 96:208, :]
 
     A = Lambda(sliceA)(inputs)
-    # B = Lambda(sliceB)(inputs)
-    C = Lambda(sliceC)(inputs)
+    B = Lambda(sliceB)(inputs)
 
     c3d_A = pretrained_c3d()
-    # c3d_B = pretrained_c3d()
-    c3d_C = pretrained_c3d()
+    c3d_B = pretrained_c3d()
     c3d_A.compile(loss="binary_crossentropy",
                 optimizer=OPTIM_C)
-    # c3d_B.compile(loss="binary_crossentropy",
-    #               optimizer=OPTIM_C)
-    c3d_C.compile(loss="binary_crossentropy",
+    c3d_B.compile(loss="binary_crossentropy",
                   optimizer=OPTIM_C)
 
     A_out = c3d_A(A)
-    # B_out = c3d_B(B)
-    C_out = c3d_C(C)
+    B_out = c3d_B(B)
 
-    features = concatenate([A_out, C_out])
+    features = concatenate([A_out, B_out])
     dense = Dense(units=1024, activation='relu', kernel_regularizer=regularizers.l2(0.01))(features)
     x = BatchNormalization()(dense)
     x = Dropout(0.5)(x)
@@ -345,6 +292,24 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         exit(0)
 
 
+def load_to_RAM(frames_source):
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
+
+    j = 1
+    for i in range(1, len(frames_source)):
+        filename = "frame_" + str(j) + ".png"
+        im_file = os.path.join(DATA_DIR, filename)
+        try:
+            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
+            frames[i] = frame.astype(np.float32)
+            j = j + 1
+        except AttributeError as e:
+            print(im_file)
+            print(e)
+
+    return frames
+
+
 def load_X_y(videos_list, index, data_dir, ped_action_cats):
     X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
     y = []
@@ -423,6 +388,7 @@ def get_action_classes(action_labels, mode='softmax'):
         ped_actions_per_frame = list(set([a.lower() for a in a_clean]))
         simple_ped_actions_per_frame = []
         encoded_ped_action = np.zeros(shape=(len(simple_ped_set)), dtype=np.float32)
+
         for action in ped_actions_per_frame:
             # Get ped action number and map it to simple set
             if action.lower() not in ped_actions:
@@ -432,7 +398,7 @@ def get_action_classes(action_labels, mode='softmax'):
             if action.lower() == 'crossing':
                 ped_action = simple_ped_set.index('crossing')
                 simple_ped_actions_per_frame.append(ped_action)
-            # if action.lower() == 'standing':
+            # if action.lower() == 'standing':s
             #     ped_action = simple_ped_set.index('standing')
             #     simple_ped_actions_per_frame.append(ped_action)
             # if action.lower() == 'no ped':
@@ -478,24 +444,6 @@ def remove_zero_classes(videos_list, simple_ped_actions_per_frame):
         videos_list = np.delete(videos_list, i, axis=0)
 
     return videos_list
-
-
-def load_to_RAM(frames_source):
-    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
-
-    j = 1
-    for i in range(1, len(frames_source)):
-        filename = "frame_" + str(j) + ".png"
-        im_file = os.path.join(DATA_DIR, filename)
-        try:
-            frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            frames[i] = frame.astype(np.float32)
-            j = j + 1
-        except AttributeError as e:
-            print(im_file)
-            print(e)
-
-    return frames
 
 
 def get_video_lists(frames_source, stride, frame_skip=0):
@@ -630,10 +578,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Loading data definitions.")
 
     frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_208.hkl'))
-    videos_list = get_video_lists(frames_source=frames_source, stride=1, frame_skip=0)
-    # videos_list_2 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=1)
-    # videos_list_3 = get_video_lists(frames_source=frames_source, stride=1, frame_skip=2)
-    # videos_list = np.concatenate((videos_list_1, videos_list_2), axis=0)
+    videos_list_1 = get_video_lists(frames_source=frames_source, stride=8, frame_skip=0)
+    videos_list_2 = get_video_lists(frames_source=frames_source, stride=8, frame_skip=1)
+    videos_list = np.concatenate((videos_list_1, videos_list_2), axis=0)
 
     # Load actions from annotations
     action_labels = hkl.load(os.path.join(DATA_DIR, 'annotations_train_208.hkl'))
@@ -653,7 +600,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=4)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8, frame_skip=0)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
@@ -669,7 +616,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     classifier.compile(loss="binary_crossentropy",
                        optimizer=OPTIM_C,
                        # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
-                       metrics=['accuracy'])
+                       metrics=['acc'])
 
     # Build attention layer output
     intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[1].output)

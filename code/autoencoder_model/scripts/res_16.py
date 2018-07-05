@@ -14,40 +14,22 @@ from keras.layers import Dropout
 from keras.models import Sequential
 from keras.layers.core import Activation
 from keras.utils.vis_utils import plot_model
-from keras.initializers import RandomNormal
 from keras.layers.wrappers import TimeDistributed
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import Conv2DTranspose
 from keras.layers.convolutional import Conv3D
-from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional import UpSampling3D
 from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.pooling import MaxPooling3D
-from keras.layers.merge import multiply
 from keras.layers.merge import add
-from keras.layers.merge import concatenate
-from keras.layers.core import Permute
-from keras.layers.core import RepeatVector
-from keras.layers.core import Dense
-from keras.layers.core import Lambda
-from keras.layers.core import Reshape
-from keras.layers.core import Flatten
-from keras.layers.recurrent import LSTM
-from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from keras.layers import Input
 from keras.models import Model
-from custom_layers import AttnLossLayer
-from experience_memory import ExperienceMemory
 from config_r16 import *
 from sys import stdout
 
 import tb_callback
 import lrs_callback
 import argparse
-import math
 import cv2
 import os
 
@@ -242,10 +224,8 @@ def arrange_images(video_stack):
 
     img_height = video_stack.shape[2]
     img_width = video_stack.shape[3]
-    # width = img_size x video_length
     width = img_width * video_stack.shape[1]
-    # height = img_size x batch_size
-    height = img_height * BATCH_SIZE
+    height = img_height * video_stack.shape[0]
     shape = frames.shape[1:]
     image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
     frame_number = 0
@@ -365,14 +345,14 @@ def get_video_lists(frames_source, stride):
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     print ("Loading data definitions...")
-    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_train_208.hkl'))
-    videos_list = get_video_lists(frames_source=frames_source, stride=4)
+    frames_source = hkl.load(os.path.join(DATA_DIR, 'sources_val_208.hkl'))
+    videos_list = get_video_lists(frames_source=frames_source, stride=8)
     n_videos = videos_list.shape[0]
 
     # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(int(VIDEO_LENGTH/2)))
-    n_test_videos = test_videos_list.shape[0]
+    val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_208.hkl'))
+    val_videos_list = get_video_lists(frames_source=val_frames_source, stride=(int(VIDEO_LENGTH/2)))
+    n_val_videos = val_videos_list.shape[0]
 
     if RAM_DECIMATE:
         frames = load_to_RAM(frames_source=frames_source)
@@ -388,20 +368,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
-
-    # Build attention layer output
-    # intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
-    # mask_gen_1 = Sequential()
-    # mask_gen_1.add(encoder)
-    # mask_gen_1.add(intermediate_decoder)
-    # mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 5
-    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    NB_VAL_ITERATIONS = int(n_val_videos / BATCH_SIZE)
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -410,10 +383,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     print ("Beginning Training...")
     # Begin Training
-    for epoch in range(NB_EPOCHS_AUTOENCODER):
+    for epoch in range(1, NB_EPOCHS_AUTOENCODER):
+        if epoch == 21:
+            autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_B)
+
         print("\n\nEpoch ", epoch)
         loss = []
-        test_loss = []
+        val_loss = []
 
         # Set learning rate every epoch
         LRS.on_epoch_begin(epoch=epoch)
@@ -446,47 +422,46 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
             truth_seq = truth_seq * 127.5 + 127.5
             pred_seq = pred_seq * 127.5 + 127.5
 
-            if epoch == 0:
+            if epoch == 1:
                 cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_pred.png"), pred_seq)
 
         # Run over test data
         print ('')
-        for index in range(NB_TEST_ITERATIONS):
-            X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE)
-            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
-            y_test = X[:, int(VIDEO_LENGTH / 2):]
-            test_loss.append(autoencoder.test_on_batch(X_test, y_test))
+        for index in range(NB_VAL_ITERATIONS):
+            X = load_X(val_videos_list, index, VAL_DATA_DIR, IMG_SIZE)
+            X_val = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            y_val = X[:, int(VIDEO_LENGTH / 2):]
+            val_loss.append(autoencoder.test_on_batch(X_val, y_val))
 
-            arrow = int(index / (NB_TEST_ITERATIONS / 40))
-            stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                         "test_loss: " + str(test_loss[len(test_loss) - 1]) +
+            arrow = int(index / (NB_VAL_ITERATIONS / 40))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
+                         "test_loss: " + str(val_loss[len(val_loss) - 1]) +
                          "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
         # then after each epoch/iteration
         avg_loss = sum(loss)/len(loss)
-        avg_test_loss = sum(test_loss) / len(test_loss)
-        logs = {'loss': avg_loss, 'test_loss': avg_test_loss}
+        avg_val_loss = sum(val_loss) / len(val_loss)
+        logs = {'loss': avg_loss, 'test_loss': avg_val_loss}
         TC.on_epoch_end(epoch, logs)
 
         # Log the losses
-        with open(os.path.join(LOG_DIR, 'losses.json'), 'a') as log_file:
-            log_file.write("{\"epoch\":%d, \"loss\":%f, \"test_loss\":%f};\n" % (epoch, avg_loss, avg_test_loss))
+        with open(os.path.join(LOG_DIR, 'losses_gen.json'), 'a') as log_file:
+            log_file.write("{\"epoch\":%d, \"train_loss\":%f, \"val_loss\":%f}\n" % (epoch, avg_loss, avg_val_loss))
 
-            print("\nAvg loss: " + str(avg_loss) + " Avg test loss: " + str(avg_test_loss))
+            print("\nAvg train loss: " + str(avg_loss) + " Avg val loss: " + str(avg_val_loss))
 
         # Save model weights per epoch to file
-        encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
-        decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        if epoch>15 and epoch<21:
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        if epoch>25:
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
-        # Save predicted attention mask per epoch
-        # predicted_attn = mask_gen_1.predict(X_train, verbose=0)
-        # a_pred = np.reshape(predicted_attn, newshape=(BATCH_SIZE, int(VIDEO_LENGTH/2), 16, 16, 1))
-        # np.save(os.path.join(ATTN_WEIGHTS_DIR, 'attention_weights_gen1_' + str(epoch) + '.npy'), a_pred)
-
-    # End TensorBoard Callback
-    # TC.on_train_end('_')
+    #test(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'),
+    #     os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'))
 
 
 def test(ENC_WEIGHTS, DEC_WEIGHTS):
@@ -496,18 +471,21 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     test_videos_list = get_video_lists(frames_source=test_frames_source, stride=(int(VIDEO_LENGTH / 2)))
     n_test_videos = test_videos_list.shape[0]
 
-    print("Creating models...")
-    encoder = encoder_model()
-    print(encoder.summary())
-
     if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
         os.mkdir(TEST_RESULTS_DIR + '/truth/')
     if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
         os.mkdir(TEST_RESULTS_DIR + '/pred/')
+    if not os.path.exists(TEST_RESULTS_DIR + '/graphs/'):
+        os.mkdir(TEST_RESULTS_DIR + '/graphs/')
+    if not os.path.exists(TEST_RESULTS_DIR + '/gifs/'):
+        os.mkdir(TEST_RESULTS_DIR + '/gifs/')
 
+    print("Creating models...")
+    encoder = encoder_model()
+    print(encoder.summary())
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_B)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
@@ -540,6 +518,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)
+    np.save(TEST_RESULTS_DIR + 'test_loss.npy', np.asarray(test_loss))
     print("\nAvg loss: " + str(avg_test_loss))
     print("\n Std: " + str(np.std(np.asarray(test_loss))))
     print("\n Variance: " + str(np.var(np.asarray(test_loss))))
@@ -548,8 +527,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print("\n Min: " + str(np.min(np.asarray(test_loss))))
 
 
-def combine_images_test(X, y, generated_images):
-    return arrange_images(X), arrange_images(y), arrange_images(generated_images)
+def err_variation()
+    K.abs(y_pred - y_true)
 
 
 def load_X_test(index, data_dir, img_size):

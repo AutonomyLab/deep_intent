@@ -24,39 +24,38 @@ elif hostname == 'bender':
 else:
     path_var = 'zhora/'
 
-DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/train/'
-# DATA_DIR= '/local_home/data/KITTI_data/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/train/'
 
-VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/val/'
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 # TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
-MODEL_DIR = './../' + path_var + 'models'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/DRRK16/'
+
+# MODEL_DIR = './../' + path_var + 'models'
+MODEL_DIR = RESULTS_DIR + 'models/'
 if not os.path.exists(MODEL_DIR):
     os.mkdir(MODEL_DIR)
 
-CHECKPOINT_DIR = './../' + path_var + 'checkpoints'
+# CHECKPOINT_DIR = './../' + path_var + 'checkpoints'
+CHECKPOINT_DIR = RESULTS_DIR + 'checkpoints/'
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
 
-ATTN_WEIGHTS_DIR = './../' + path_var + 'attn_weights'
-if not os.path.exists(ATTN_WEIGHTS_DIR):
-    os.mkdir(ATTN_WEIGHTS_DIR)
-
-GEN_IMAGES_DIR = './../' + path_var + 'generated_images'
+GEN_IMAGES_DIR = RESULTS_DIR + 'generated_images/'
 if not os.path.exists(GEN_IMAGES_DIR):
     os.mkdir(GEN_IMAGES_DIR)
 
-LOG_DIR = './../' + path_var + 'logs'
+LOG_DIR = RESULTS_DIR + 'logs/'
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
-TF_LOG_DIR = './../' + path_var + 'tf_logs'
+TF_LOG_DIR = RESULTS_DIR + 'tf_logs/'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
-TEST_RESULTS_DIR = './../' + path_var + 'test_results'
+TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/'
 if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
 
@@ -67,9 +66,7 @@ SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
 IMG_SIZE = (128, 208, 3)
-ATTN_COEFF = 0
-KL_COEFF = 0
-RAM_DECIMATE = False
+RAM_DECIMATE = True
 REVERSE = True
 
 # -------------------------------------------------
@@ -80,36 +77,21 @@ print ("Config file: " + str(__name__))
 BATCH_SIZE = 9
 NB_EPOCHS_AUTOENCODER = 30
 
-OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
+# OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_A = rmsprop(lr=0.0001, rho=0.9)
+OPTIM_B = rmsprop(lr=0.00001, rho=0.9)
 # OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
-# OPTIM_A = rmsprop(lr=0.00001)
 
-lr_schedule = [10, 15, 30]  # epoch_step
+lr_schedule = [15, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
-    if (epoch_idx + 1) < lr_schedule[0]:
+    if (epoch_idx) <= lr_schedule[0]:
         return 0.0001
-    elif (epoch_idx + 1) < lr_schedule[1]:
-        return 0.0001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < lr_schedule[2]:
+    elif (epoch_idx) <= lr_schedule[1]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx) <= lr_schedule[2]:
         return 0.00001
-    return 0.0001
+    return 0.00001
 
- # aclstm_1 = ConvLSTM2D(filters=1,
-    #                       kernel_size=(3, 3),
-    #                       strides=(1, 1),
-    #                       padding='same',
-    #                       return_sequences=True,
-    #                       recurrent_dropout=0.2)(h_4)
-    # x = TimeDistributed(BatchNormalization())(aclstm_1)
-    #
-    # flat_1 = TimeDistributed(Flatten())(x)
-    # dense_1 = TimeDistributed(Dense(units=128 * 208, activation='softmax'))(flat_1)
-    # x = TimeDistributed(BatchNormalization())(dense_1)
-    # x = TimeDistributed(Dropout(0.2))(x)
-    # print (x.shape)
-    # a1_reshape = Reshape(target_shape=(int(VIDEO_LENGTH/2), 128, 208, 1))(x)
-    # a1 = AttnLossLayer()(a1_reshape)
-    # dot_1 = multiply([out_4, a1])
 
 

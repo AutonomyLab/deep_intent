@@ -5,6 +5,7 @@ from __future__ import print_function
 from keras.optimizers import SGD
 from keras.optimizers import Adam
 from keras import backend as K
+from keras.optimizers import RMSprop
 K.set_image_dim_ordering('tf')
 import socket
 import os
@@ -21,12 +22,12 @@ elif hostname == 'bender':
 else:
     path_var = 'zhora/'
 
-DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/train/'
+DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/train/'
 # DATA_DIR= '/local_home/data/KITTI_data/'
 
-TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/test/'
+TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/test/'
 
-VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_128/val/'
+VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_sorted/val/'
 
 PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
 PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
@@ -73,50 +74,43 @@ PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
-IMG_SIZE = (128, 128, 3)
+IMG_SIZE = (128, 208, 3)
 VIS_ATTN = True
 ATTN_COEFF = 0
 # KL coeff damages learning
 KL_COEFF = 0
 CLASSIFIER = True
 RAM_DECIMATE = True
-RETRAIN_CLASSIFIER = True
+RETRAIN_CLASSIFIER = False
 CLASS_TARGET_INDEX = 24
+ROT_MAX = 5
+SFT_H_MAX = 0.02
+SFT_V_MAX = 0.02
+ZOOM_MAX = 0.2
+BRIGHT_RANGE_L = 0.5
+BRIGHT_RANGE_H = 1.5
+FILTER_SIZE = 3
+RANDOM_AUGMENTATION = False
+RETRAIN_GENERATOR = True
 
-ped_actions = ['slow down', 'moving slow', 'standing', 'stopped',
-               'speed up', 'moving fast', 'look', 'looking',  'clear path',
-               'crossing', 'nod', 'handwave', 'unknown']
+ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
+               'clear path', 'handwave', 'crossing', 'looking', 'no ped']
 
-simple_ped_set = ['crossing', 'stopped', 'looking', 'clear path', 'unknown']
-
-driver_actions = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast']
-simple_driver_set = ['slow down', 'stop', 'speed up']
-
-joint_action_set = ['moving slow', 'slowing down', 'standing', 'speeding up', 'moving fast',
-                    'slow down', 'standing', 'moving fast', 'speed up', 'look', 'nod', 'unknown',
-                    'moving slow', 'flasher signal', 'looking' , 'handwave', 'clear path',
-                    'stopped', 'slowing down', 'crossing', 'speeding up']
-
-formatted_joint_action_set = ['car moving slow', 'car slowing down', 'car standing', 'car speeding up', 'car moving fast',
-                              'ped slow down', 'ped standing', 'ped moving fast', 'ped speed up', 'ped look',
-                              'ped nod', 'ped unknown', 'ped moving slow', 'ped flasher signal', 'ped looking' ,
-                              'ped handwave', 'ped clear path', 'ped stopped', 'ped slowing down', 'ped crossing',
-                              'ped speeding up']
-
+simple_ped_set = ['crossing']
 
 # -------------------------------------------------
 # Network configuration:
 print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 25
+BATCH_SIZE = 6
 NB_EPOCHS_AUTOENCODER = 0
-NB_EPOCHS_CLASS = 100
+NB_EPOCHS_CLASS = 30
 
 OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
 # OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
-OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
-
+# OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
+OPTIM_C = RMSprop(lr=0.0001, rho=0.9)
 
 auto_lr_schedule = [25, 30, 35]  # epoch_step
 def auto_schedule(epoch_idx):
@@ -129,12 +123,12 @@ def auto_schedule(epoch_idx):
     return 0.00001
 
 
-clas_lr_schedule = [10, 11, 12]  # epoch_step
-def clas_schedule(epoch_idx):
-    if (epoch_idx + 1) < clas_lr_schedule[0]:
-        return 0.0001
-    elif (epoch_idx + 1) < clas_lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < clas_lr_schedule[2]:
+cla_lr_schedule = [10, 13, 16]  # epoch_step
+def cla_schedule(epoch_idx):
+    if (epoch_idx + 1) < cla_lr_schedule[0]:
         return 0.000001
+    elif (epoch_idx + 1) < cla_lr_schedule[1]:
+        return 0.0000001  # lr_decay_ratio = 10
+    elif (epoch_idx + 1) < cla_lr_schedule[2]:
+        return 0.0000001
     return 0.0000001

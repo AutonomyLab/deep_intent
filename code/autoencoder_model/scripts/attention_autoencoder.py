@@ -341,9 +341,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
-    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
-    # NB_ITERATIONS = 5
-    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    # NB_ITERATIONS = int(n_videos/BATCH_SIZE)
+    NB_ITERATIONS = 1
+    # NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
+    NB_TEST_ITERATIONS = 1
 
     # Setup TensorBoard Callback
     TC = tb_callback.TensorBoard(log_dir=TF_LOG_DIR, histogram_freq=0, write_graph=False, write_images=False)
