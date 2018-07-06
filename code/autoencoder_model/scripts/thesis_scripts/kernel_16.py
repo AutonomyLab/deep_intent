@@ -23,7 +23,7 @@ from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
 from sklearn.metrics import mean_absolute_error as mae
-from plot_results import plot_err_variation
+from plot_heatmap import plot_err_variation
 from keras.layers import Input
 from keras.models import Model
 from config_r16 import *
@@ -43,7 +43,7 @@ def encoder_model():
     conv_1 = Conv3D(filters=128,
                      strides=(1, 4, 4),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 11, 11),
+                     kernel_size=(3, 3, 3),
                      padding='same')(inputs)
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
@@ -51,8 +51,8 @@ def encoder_model():
 
     conv_2a = Conv3D(filters=64,
                      strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 5, 5),
+                     dilation_rate=(1, 1, 1),
+                     kernel_size=(2, 3, 3),
                      padding='same')(out_1)
     x = TimeDistributed(BatchNormalization())(conv_2a)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
@@ -60,8 +60,8 @@ def encoder_model():
 
     conv_2b = Conv3D(filters=64,
                     strides=(1, 1, 1),
-                    dilation_rate=(2, 1, 1),
-                    kernel_size=(2, 5, 5),
+                    dilation_rate=(1, 1, 1),
+                    kernel_size=(2, 3, 3),
                     padding='same')(out_2a)
     x = TimeDistributed(BatchNormalization())(conv_2b)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
@@ -73,7 +73,7 @@ def encoder_model():
     conv_3 = Conv3D(filters=64,
                      strides=(1, 2, 2),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
+                     kernel_size=(3, 3, 3),
                      padding='same')(res_1)
     x = TimeDistributed(BatchNormalization())(conv_3)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
@@ -82,7 +82,7 @@ def encoder_model():
     # 10x16x16
     conv_4a = Conv3D(filters=64,
                      strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
+                     dilation_rate=(1, 1, 1),
                      kernel_size=(2, 3, 3),
                      padding='same')(out_3)
     x = TimeDistributed(BatchNormalization())(conv_4a)
@@ -91,7 +91,7 @@ def encoder_model():
 
     conv_4b = Conv3D(filters=64,
                      strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
+                     dilation_rate=(1, 1, 1),
                      kernel_size=(2, 3, 3),
                      padding='same')(out_4a)
     x = TimeDistributed(BatchNormalization())(conv_4b)
@@ -287,7 +287,7 @@ def load_to_RAM(frames_source):
         im_file = os.path.join(DATA_DIR, filename)
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            frame = cv2.medianBlur(frame, FILTER_SIZE)
+            # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_CUBIC)
             frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
             j = j + 1
         except AttributeError as e:
@@ -316,7 +316,7 @@ def load_X(videos_list, index, data_dir, img_size):
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                frame = cv2.medianBlur(frame, FILTER_SIZE)
+                # frame = cv2.resize(frame, (112, 112), interpolation=cv2.INTER_LANCZOS4)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print (im_file)

@@ -68,6 +68,8 @@ VIDEO_LENGTH = 32
 IMG_SIZE = (128, 208, 3)
 RAM_DECIMATE = True
 REVERSE = True
+FILTER_SIZE = 3
+
 
 # -------------------------------------------------
 # Network configuration:
@@ -83,14 +85,16 @@ OPTIM_A = rmsprop(lr=0.0001, rho=0.9)
 OPTIM_B = rmsprop(lr=0.00001, rho=0.9)
 # OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
 
-lr_schedule = [15, 20, 30]  # epoch_step
+lr_schedule = [7, 14, 20, 30]  # epoch_step
 
 def schedule(epoch_idx):
     if (epoch_idx) <= lr_schedule[0]:
-        return 0.0001
+        return 0.001
     elif (epoch_idx) <= lr_schedule[1]:
-        return 0.00001  # lr_decay_ratio = 10
+        return 0.0001  # lr_decay_ratio = 10
     elif (epoch_idx) <= lr_schedule[2]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx) <= lr_schedule[3]:
         return 0.00001
     return 0.00001
 

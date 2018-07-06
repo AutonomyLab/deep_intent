@@ -404,7 +404,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
                 X = load_X_RAM(videos_list, index, frames)
             else:
                 X = load_X(videos_list, index, DATA_DIR, IMG_SIZE)
-            X_train = np.flip(X[:, 0 : int(VIDEO_LENGTH/2)], axis=1)
+            X_train = X[:, 0 : int(VIDEO_LENGTH/2)]
             y_train = X[:, int(VIDEO_LENGTH/2) :]
             loss.append(autoencoder.train_on_batch(X_train, y_train))
 
@@ -432,7 +432,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
         print ('')
         for index in range(NB_VAL_ITERATIONS):
             X = load_X(val_videos_list, index, VAL_DATA_DIR, IMG_SIZE)
-            X_val = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            X_val = X[:, 0: int(VIDEO_LENGTH / 2)]
             y_val = X[:, int(VIDEO_LENGTH / 2):]
             val_loss.append(autoencoder.test_on_batch(X_val, y_val))
 
@@ -496,7 +496,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     test_loss = []
     for index in range(NB_TEST_ITERATIONS):
         X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE)
-        X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+        X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
         y_test = X[:, int(VIDEO_LENGTH / 2):]
         test_loss.append(autoencoder.test_on_batch(X_test, y_test))
 
@@ -592,7 +592,7 @@ def test_ind(ENC_WEIGHTS, DEC_WEIGHTS):
     print (TEST_DATA_DIR)
     for index in range(NB_TEST_ITERATIONS):
         X = load_X_test(index, TEST_DATA_DIR, (128, 208, 3))
-        X_test = np.flip(X, axis=1)
+        X_test = X
         # X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
         y_test = load_X_test(index+1, TEST_DATA_DIR, (128, 208, 3))
         test_loss.append(autoencoder.test_on_batch(X_test, y_test))
