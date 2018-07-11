@@ -31,7 +31,7 @@ VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 # TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/res/'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/NRNN16/'
 
 # MODEL_DIR = './../' + path_var + 'models'
 MODEL_DIR = RESULTS_DIR + 'models/'
@@ -66,7 +66,7 @@ SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
 VIDEO_LENGTH = 32
 IMG_SIZE = (128, 208, 3)
-RAM_DECIMATE = True
+RAM_DECIMATE = False
 REVERSE = True
 FILTER_SIZE = 3
 
@@ -77,7 +77,7 @@ print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 9
-TEST_BATCH_SIZE = 9
+TEST_BATCH_SIZE = 1
 NB_EPOCHS_AUTOENCODER = 30
 
 # OPTIM_A = Adam(lr=0.0001, beta_1=0.5)

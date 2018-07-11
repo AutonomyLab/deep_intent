@@ -43,10 +43,17 @@ def plot_heatmap(attn_layer, epoch, vid_num, file):
 def plot_err_variation(values, index):
     plt.clf()
     plt.plot(values)
-    plt.axis('off')
+    plt.grid()
     plt.savefig(os.path.join(TEST_RESULTS_DIR + '/graphs/', 'plot_' + str(index) + '.png'),
-                transparent=True)
+                transparent=False)
 
+
+def errorbars(data):
+    means = np.mean(data, axis=0)
+    l_error = abs(means-np.min(data, axis=0))
+    h_error = abs(means-np.max(data, axis=0))
+    plt.clf()
+    plt.errorbar()
 
 def get_args():
     parser = argparse.ArgumentParser()
@@ -64,3 +71,14 @@ if __name__ == "__main__":
     # print (args.epoch)
     # print (args.vid_num)
     plot_heatmap(attn_layer=args.attn_layers, epoch=args.epoch, vid_num=args.vid_num, file=args.file)
+
+# res = np.load('../DRRK16/test_results/graphs/values/1256_mae.npy')
+# rescheck = np.load('../NRNK16/test_results/graphs/values/1256_mae.npy')
+# dilation = np.load('../NRRK16/test_results/graphs/values/1256_mae.npy')
+# kernel = np.load('../NRNN16/test_results/graphs/values/1256_mae.npy')
+# rev = np.load('../DRNK16/test_results/graphs/values/1256_mae.npy')
+# res_mean = np.mean(res, axis=0)
+# rescheck_mean = np.mean(rescheck, axis=0)
+# dilation_mean = np.mean(dilation, axis=0)
+# kernel_mean = np.mean(dilation, axis=0)
+# rev_mean = np.mean(rev, axis=0)
