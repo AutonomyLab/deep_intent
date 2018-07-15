@@ -27,7 +27,7 @@ from sklearn.metrics import mean_squared_error as mse
 from plot_results import plot_err_variation
 from keras.layers import Input
 from keras.models import Model
-from config_r16 import *
+from config_walle_r16 import *
 from sys import stdout
 
 import tb_callback
@@ -78,7 +78,7 @@ def decoder_model():
     inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 64))
 
     # 10x16x16
-    convlstm_1 = ConvLSTM2D(filters=128,
+    convlstm_1 = ConvLSTM2D(filters=64,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -202,7 +202,7 @@ def run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS):
 
 
 def load_to_RAM(frames_source):
-    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE), dtype=np.float32)
+    frames = np.zeros(shape=((len(frames_source),) + IMG_SIZE))
     print("Decimating RAM!")
     j = 1
     for i in range(1, len(frames_source)):
@@ -210,7 +210,6 @@ def load_to_RAM(frames_source):
         im_file = os.path.join(DATA_DIR, filename)
         try:
             frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-            frame = cv2.medianBlur(frame, FILTER_SIZE)
             frames[i] = (frame.astype(np.float32) - 127.5) / 127.5
             j = j + 1
         except AttributeError as e:
@@ -232,14 +231,13 @@ def load_X_RAM(videos_list, index, frames):
 
 
 def load_X(videos_list, index, data_dir, img_size, batch_size=BATCH_SIZE):
-    X = np.zeros((batch_size, VIDEO_LENGTH,) + img_size, dtype=np.float32)
+    X = np.zeros((batch_size, VIDEO_LENGTH,) + img_size)
     for i in range(batch_size):
         for j in range(VIDEO_LENGTH):
             filename = "frame_" + str(videos_list[(index * batch_size + i), j]) + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
-                frame = cv2.medianBlur(frame, FILTER_SIZE)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
                 print(im_file)
@@ -289,8 +287,6 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     # Build the Spatio-temporal Autoencoder
     print("Creating models...")
     encoder = encoder_model()
-    print(encoder.summary())
-
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
     autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
@@ -311,8 +307,8 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
     for epoch in range(1, NB_EPOCHS_AUTOENCODER+1):
         if epoch == 21:
             autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_B)
-            load_weights('/local_home/JAAD_Dataset/thesis/results/rescheck/checkpoints/encoder_epoch_20.h5', encoder)
-            load_weights('/local_home/JAAD_Dataset/thesis/results/rescheck/checkpoints/decoder_epoch_20.h5', decoder)
+            load_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_20.h5'), encoder)
+            load_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_20.h5'), decoder)
 
         print("\n\nEpoch ", epoch)
         loss = []
@@ -363,7 +359,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                         "test_loss: " + str(val_loss[len(val_loss) - 1]) +
+                         "val_loss: " + str(val_loss[len(val_loss) - 1]) +
                          "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
@@ -380,18 +376,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
             print("\nAvg train loss: " + str(avg_loss) + " Avg val loss: " + str(avg_val_loss))
 
         # Save model weights per epoch to file
-        # if epoch > 15 and epoch < 21:
-        #     encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
-        #     decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
-        # if epoch > 25:
-        #     encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
-        #     decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        if epoch > 15 and epoch < 21:
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        if epoch > 25:
+            encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+            decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
-        encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
-        decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
+        # encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'), True)
+        # decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'), True)
 
-        test(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'),
-             os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'))
+        #test(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_' + str(epoch) + '.h5'),
+        #     os.path.join(CHECKPOINT_DIR, 'decoder_epoch_' + str(epoch) + '.h5'))
 
 
 def test(ENC_WEIGHTS, DEC_WEIGHTS):
@@ -413,14 +409,14 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
     test_loss = []
-    mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2)), dtype=np.float32)
-    mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2)), dtype=np.float32)
+    mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
+    mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
 
     for index in range(NB_TEST_ITERATIONS):
         X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE, batch_size=TEST_BATCH_SIZE)
@@ -450,13 +446,18 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                 mae_errors[index, i] = (mae(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mae_error.append(mae_errors[index, i])
 
+
                 mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mse_error.append(mse_errors[index, i])
 
+            dc_mae = mae(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            mae_errors[index, -1] = dc_mae
+            dc_mse = mse(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            mse_errors[index, -1] = dc_mse
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
-            plot_err_variation(mae_error, index)
-            plot_err_variation(mse_error, index)
+            plot_err_variation(mae_error, index, dc_mae, 'mae')
+            plot_err_variation(mse_error, index, dc_mse, 'mse')
 
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
@@ -471,6 +472,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print("\n Mean: " + str(np.mean(np.asarray(test_loss))))
     print("\n Max: " + str(np.max(np.asarray(test_loss))))
     print("\n Min: " + str(np.min(np.asarray(test_loss))))
+
 
 
 # def load_X_test(index, data_dir, img_size):

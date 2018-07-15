@@ -67,11 +67,11 @@ def get_args():
 
 
 if __name__ == "__main__":
-    GIF_DIR = '../gifs/'
+    GIF_DIR = '/local_home/JAAD_Dataset/thesis/results/gifs/'
     if not os.path.exists(GIF_DIR):
         os.mkdir(GIF_DIR)
 
-    GIF_IMG_DIR = '../gifs/imgs/'
+    GIF_IMG_DIR = '/local_home/JAAD_Dataset/thesis/results/gifs/imgs/'
     if not os.path.exists(GIF_IMG_DIR):
         os.mkdir(GIF_IMG_DIR)
 

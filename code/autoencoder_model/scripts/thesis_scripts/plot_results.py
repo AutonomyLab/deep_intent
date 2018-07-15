@@ -40,11 +40,13 @@ def plot_heatmap(attn_layer, epoch, vid_num, file):
                             transparent=True)
 
 
-def plot_err_variation(values, index):
+def plot_err_variation(values, index, dc_value, filename):
     plt.clf()
-    plt.plot(values)
+    plt.axis([1, 17, min(values), max(values)])
+    plt.plot([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16], values, 'b')
+    plt.plot([dc_value]*(len(values) + 1), 'r--')
     plt.grid()
-    plt.savefig(os.path.join(TEST_RESULTS_DIR + '/graphs/', 'plot_' + str(index) + '.png'),
+    plt.savefig(os.path.join(TEST_RESULTS_DIR + '/graphs/', 'plot_' + filename + '_' + str(index) + '.png'),
                 transparent=False)
 
 
