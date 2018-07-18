@@ -31,7 +31,7 @@ VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 # TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rescheck/'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/kernel/'
 
 # MODEL_DIR = './../' + path_var + 'models'
 MODEL_DIR = RESULTS_DIR + 'models/'

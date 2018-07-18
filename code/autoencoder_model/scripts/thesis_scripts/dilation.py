@@ -4,8 +4,9 @@ from __future__ import print_function
 
 import hickle as hkl
 import numpy as np
-from tensorflow.python.pywrap_tensorflow import do_quantize_training_on_graphdef
 
+#import tensorflow as tf
+#tf.reset_default_graph()
 np.random.seed(9 ** 10)
 from keras import backend as K
 K.set_image_dim_ordering('tf')
@@ -223,13 +224,17 @@ def set_trainability(model, trainable):
 
 
 def autoencoder_model(encoder, decoder):
-    inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
-    z = encoder(inputs)
+    # inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
+    # z = encoder(inputs)
     # print (z.shape)
     # print (type(z))
-    future = decoder(z)
+    # future = decoder(z)
 
-    model = Model(inputs=inputs, outputs=future)
+    # model = Model(inputs=inputs, outputs=future)
+
+    model = Sequential()
+    model.add(encoder)
+    model.add(decoder)
 
     return model
 
@@ -401,11 +406,11 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS):
 
     print("Beginning Training...")
     # Begin Training
-    for epoch in range(1, NB_EPOCHS_AUTOENCODER+1):
-        if epoch == 21:
+    for epoch in range(28, NB_EPOCHS_AUTOENCODER+1):
+        if epoch == 28:
             autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_B)
-            load_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_20.h5'), encoder)
-            load_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_20.h5'), decoder)
+            load_weights(os.path.join(CHECKPOINT_DIR, 'encoder_epoch_27.h5'), encoder)
+            load_weights(os.path.join(CHECKPOINT_DIR, 'decoder_epoch_27.h5'), decoder)
 
         print("\n\nEpoch ", epoch)
         loss = []
@@ -515,6 +520,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
     mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
 
+    # z_all = []
     for index in range(NB_TEST_ITERATIONS):
         X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE, batch_size=TEST_BATCH_SIZE)
         X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
@@ -527,9 +533,16 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                      "\t    [" + "{0}>".format("=" * (arrow)))
         stdout.flush()
 
+
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            predicted_images = autoencoder.predict(X_test, verbose=0)
+            z = encoder.predict(X_test, verbose=0)
+            # z_all.append(z)
+
+            # z_new = np.zeros(shape=(TEST_BATCH_SIZE, 1, 16, 26, 64))
+            # z_new[0] = z[:, 15]
+            # z_new = np.repeat(z_new, int(VIDEO_LENGTH/2), axis=1)
+            predicted_images = decoder.predict(z, verbose=0)
             voila = np.concatenate((X_test, y_test), axis=1)
             truth_seq = arrange_images(voila)
             pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
@@ -558,7 +571,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
-
+    # np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', "z_all.npy"), np.asarray(z_all))
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)

@@ -23,9 +23,9 @@ from keras.layers.merge import add
 from keras.layers.normalization import BatchNormalization
 from keras.callbacks import LearningRateScheduler
 from keras.layers.advanced_activations import LeakyReLU
-# from sklearn.metrics import mean_absolute_error as mae
-# from sklearn.metrics import mean_squared_error as mse
-# from plot_results import plot_err_variation
+from sklearn.metrics import mean_absolute_error as mae
+from sklearn.metrics import mean_squared_error as mse
+from plot_results import plot_err_variation
 from keras.layers import Input
 from keras.models import Model
 from config_walle_r16 import *
@@ -413,15 +413,16 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_squared_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
     test_loss = []
-    mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2)))
-    mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2)))
+    mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
+    mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
 
+    z_all = []
     for index in range(NB_TEST_ITERATIONS):
         X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE, batch_size=TEST_BATCH_SIZE)
         X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
@@ -434,9 +435,16 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                      "\t    [" + "{0}>".format("=" * (arrow)))
         stdout.flush()
 
+
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            predicted_images = autoencoder.predict(X_test, verbose=0)
+            z = encoder.predict(X_test, verbose=0)
+            z_all.append(z)
+
+            # z_new = np.zeros(shape=(TEST_BATCH_SIZE, 1, 16, 26, 64))
+            # z_new[0] = z[:, 15]
+            # z_new = np.repeat(z_new, int(VIDEO_LENGTH/2), axis=1)
+            predicted_images = decoder.predict(z, verbose=0)
             voila = np.concatenate((X_test, y_test), axis=1)
             truth_seq = arrange_images(voila)
             pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
@@ -450,17 +458,22 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                 mae_errors[index, i] = (mae(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mae_error.append(mae_errors[index, i])
 
+
                 mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mse_error.append(mse_errors[index, i])
 
+            dc_mae = mae(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            mae_errors[index, -1] = dc_mae
+            dc_mse = mse(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            mse_errors[index, -1] = dc_mse
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
-            plot_err_variation(mae_error, index)
-            plot_err_variation(mse_error, index)
+            plot_err_variation(mae_error, index, dc_mae, 'mae')
+            plot_err_variation(mse_error, index, dc_mse, 'mse')
 
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
-
+    np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', "z_all.npy"), np.asarray(z_all))
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)
@@ -471,6 +484,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print("\n Mean: " + str(np.mean(np.asarray(test_loss))))
     print("\n Max: " + str(np.max(np.asarray(test_loss))))
     print("\n Min: " + str(np.min(np.asarray(test_loss))))
+
 
 
 def get_args():

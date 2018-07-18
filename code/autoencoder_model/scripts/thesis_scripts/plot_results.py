@@ -84,3 +84,56 @@ if __name__ == "__main__":
 # dilation_mean = np.mean(dilation, axis=0)
 # kernel_mean = np.mean(dilation, axis=0)
 # rev_mean = np.mean(rev, axis=0)
+
+# import math
+# import numpy as np
+# import matplotlib.pyplot as plt
+# import matplotlib.patches as mpatches
+#
+# # def myreadlines(f, newline):
+# #   buf = ""
+# #   while True:
+# #     while newline in buf:
+# #       pos = buf.index(newline)
+# #       yield buf[:pos]
+# #       buf = buf[pos + len(newline):]
+# #     chunk = f.read(4096)
+# #     if not chunk:
+# #       yield buf
+# #       break
+# #     buf += chunk
+#
+# # plt.rcParams['font.family'] = 'serif'
+# plt.rc('font', **{'family': 'serif', 'serif': ['Computer Modern']})
+# plt.rc('text', usetex=True)
+#
+# # plt.rcParams['font.serif'] = 'Ubuntu'
+# # plt.rcParams['font.monospace'] = 'Ubuntu Mono'
+# plt.rcParams['font.size'] = 10
+# plt.rcParams['axes.labelsize'] = 10
+# plt.rcParams['axes.labelweight'] = 'bold'
+# plt.rcParams['xtick.labelsize'] = 8
+# plt.rcParams['ytick.labelsize'] = 8
+# plt.rcParams['legend.fontsize'] = 10
+# plt.rcParams['figure.titlesize'] = 12
+# plt.style.use('seaborn-white')
+#
+# #   if (prefixStr == "Results/200Robots500Boxes/star_switch/star_switch"):
+# #     lines = plt.plot(stepNumbers, avgAvgDists)
+# #     plt.setp(lines, color='#3E6386', linewidth=1)
+# #     plt.fill_between(stepNumbers, [a-b for a,b in zip(avgAvgDists, stdDevs)], [a+b for a,b in zip(avgAvgDists, stdDevs)], facecolor="#9DB3C8", alpha=0.7)
+# #   else:
+# #     lines = plt.plot(stepNumbers, avgAvgDists)
+# #     plt.setp(lines, color='#430029', linewidth=1)
+# #     plt.fill_between(stepNumbers, [a-b for a,b in zip(avgAvgDists, stdDevs)], [a+b for a,b in zip(avgAvgDists, stdDevs)], facecolor="#C986AF", alpha=0.7)
+# #   ax = plt.gca()
+# #   ax.set_yticks(np.arange(0, math.ceil(max(avgAvgDists)), 0.50))
+# # plt.xlabel('World Steps')
+# # plt.ylabel('Mean Box Distance from Goal Shape (m)')
+# # plt.title("Avg Distance from Boxes to \nStar Shaped Goal with and without Switching\n200 Robots 500 Boxes")
+# # #plt.fill_between(stepNumbers, [a-b for a,b in zip(avgAvgDistsOut, stdDevsOut)], [a+b for a,b in zip(avgAvgDistsOut, stdDevsOut)], facecolor="#9DB3C8")
+# # red_patch = mpatches.Patch(color='#3E6386', label='With Switching')
+# # blue_patch = mpatches.Patch(color='#430029', label='Without Switching')
+# # plt.legend(handles=[blue_patch, red_patch])
+# # ax.set_facecolor([0.975, 0.975, 0.975])
+# # plt.savefig('/home/abignell/Pictures/push_pics/starstyle.pdf', bbox_inches='tight')
