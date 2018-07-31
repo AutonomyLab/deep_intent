@@ -446,9 +446,9 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                 mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mse_error.append(mse_errors[index, i])
 
-            dc_mae = mae(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            dc_mae = mae(X_test[0, 0].flatten(), y_test[0, 0].flatten())
             mae_errors[index, -1] = dc_mae
-            dc_mse = mse(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            dc_mse = mse(X_test[0, 0].flatten(), y_test[0, 0].flatten())
             mse_errors[index, -1] = dc_mse
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
@@ -468,6 +468,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     print("\n Mean: " + str(np.mean(np.asarray(test_loss))))
     print("\n Max: " + str(np.max(np.asarray(test_loss))))
     print("\n Min: " + str(np.min(np.asarray(test_loss))))
+
 
 
 def get_args():

@@ -9,56 +9,28 @@ import numpy as np
 
 np.random.seed(2 ** 10)
 import tensorflow as tf
-import itertools
 from keras import backend as K
 K.set_image_dim_ordering('tf')
-import matplotlib.pyplot as plt
 from keras import regularizers
 from keras.layers import Dropout
 from keras.models import Sequential
-from keras.layers.core import Activation
 from keras.utils.vis_utils import plot_model
-from keras.initializers import RandomNormal
 from keras.layers.wrappers import TimeDistributed
-from keras.layers.convolutional import Conv2D
-from keras.layers.convolutional import Conv2DTranspose
-from keras.layers.convolutional import Conv3D
-from keras.layers.convolutional import Conv3DTranspose
-from keras.layers.convolutional import UpSampling3D
-from keras.layers.convolutional_recurrent import ConvLSTM2D
-from keras.layers.convolutional import MaxPooling3D
-from keras.layers.convolutional import ZeroPadding3D
-from keras.layers.merge import multiply
-from keras.layers.merge import add
 from keras.layers.merge import concatenate
-from keras.layers.merge import average
-from keras.layers.core import Permute
-from keras.layers.core import RepeatVector
 from keras.layers.core import Dense
 from keras.layers.core import Lambda
-from keras.layers.core import Reshape
 from keras.layers.core import Flatten
 from keras.utils import to_categorical
-from keras.layers.recurrent import LSTM
-from keras.layers.recurrent import GRU
 from keras.layers.normalization import BatchNormalization
-from keras.callbacks import LearningRateScheduler
-from keras.layers.advanced_activations import LeakyReLU
-from keras.losses import kullback_leibler_divergence
-from keras.losses import mean_squared_error
 from keras.layers import Input
 from keras.models import Model
 from keras.models import model_from_json
-from keras.metrics import top_k_categorical_accuracy
-from experience_memory import ExperienceMemory
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
 from image_utils import random_rotation
 from image_utils import random_shift
-from image_utils import random_zoom
 from image_utils import flip_axis
-from custom_layers import AttnLossLayer
 from image_utils import random_brightness
 from config_sigc import *
 from sys import stdout
@@ -66,8 +38,6 @@ from sys import stdout
 import tb_callback
 import lrs_callback
 import argparse
-import random
-import math
 import cv2
 import os
 
@@ -188,15 +158,13 @@ def arrange_images(video_stack):
 
     img_height = video_stack.shape[2]
     img_width = video_stack.shape[3]
-    # width = img_size x video_length
-    width = img_width * VIDEO_LENGTH
-    # height = img_size x batch_size
-    height = img_height * BATCH_SIZE
+    width = img_width * video_stack.shape[1]
+    height = img_height * video_stack.shape[0]
     shape = frames.shape[1:]
     image = np.zeros((height, width, shape[2]), dtype=video_stack.dtype)
     frame_number = 0
-    for i in range(BATCH_SIZE):
-        for j in range(VIDEO_LENGTH):
+    for i in range(video_stack.shape[0]):
+        for j in range(video_stack.shape[1]):
             image[(i * img_height):((i + 1) * img_height), (j * img_width):((j + 1) * img_width)] = frames[frame_number]
             frame_number = frame_number + 1
 
@@ -310,13 +278,13 @@ def load_to_RAM(frames_source):
     return frames
 
 
-def load_X_y(videos_list, index, data_dir, ped_action_cats):
-    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X_y(videos_list, index, data_dir, ped_action_cats, batch_size=BATCH_SIZE):
+    X = np.zeros((batch_size, VIDEO_LENGTH,) + IMG_SIZE)
     y = []
-    for i in range(BATCH_SIZE):
+    for i in range(batch_size):
         y_per_vid = []
         for j in range(VIDEO_LENGTH):
-            frame_number = (videos_list[(index*BATCH_SIZE + i), j])
+            frame_number = (videos_list[(index*batch_size + i), j])
             filename = "frame_" + str(frame_number) + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
@@ -398,7 +366,7 @@ def get_action_classes(action_labels, mode='softmax'):
             if action.lower() == 'crossing':
                 ped_action = simple_ped_set.index('crossing')
                 simple_ped_actions_per_frame.append(ped_action)
-            # if action.lower() == 'standing':s
+            # if action.lower() == 'standing':
             #     ped_action = simple_ped_set.index('standing')
             #     simple_ped_actions_per_frame.append(ped_action)
             # if action.lower() == 'no ped':
@@ -566,12 +534,12 @@ def subsample_videos(videos_list, ped_action_labels):
     return videos_list
 
 
-def get_sklearn_metrics(y_true, y_pred, avg=None):
-    return precision_recall_fscore_support(y_true, np.round(y_pred), average=avg)
+def get_sklearn_metrics(y_true, y_pred, avg=None, pos_label=1):
+    return precision_recall_fscore_support(y_true, np.round(y_pred), average=avg, pos_label=pos_label)
 
 
 def get_classification_report(y_true, y_pred):
-    return classification_report(y_true, np.round(y_pred), target_names=simple_ped_set)
+    return classification_report(y_true, np.round(y_pred), target_names=['crossing', 'not crossing'])
 
 
 def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
@@ -598,14 +566,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         # Shuffle images to aid generalization
         videos_list = np.random.permutation(videos_list)
 
-    # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8, frame_skip=0)
-    # Load test action annotations
-    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
-    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
-    # test_videos_list = remove_zero_classes(test_videos_list, test_ped_action_classes)
-    print("Test Stats: " + str(test_ped_class_count))
+    # Setup validation
+    val_frames_source = hkl.load(os.path.join(VAL_DATA_DIR, 'sources_val_208.hkl'))
+    val_videos_list = get_video_lists(frames_source=val_frames_source, stride=8, frame_skip=0)
+    # Load val action annotations
+    val_action_labels = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_208.hkl'))
+    val_ped_action_classes, val_ped_class_count = get_action_classes(val_action_labels, mode='sigmoid')
+    # val_videos_list = remove_zero_classes(val_videos_list, val_ped_action_classes)
+    print("Val Stats: " + str(val_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
     print ("Creating models.")
@@ -628,12 +596,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     run_utilities(classifier, CLA_WEIGHTS)
 
     n_videos = videos_list.shape[0]
-    n_test_videos = test_videos_list.shape[0]
+    n_val_videos = val_videos_list.shape[0]
 
     NB_ITERATIONS = int(n_videos/BATCH_SIZE)
     # NB_ITERATIONS = 5
-    NB_TEST_ITERATIONS = int(n_test_videos/BATCH_SIZE)
-    # NB_TEST_ITERATIONS = 5
+    NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
+    # NB_VAL_ITERATIONS = 5
 
     # Setup TensorBoard Callback
     TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False, write_images=False)
@@ -646,10 +614,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     # Train Classifier
     if CLASSIFIER:
         print("Training Classifier...")
-        for epoch in range(NB_EPOCHS_CLASS):
+        for epoch in range(1, NB_EPOCHS_CLASS+1):
             print("\n\nEpoch ", epoch)
             c_loss = []
-            test_c_loss = []
+            val_c_loss = []
 
             # # Set learning rate every epoch
             LRS_clas.on_epoch_begin(epoch=epoch)
@@ -697,21 +665,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     for j in range(int(VIDEO_LENGTH )):
                         class_num_past = np.argmax(y_orig_classes[k, j])
                         class_num_y = np.argmax(ped_pred_class[k])
-                        # label_true = simple_ped_set[class_num_past]
-                        # label_pred = simple_ped_set[class_num_y]
 
                         label_true = str(y_orig_classes[k, j])
                         label_pred = str([round(float(i), 2) for i in ped_pred_class[k]])
-
-                        # if (y_orig_classes[k, j] > 0.5):
-                        #     label_true = "crossing"
-                        # else:
-                        #     label_true = "not crossing"
-                        #
-                        # if (ped_pred_class[k] > 0.5):
-                        #     label_pred = "crossing"
-                        # else:
-                        #     label_pred = "not crossing"
 
                         cv2.putText(pred_seq, 'truth: ' + label_true,
                                     (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
@@ -727,23 +683,167 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 slice_images = slice_images * 127.5 + 127.5
                 cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_slice_pred.png"), slice_images)
 
-            # Run over test data
+            # Run over val data
             print('')
-            y_test_pred = []
-            y_test_true = []
-            for index in range(NB_TEST_ITERATIONS):
-                X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes)
-                X_test = X
+            y_val_pred = []
+            y_val_true = []
+            for index in range(NB_VAL_ITERATIONS):
+                X, y = load_X_y(val_videos_list, index, VAL_DATA_DIR, val_ped_action_classes)
+                X_val = X
                 y_true_class = y[:, CLASS_TARGET_INDEX]
 
-                test_c_loss.append(classifier.test_on_batch(X_test, y_true_class))
-                y_test_true.extend(y_true_class)
-                y_test_pred.extend(classifier.predict(X_test, verbose=0))
+                val_c_loss.append(classifier.test_on_batch(X_val, y_true_class))
+                y_val_true.extend(y_true_class)
+                y_val_pred.extend(classifier.predict(X_val, verbose=0))
 
-                arrow = int(index / (NB_TEST_ITERATIONS / 40))
-                stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                             "test_c_loss: " +  str([ test_c_loss[len(test_c_loss) - 1][j]  for j in [0, 1]]))
+                arrow = int(index / (NB_VAL_ITERATIONS / 40))
+                stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
+                             "val_c_loss: " +  str([ val_c_loss[len(val_c_loss) - 1][j]  for j in [0, 1]]))
                 stdout.flush()
+
+            if SAVE_GENERATED_IMAGES:
+                # Save generated images to file
+                val_ped_pred_class = classifier.predict(X_val, verbose=0)
+                # pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
+                pred_seq = arrange_images(X_val)
+                pred_seq = pred_seq * 127.5 + 127.5
+
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                y_orig_classes = y
+                # Add labels as text to the image
+
+                for k in range(BATCH_SIZE):
+                    for j in range(int(VIDEO_LENGTH)):
+                        class_num_past = np.argmax(y_orig_classes[k, j])
+                        class_num_y = np.argmax(val_ped_pred_class[k])
+
+                        label_true = str(y_orig_classes[k, j])
+                        label_pred = str([round(float(i), 2) for i in ped_pred_class[k]])
+
+
+                        cv2.putText(pred_seq, 'truth: ' + label_true,
+                                    (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+                        cv2.putText(pred_seq, label_pred,
+                                    (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+
+                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_val_pred.png"), pred_seq)
+
+            # then after each epoch
+            avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
+            avg_val_c_loss = np.mean(np.asarray(val_c_loss, dtype=np.float32), axis=0)
+
+            train_prec, train_rec, train_fbeta, train_support = get_sklearn_metrics(np.asarray(y_train_true),
+                                                                                    np.asarray(y_train_pred),
+                                                                                    avg='binary',
+                                                                                    pos_label=1)
+            val_prec, val_rec, val_fbeta, val_support = get_sklearn_metrics(np.asarray(y_val_true),
+                                                                                np.asarray(y_val_pred),
+                                                                                avg='binary',
+                                                                                pos_label=1)
+
+            loss_values = np.asarray(avg_c_loss.tolist() + [train_prec.tolist()] +
+                                     [train_rec.tolist()] +
+                                     avg_val_c_loss.tolist() + [val_prec.tolist()] +
+                                     [val_rec.tolist()], dtype=np.float32)
+
+            precs = ['prec_' + action for action in simple_ped_set]
+            recs = ['rec_' + action for action in simple_ped_set]
+            fbeta = ['fbeta_' + action for action in simple_ped_set]
+            c_loss_keys = ['c_' + metric for metric in classifier.metrics_names+precs+recs]
+            val_c_loss_keys = ['c_val_' + metric for metric in classifier.metrics_names+precs+recs]
+
+            loss_keys = c_loss_keys + val_c_loss_keys
+            logs = dict(zip(loss_keys, loss_values))
+
+            TC_cla.on_epoch_end(epoch, logs)
+
+            # Log the losses
+            with open(os.path.join(LOG_DIR, 'losses_cla.json'), 'a') as log_file:
+                log_file.write("{\"epoch\":%d, %s\n" % (epoch, str(logs).strip('{')))
+
+            print("\nAvg c_loss: " + str(avg_c_loss) +
+                  " Avg val_c_loss: " + str(avg_val_c_loss))
+
+            print ("Train Prec: %.2f, Recall: %.2f, Fbeta: %.2f" %(train_prec, train_rec, train_fbeta))
+            print("Val Prec: %.2f, Recall: %.2f, Fbeta: %.2f" % (val_prec, val_rec, val_fbeta))
+
+            # Save model weights per epoch to file
+            classifier.save_weights(os.path.join(CHECKPOINT_DIR, 'classifier_cla_epoch_' + str(epoch) + '.h5'),
+                                    True)
+            classifier.save(os.path.join(CHECKPOINT_DIR, 'full_classifier_cla_epoch_' + str(epoch) + '.h5'))
+
+
+        print (get_classification_report(np.asarray(y_train_true), np.asarray(y_train_pred)))
+        print (get_classification_report(np.asarray(y_val_true), np.asarray(y_val_pred)))
+
+
+def test(CLA_WEIGHTS):
+
+    if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
+        os.mkdir(TEST_RESULTS_DIR + '/pred/')
+
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8, frame_skip=0)
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=0)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=2)
+    # Load test action annotations
+    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
+    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
+    print("Test Stats: " + str(test_ped_class_count))
+
+    # Build the Spatio-temporal Autoencoder
+    print("Creating models.")
+    # Build stacked classifier
+    # classifier = pretrained_c3d()
+    classifier = ensemble_c3d()
+    # classifier = c3d_scratch()
+    classifier.compile(loss="binary_crossentropy",
+                       optimizer=OPTIM_C,
+                       # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
+                       metrics=['acc'])
+
+    # Build attention layer output
+    intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[1].output)
+    mask_gen_1 = Sequential()
+    # mask_gen_1.add(encoder)
+    mask_gen_1.add(intermediate_classifier)
+    mask_gen_1.compile(loss='binary_crossentropy', optimizer=OPTIM_C)
+
+    run_utilities(classifier, CLA_WEIGHTS)
+
+    n_test_videos = test_videos_list.shape[0]
+
+    NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 5
+
+    # Setup TensorBoard Callback
+    TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False, write_images=False)
+    LRS_clas = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS_clas.set_model(classifier)
+
+    if CLASSIFIER:
+        print("Testing Classifier...")
+        # Run over test data
+        print('')
+        y_test_pred = []
+        y_test_true = []
+        test_c_loss = []
+        for index in range(NB_TEST_ITERATIONS):
+            X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes, batch_size=TEST_BATCH_SIZE)
+            X_test = X
+            y_true_class = y[:, CLASS_TARGET_INDEX]
+
+            test_c_loss.append(classifier.test_on_batch(X_test, y_true_class))
+            y_test_true.extend(y_true_class)
+            y_test_pred.extend(classifier.predict(X_test, verbose=0))
+
+            arrow = int(index / (NB_TEST_ITERATIONS / 40))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
+                         "test_c_loss: " + str([test_c_loss[len(test_c_loss) - 1][j] for j in [0, 1]]))
+            stdout.flush()
 
             if SAVE_GENERATED_IMAGES:
                 # Save generated images to file
@@ -756,26 +856,18 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                 y_orig_classes = y
                 # Add labels as text to the image
 
-                for k in range(BATCH_SIZE):
+                for k in range(TEST_BATCH_SIZE):
                     for j in range(int(VIDEO_LENGTH)):
-                        class_num_past = np.argmax(y_orig_classes[k, j])
-                        class_num_y = np.argmax(test_ped_pred_class[k])
 
-                        # label_true = simple_ped_set[class_num_past]
-                        # label_pred = simple_ped_set[class_num_y]
-                        label_true = str(y_orig_classes[k, j])
-                        label_pred = str([round(float(i), 2) for i in ped_pred_class[k]])
+                        if (y_orig_classes[k, j] > 0.5):
+                            label_true = "crossing"
+                        else:
+                            label_true = "not crossing"
 
-                        #
-                        # if (y_orig_classes[k, j] > 0.5):
-                        #     label_true = "crossing"
-                        # else:
-                        #     label_true = "not crossing"
-                        #
-                        # if (test_ped_pred_class[k] > 0.5):
-                        #     label_pred = "crossing"
-                        # else:
-                        #     label_pred = "not crossing"
+                        if (test_ped_pred_class[k] > 0.5):
+                            label_pred = "crossing"
+                        else:
+                            label_pred = "not crossing"
 
                         cv2.putText(pred_seq, 'truth: ' + label_true,
                                     (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
@@ -784,166 +876,25 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                     (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
                                     cv2.LINE_AA)
 
-                cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(epoch) + "_" + str(index) + "_cla_test_pred.png"), pred_seq)
+                cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_cla_test_pred.png"),
+                            pred_seq)
 
-            # then after each epoch
-            avg_c_loss = np.mean(np.asarray(c_loss, dtype=np.float32), axis=0)
-            avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
+        # then after each epoch
+        avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
 
-            print (np.asarray(y_train_true))
-            print (np.asarray(y_train_pred))
+        test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
+                                                                        np.asarray(y_test_pred),
+                                                                        avg='binary',
+                                                                        pos_label=1)
+        print("\nAvg test_c_loss: " + str(avg_test_c_loss))
+        print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
 
-            train_prec, train_rec, train_fbeta, train_support = get_sklearn_metrics(np.asarray(y_train_true),
-                                                                                    np.asarray(y_train_pred),
-                                                                                    avg='micro')
-            test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
-                                                                                np.asarray(y_test_pred),
-                                                                                avg='micro')
+        print ("Classification Report")
+        print(get_classification_report(np.asarray(y_test_true), np.asarray(y_test_pred)))
 
-            loss_values = np.asarray(avg_c_loss.tolist() + [train_prec.tolist()] +
-                                     [train_rec.tolist()] +
-                                     avg_test_c_loss.tolist() + [test_prec.tolist()] +
-                                     [test_rec.tolist()], dtype=np.float32)
-            # loss_values = np.asarray(avg_c_loss.tolist() + train_prec.tolist() +
-            #                          train_rec.tolist() +
-            #                          avg_test_c_loss.tolist() + test_prec.tolist() +
-            #                          test_rec.tolist(), dtype=np.float32)
-            precs = ['prec_' + action for action in simple_ped_set]
-            recs = ['rec_' + action for action in simple_ped_set]
-            fbeta = ['fbeta_' + action for action in simple_ped_set]
-            c_loss_keys = ['c_' + metric for metric in classifier.metrics_names+precs+recs]
-            test_c_loss_keys = ['c_test_' + metric for metric in classifier.metrics_names+precs+recs]
-
-            loss_keys = c_loss_keys + test_c_loss_keys
-            logs = dict(zip(loss_keys, loss_values))
-
-            TC_cla.on_epoch_end(epoch, logs)
-
-            # Log the losses
-            with open(os.path.join(LOG_DIR, 'losses_cla.json'), 'a') as log_file:
-                log_file.write("{\"epoch\":%d, %s;\n" % (epoch, logs))
-
-            print("\nAvg c_loss: " + str(avg_c_loss) +
-                  " Avg test_c_loss: " + str(avg_test_c_loss))
-
-            print ("Training Precision per class:" + str(train_prec))
-            print ("Test Precision per class:" + str(test_prec))
-            print ("Training Recall per class:" + str(train_rec))
-            print ("Test Recall per class:" + str(test_rec))
-
-            prec, recall, fbeta, support = get_sklearn_metrics(np.asarray(y_train_true),
-                                                               np.asarray(y_train_pred),
-                                                               avg='weighted')
-            print ("Train Prec: %.2f, Recall: %.2f, Fbeta: %.2f" %(prec, recall, fbeta))
-            prec, recall, fbeta, support = get_sklearn_metrics(np.asarray(y_test_true),
-                                                               np.asarray(y_test_pred),
-                                                               avg='weighted')
-            print("Test Prec: %.2f, Recall: %.2f, Fbeta: %.2f" % (prec, recall, fbeta))
-
-            # Save model weights per epoch to file
-            # encoder.save_weights(os.path.join(CHECKPOINT_DIR, 'encoder_cla_epoch_' + str(epoch) + '.h5'), True)
-            # decoder.save_weights(os.path.join(CHECKPOINT_DIR, 'decoder_cla_epoch_' + str(epoch) + '.h5'), True)
-            classifier.save_weights(os.path.join(CHECKPOINT_DIR, 'classifier_cla_epoch_' + str(epoch) + '.h5'),
-                                    True)
-
-            # get_confusion_matrix(y_train_true, y_train_pred)
-            # get_confusion_matrix(y_test_true, y_test_pred)
-
-        print (get_classification_report(np.asarray(y_train_true), np.asarray(y_train_pred)))
-        print (get_classification_report(np.asarray(y_test_true), np.asarray(y_test_pred)))
-
-
-def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
-
-    # Create models
-    print ("Creating models.")
-    classifier = pretrained_c3d()
-    classifier.compile(loss="binary_crossentropy",
-                       optimizer=OPTIM_C,
-                       metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
-
-    run_utilities(classifier, CLA_WEIGHTS)
-
-    # Setup test
-    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8)
-    # Load test action annotations
-    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
-    test_driver_action_classes, test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
-    print("Test Stats: " + str(test_ped_class_count))
-
-    n_test_videos = test_videos_list.shape[0]
-
-    # Test model by making predictions
-    test_c_loss = []
-    y_true_total = []
-    y_pred_total = []
-    NB_TEST_ITERATIONS = int(n_test_videos / BATCH_SIZE)
-    for index in range(NB_TEST_ITERATIONS):
-        X, y1, y2 = load_X_y(test_videos_list, index, TEST_DATA_DIR, [], test_ped_action_classes)
-        X_test = X
-        y2_true_class = y2[:, CLASS_TARGET_INDEX]
-
-        test_c_loss.append(classifier.test_on_batch(X_test, y2_true_class))
-        y_true_total.append(K.cast(y2_true_class, dtype='int32'))
-        y_pred_total.append(K.cast(K.round(classifier.predict(X_test)), 'int32'))
-
-        arrow = int(index / (NB_TEST_ITERATIONS / 40))
-        stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
-                     "test_c_loss: " + str([test_c_loss[len(test_c_loss) - 1][j] for j in [0, 1, 2, 3, 4]]))
-        stdout.flush()
-
-        # Save generated images to file
-        ped_pred_class = classifier.predict(X_test, verbose=0)
-        orig_image = arrange_images(X_test)
-        orig_image = orig_image * 127.5 + 127.5
-        pred_image = np.copy(orig_image)
-        font = cv2.FONT_HERSHEY_SIMPLEX
-        y2_orig_classes = y2
-        # Add labels as text to the image
-        for k in range(BATCH_SIZE):
-            for j in range(VIDEO_LENGTH):
-                class_num_past_y2 = np.argmax(y2_orig_classes[k, j])
-                cv2.putText(orig_image, "Ped: " + simple_ped_set[class_num_past_y2],
-                            (2 + j * (112), 104 + k * 112), font, 0.5, (255, 255, 255), 1,
-                            cv2.LINE_AA)
-        cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(index) +
-                                 "_cla_test_orig.png"), orig_image)
-
-        # Add labels as text to the image
-        for k in range(BATCH_SIZE):
-            class_num_y2 = np.argmax(ped_pred_class[k])
-            cv2.putText(pred_image, "Ped: " + simple_ped_set[class_num_y2],
-                        (2, 104 + k * 112), font, 0.5, (255, 255, 255), 1,
-                        cv2.LINE_AA)
-        cv2.imwrite(os.path.join(CLA_GEN_IMAGES_DIR, str(index) + "_cla_test_pred.png"),
-                    pred_image)
-
-    # then after each epoch/iteration
-    avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
-
-    loss_values = np.asarray(avg_test_c_loss.tolist(), dtype=np.float32)
-    test_c_loss_keys = ['c_test_' + metric for metric in classifier.metrics_names]
-
-    loss_keys = test_c_loss_keys
-    logs = dict(zip(loss_keys, loss_values))
-
-    # Log the losses
-    with open(os.path.join(LOG_DIR, 'losses_cla.json'), 'a') as log_file:
-        log_file.write("{\"Iter\":%d, %s;\n" % (index, logs))
-
-    print("\nAvg test_c_loss: " + str(avg_test_c_loss))
-
-    np.save(os.path.join(CLA_GEN_IMAGES_DIR, 'y_true_total.npy'), np.asarray(y_true_total))
-    np.save(os.path.join(CLA_GEN_IMAGES_DIR, 'y_pred_total.npy'), np.asarray(y_pred_total))
-
-    precision, recall, f1 = score(np.asarray(y_true_total), np.asarray(y_pred_total))
-
-    print('precision: {}'.format(precision))
-    print('recall: {}'.format(recall))
-    print('fscore: {}'.format(f1))
-
-
+        print ("Confusion matrix")
+        tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
+        print ("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
 
 
 def get_args():
@@ -967,6 +918,4 @@ if __name__ == "__main__":
               CLA_WEIGHTS=args.cla_weights)
 
     if args.mode == "test":
-        test(ENC_WEIGHTS=args.enc_weights,
-             DEC_WEIGHTS=args.dec_weights,
-             CLA_WEIGHTS=args.cla_weights)
+        test(CLA_WEIGHTS=args.cla_weights)

@@ -31,7 +31,7 @@ VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 # TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rev/'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec/'
 
 # MODEL_DIR = './../' + path_var + 'models'
 MODEL_DIR = RESULTS_DIR + 'models/'
@@ -55,7 +55,7 @@ TF_LOG_DIR = RESULTS_DIR + 'tf_logs/'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
-TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/'
+TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/new_experiments/'
 if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
 

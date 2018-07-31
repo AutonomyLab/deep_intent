@@ -422,7 +422,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     mae_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
     mse_errors = np.zeros(shape=(n_test_videos, int(VIDEO_LENGTH/2) + 1))
 
-    z_all = []
+    # z_all = []
     for index in range(NB_TEST_ITERATIONS):
         X = load_X(test_videos_list, index, TEST_DATA_DIR, IMG_SIZE, batch_size=TEST_BATCH_SIZE)
         X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
@@ -439,7 +439,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
             z = encoder.predict(X_test, verbose=0)
-            z_all.append(z)
+            # z_all.append(z)
 
             # z_new = np.zeros(shape=(TEST_BATCH_SIZE, 1, 16, 26, 64))
             # z_new[0] = z[:, 15]
@@ -462,9 +462,9 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
                 mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
                 mse_error.append(mse_errors[index, i])
 
-            dc_mae = mae(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            dc_mae = mae(X_test[0, 0].flatten(), y_test[0, 0].flatten())
             mae_errors[index, -1] = dc_mae
-            dc_mse = mse(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
+            dc_mse = mse(X_test[0, 0].flatten(), y_test[0, 0].flatten())
             mse_errors[index, -1] = dc_mse
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
@@ -473,7 +473,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
-    np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', "z_all.npy"), np.asarray(z_all))
+    # np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', "z_all.npy"), np.asarray(z_all))
 
     # then after each epoch/iteration
     avg_test_loss = sum(test_loss) / len(test_loss)

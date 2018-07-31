@@ -41,7 +41,7 @@ if not os.path.exists(MODEL_DIR):
 # CHECKPOINT_DIR = './../' + path_var + 'checkpoints'
 CHECKPOINT_DIR = RESULTS_DIR + 'checkpoints/'
 if not os.path.exists(CHECKPOINT_DIR):
-    os.mkdir(CHECKPOINT_DIR)D49A6A
+    os.mkdir(CHECKPOINT_DIR)
 
 GEN_IMAGES_DIR = RESULTS_DIR + 'generated_images/'
 if not os.path.exists(GEN_IMAGES_DIR):

@@ -1,85 +1,111 @@
-import time
-# import matplotlib
-# matplotlib.use('Agg')
+from matplotlib import rc
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from sklearn.manifold import TSNE
 from sklearn.decomposition import PCA
 import numpy as np
-# from ggplot import *
-
+np.random.seed(2**5)
 
 def build_tsne(z, labels):
     # PCA plot
+    perplexity = 100
     pca = PCA(n_components=100)
     pca_result = pca.fit_transform(z)
-    print(pca_result.shape)
 
-    tsne = TSNE(n_components=3, verbose=1, perplexity=40, n_iter=1000)
+    # tsne = TSNE(n_components=3, verbose=2, perplexity=perplexity, n_iter=1500)
+    tsne = TSNE(n_components=2, verbose=2, perplexity=perplexity, n_iter=1500)
     tsne_results = tsne.fit_transform(pca_result)
 
-    # print 't-SNE done! Time elapsed: {} seconds'.format(time.time()-time_start)
-    print (tsne_results.shape)
+    np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec2-' + str(perplexity) + '.npy', tsne_results)
+    np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels-rendec2-' + str(perplexity) + '.npy', labels)
+
+    # tsne_results = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec2.npy')
+    # labels = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels_rendec2.npy')
+
     a1 = tsne_results[:, 0]
     a2 = tsne_results[:, 1]
-    a3 = tsne_results[:, 2]
+    # a3 = tsne_results[:, 2]
 
-    np.save('/local_home/JAAD_Dataset/thesis/t-sne.npy', tsne_results)
+    # Setup plot appearances
+    rc('text', usetex=True)
+    rc('font', **{'family': 'serif', 'serif': ['Computer Modern'],
+                  'monospace': ['Computer Modern']})
+
+    plt.rcParams['font.size'] = 14
+    plt.rcParams['axes.labelsize'] = 10
+    plt.rcParams['axes.labelweight'] = 'bold'
+    plt.rcParams['axes.linewidth'] = 0.5
+    # plt.rcParams['axes.color'] = 'white'
+    plt.rcParams['xtick.labelsize'] = 12
+    plt.rcParams['ytick.labelsize'] = 12
+    plt.rcParams['legend.fontsize'] = 12
+    plt.rcParams['figure.titlesize'] = 14
+    plt.rcParams['grid.linestyle'] = '--'
+    plt.rcParams['grid.linewidth'] = 0.6
+    plt.rcParams['grid.color'] = [0.8, 0.8, 0.8]
 
     fig = plt.figure()
-    ax = fig.add_subplot(111, title='t-sne', projection='3d')
+    # ax = fig.add_subplot(111, title='t-sne', projection='3d')
+    ax = fig.add_subplot(111, title='t-sne')
     # Create the scatter
-    mesh = ax.scatter(xs=a1, ys=a2, zs=a3, c=labels, edgecolors='none')
-    plt.colorbar(mesh, ax=ax)
+    # mesh = ax.scatter(xs=a1, ys=a2, zs=a3, c=labels,
+    #                   cmap='jet',
+    #                   edgecolors='none')
+    mesh = ax.scatter(x=a1, y=a2, c=labels, cmap='viridis', edgecolors='none')
+    # plt.colorbar(mesh, ax=ax)
+    plt.colorbar(mesh, fraction=0.046, pad=0.04, ax=ax)
     plt.grid()
-    # ax.colorbar()
+    ax.set_facecolor([1, 1, 1])
+    plt.title("Perplexity =" + str(perplexity))
     plt.show()
 
+
 if __name__ == "__main__":
-    z = np.load('/local_home/JAAD_Dataset/thesis/results/res/test_results/graphs/values/z_all.npy')
-    print (z.shape)
+    z = np.load('/local_home/JAAD_Dataset/thesis/plots/data/z/z_all_rendec.npy')
+    # Remove the 1 dimensional second axis
     z = np.reshape(z, newshape=(1257, 16, 16, 26, 64))
-    print (z.shape)
+    z_mean = np.mean(z, axis=1)
     z = np.moveaxis(z, 0, 1)
-    print (z.shape)
-    z_flat = []
     z_pca = []
+    n_samples = 500
     for i in range(1, 16):
-        z_sub_flat = []
-        for j in range (1257):
+        for j in range(n_samples):
             z_pca.append(z[i, j].flatten() - z[0, j].flatten())
-            z_sub_flat.append(z[i, j].flatten())
-        z_flat.append(z_sub_flat)
+            # z_pca.append(z[i, j].flatten() - z_mean[j].flatten())
+
     z_pca = np.asarray(z_pca)
-    print (z_pca)
-    labels = np.asarray([2]*1257 + [3]*1257 + [4] *1257 + [5] *1257 + [6] *1257 + [7] *1257 + [8] *1257\
-             + [9] * 1257 + [10] *1257 + [11] *1257 + [12] *1257 + [13] *1257 + [14] *1257 + [15] *1257\
-             + [16] *1257)
-    print (labels.shape)
+
+    # labels = np.asarray([1]*n_samples + [2]*n_samples + [3]*n_samples + [4] *n_samples + [5] *n_samples + [6] *n_samples + [7] *n_samples + [8] *n_samples\
+    #          + [9] * n_samples + [10] *n_samples + [11] *n_samples + [12] *n_samples + [13] *n_samples + [14] *n_samples + [15] *n_samples\
+    #          + [16] *n_samples)
+    labels = np.asarray(
+        [2] * n_samples + [3] * n_samples + [4] * n_samples + [5] * n_samples + [6] * n_samples +
+        [7] * n_samples + [8] * n_samples + [9] * n_samples + [10] * n_samples + [11] * n_samples +
+        [12] * n_samples + [13] * n_samples + [14] * n_samples + [15] * n_samples + [16] * n_samples)
+
     # 74FCFE #CE00C1 #965DFF #3AC500
 
+    print (labels)
     z_pca = np.column_stack((z_pca, labels))
-    print (z_pca.shape)
     # Create random permutation to select 10k samples
-    z_pca = np.random.permutation(z_pca)[0:10000]
+    z_pca = np.random.permutation(z_pca)
     labels = z_pca[:, -1]
-    print (labels.shape)
     z_pca = z_pca[:, 0:26624]
-    print (z_pca.shape)
+
+    # label_2 = []
+    # for label in labels:
+    #     if label <=4:
+    #         label_2.append('r')
+    #     elif label <=8:
+    #         label_2.append('w')
+    #     elif label <=12:
+    #         label_2.append('w')
+    #     else:
+    #         label_2.append('y')
+    # label_2 = np.asarray(label_2)
+    # print (label_2)
+
     print (labels)
 
-    label_2 = []
-    for label in labels:
-        if label <=4:
-            label_2.append('r')
-        elif label <=8:
-            label_2.append('w')
-        elif label <=12:
-            label_2.append('w')
-        else:
-            label_2.append('y')
-    label_2 = np.asarray(label_2)
-    print (label_2)
+    build_tsne(z_pca, labels)
 
-    np.save('/local_home/JAAD_Dataset/thesis/labels.npy', labels)
-    build_tsne(z_pca, label_2)

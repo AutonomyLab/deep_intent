@@ -2,13 +2,13 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import matplotlib
+matplotlib.use('Agg')
 import numpy as np
 import numpy.random
 import math
 import argparse
-import matplotlib
 from matplotlib import rc
-matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import matplotlib.cm as cm
 import matplotlib.patches as mpatches
@@ -16,7 +16,7 @@ import cv2
 import ast
 import json
 import os
-# from config_3d import TEST_RESULTS_DIR
+# from config_rendec16 import TEST_RESULTS_DIR
 
 def plot_heatmap(attn_layer, epoch, vid_num, file):
     print (attn_layer)
@@ -79,11 +79,11 @@ def errorbars(data, model, colour='#3E6386'):
     meanErr = np.mean(data, axis=0)
     frames = np.linspace(1, 16, 16)
     stdDevs = np.std(data, axis=0)
-    dcVal = [meanErr[-1]] * len(meanErr[0:16])
-    dcDev = [stdDevs[-1]] * len(stdDevs[0:16])
-
-    dcLine = plt.plot(frames, dcVal)
-    plt.setp(dcLine, color='#D49A6A', linewidth=1.5, linestyle='-.')
+    # dcVal = [meanErr[-1]] * len(meanErr[0:16])
+    # dcDev = [stdDevs[-1]] * len(stdDevs[0:16])
+    #
+    # dcLine = plt.plot(frames, dcVal)
+    # plt.setp(dcLine, color='#D49A6A', linewidth=1.5, linestyle='-.')
     # plt.fill_between(frames, [a - b for a, b in zip(dcVal, dcDev)],
     #                  [a + b for a, b in zip(dcVal, dcDev)], facecolor="#C986AF", alpha=0.7)
 
@@ -105,10 +105,10 @@ def errorbars(data, model, colour='#3E6386'):
 
     plt.xlabel('Predicted frame numbers', fontsize=14)
     plt.ylabel('$l_{1}$ loss', fontsize=14)
-    plt.title("Temporal $l_{1}$ loss Variation")
+    # plt.title("Temporal $l_{1}$ loss Variation")
 
     ax.set_facecolor([1, 1, 1])
-    plt.savefig('/local_home/JAAD_Dataset/thesis/plots/' + model + '-tem.pdf', bbox_inches='tight')
+    plt.savefig('/local_home/JAAD_Dataset/thesis/plots/' + model.lower() + '-tem.pdf', bbox_inches='tight')
 
 
 def errorbars_all(models, y, colours):
@@ -132,6 +132,7 @@ def errorbars_all(models, y, colours):
     plt.rcParams['grid.linewidth'] = 0.6
     plt.rcParams['grid.color'] = [0.8, 0.8, 0.8]
     # plt.style.use('seaborn-white')
+    model_names = ['Res', 'EnDec', 'Res-EnDec', 'Segment', 'Undilated', 'Unreversed', 'Conv3D']
 
     for i in range(len(models)):
         data = np.load('/local_home/JAAD_Dataset/thesis/plots/data/mae/1256_mae_' + models[i].lower() + '.npy')
@@ -142,7 +143,7 @@ def errorbars_all(models, y, colours):
 
         lines = plt.plot(frames, meanErr[0:16], 'o')
         plt.setp(lines, color=colours[i], linewidth=1, linestyle='-')
-        plt.text(16.5, y[i], models[i].lower(), fontsize=14, color=colours[i])
+        plt.text(16.5, y[i], model_names[i], fontsize=14, color=colours[i])
 
         # plt.fill_between(frames, [a - b for a, b in zip(meanErr[0:16], stdDevs[0:16])],
         #                  [a + b for a, b in zip(meanErr[0:16], stdDevs[0:16])], facecolor="#DBF4FF", alpha=0.7)
@@ -159,7 +160,7 @@ def errorbars_all(models, y, colours):
 
     plt.xlabel('Predicted frame numbers', fontsize=14)
     plt.ylabel('$l_{1}$ loss', fontsize=14)
-    plt.title("Temporal $l_{1}$ loss Variation")
+    # plt.title("Temporal $l_{1}$ loss Variation")
 
     # red_patch = mpatches.Patch(color='#3E6386', label='With Switching')
     # blue_patch = mpatches.Patch(color='#430029', label='Without Switching')
@@ -167,6 +168,7 @@ def errorbars_all(models, y, colours):
     # ax.set_facecolor([0.975, 0.975, 0.975])
     # ax.set_facecolor([0.99, 0.99, 0.99])
     ax.set_facecolor([1, 1, 1])
+    plt.show()
     plt.savefig('/local_home/JAAD_Dataset/thesis/plots/all-tem.pdf', bbox_inches='tight')
 
 
@@ -199,14 +201,14 @@ def trainval_plot(data, model, colour='#3E6386'):
         trainLoss.append(line['train_loss'])
         valLoss.append(line['val_loss'])
 
-    epochs = np.linspace(21, 30, 10)
+    epochs = np.linspace(1, 20, 20)
 
-    valLine = plt.plot(epochs, valLoss[20:], 'o')
+    valLine = plt.plot(epochs, valLoss[0:20], 'o')
     plt.setp(valLine, color='#D49A6A', linewidth=1.5, linestyle='-')
     # plt.text(20.5, valLoss[19], 'Validation Loss', fontsize=14, color=colour)
 
 
-    trainLine = plt.plot(epochs, trainLoss[20:], 'o')
+    trainLine = plt.plot(epochs, trainLoss[0:20], 'o')
     plt.setp(trainLine, color=colour, linewidth=1, linestyle='-')
     # plt.text(20.5, trainLoss[19], 'Training Loss', fontsize=14, color='#D49A6A')
 
@@ -249,44 +251,56 @@ if __name__ == "__main__":
     # print (args.vid_num)
     # plot_heatmap(attn_layer=args.attn_layers, epoch=args.epoch, vid_num=args.vid_num, file=args.file)
 
+    # models = ['Res', 'Rescheck', 'Rendec', 'Kernel', 'Dilation', 'Rev', 'Conv']
     models = ['Res', 'Rescheck', 'Rendec', 'Kernel', 'Dilation', 'Rev']
-    colours = ['#58B33D', '#AB78CC', '#5571B9', '#C43731', '#EC8F1B', '#E394D4']
+    # colours = ['#58B33D', '#AB78CC', '#5571B9', '#C43731', '#EC8F1B', '#E394D4']
+    colours = ['#58B33D', '#AB78CC', '#5571B9', '#C43731', '#EC8F1B', '#B2C900']
 
 
     # 98766B
     # D5D5D5
     # B2C900
-
+    #
     # for i in range (len(models)):
-    #     data = np.load('/local_home/JAAD_Dataset/thesis/plots/data/mae/1256_mae_' + models[i] + '.npy')
+    #     data = np.load('/local_home/JAAD_Dataset/thesis/plots/data/mae/1256_mae_' + models[i].lower() + '.npy')
     #     errorbars(data, models[i])
 
 
-    # y = []
-    # for model in models:
-    #     data = np.load('/local_home/JAAD_Dataset/thesis/plots/data/mae/1256_mae_' + model.lower() + '.npy')
-    #     meanErr = np.mean(data, axis=0)
-    #     y_val = meanErr[15]
-    #     if model == 'Rescheck':
-    #         y_val = y_val + 0.0015
-    #     if model == 'Rev':
-    #         y_val = y_val + 0.001
-    #     if model == 'Kernel':
-    #         y_val = y_val - 0.001
-    #     if model == 'Dilation':
-    #         y_val = y_val - 0.0035
-    #     if model == 'Res':
-    #         y_val = y_val - 0.006
-    #     if model == 'Rendec':
-    #         y_val = y_val - 0.0055
-    #
-    #     y.append(y_val)
-    #
-    # errorbars_all(models, y, colours=colours)
+    y = []
+    for model in models:
+        data = np.load('/local_home/JAAD_Dataset/thesis/plots/data/mae/1256_mae_' + model.lower() + '.npy')
+        meanErr = np.mean(data, axis=0)
+        stdDevs = np.std(data, axis=0)
+        print (model)
+        print (meanErr)
+        print ((meanErr[15] - meanErr[2])/13)
+        print (((meanErr[15] - meanErr[2])/meanErr[2])*100)
+        print (stdDevs)
+        print (np.mean(stdDevs))
+        print (np.mean(data))
 
-    for i in range (len(models)):
-        with open('/local_home/JAAD_Dataset/thesis/plots/data/train-val_loss/losses_gen_' + models[i].lower() + '.json', 'r') as f:
-            data = f.readlines()
-        trainval_plot(data, models[i])
+        y_val = meanErr[15]
+        if model == 'Rescheck':
+            y_val = y_val + 0.0015
+        if model == 'Rev':
+            y_val = y_val + 0.001
+        if model == 'Kernel':
+            y_val = y_val - 0.001
+        if model == 'Dilation':
+            y_val = y_val - 0.0035
+        if model == 'Res':
+            y_val = y_val - 0.006
+        if model == 'Rendec':
+            y_val = y_val - 0.0055
+        # if model == 'Conv':
+        #     y_val = y_val - 0.0055
+
+        y.append(y_val)
+    errorbars_all(models, y, colours=colours)
+
+    # for i in range (len(models)):
+    #     with open('/local_home/JAAD_Dataset/thesis/plots/data/train-val_loss/losses_gen_' + models[i].lower() + '.json', 'r') as f:
+    #         data = f.readlines()
+    #     trainval_plot(data, models[i])
 
 

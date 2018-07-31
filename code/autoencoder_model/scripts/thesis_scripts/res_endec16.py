@@ -507,6 +507,14 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     autoencoder = autoencoder_model(encoder, decoder)
     autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
 
+    # Build first decoder layer output
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
+    mask_gen_1 = Sequential()
+    mask_gen_1.add(encoder)
+    mask_gen_1.add(intermediate_decoder)
+    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_A)
+
+
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
@@ -536,35 +544,35 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
             # z_new = np.zeros(shape=(TEST_BATCH_SIZE, 1, 16, 26, 64))
             # z_new[0] = z[:, 15]
             # z_new = np.repeat(z_new, int(VIDEO_LENGTH/2), axis=1)
-            # predicted_images = decoder.predict(z, verbose=0)
-            # voila = np.concatenate((X_test, y_test), axis=1)
-            # truth_seq = arrange_images(voila)
-            # pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
-            #
-            # truth_seq = truth_seq * 127.5 + 127.5
-            # pred_seq = pred_seq * 127.5 + 127.5
-            #
-            # mae_error = []
-            # mse_error = []
-            # for i in range(int(VIDEO_LENGTH / 2)):
-            #     mae_errors[index, i] = (mae(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
-            #     mae_error.append(mae_errors[index, i])
-            #
-            #
-            #     mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
-            #     mse_error.append(mse_errors[index, i])
-            #
-            # dc_mae = mae(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
-            # mae_errors[index, -1] = dc_mae
-            # dc_mse = mse(X_test[0, 0].flatten(), predicted_images[0, 0].flatten())
-            # mse_errors[index, -1] = dc_mse
-            # cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
-            # cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
-            # plot_err_variation(mae_error, index, dc_mae, 'mae')
-            # plot_err_variation(mse_error, index, dc_mse, 'mse')
+            predicted_images = decoder.predict([z, res], verbose=0)
+            voila = np.concatenate((X_test, y_test), axis=1)
+            truth_seq = arrange_images(voila)
+            pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
 
-    # np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
-    # np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
+            truth_seq = truth_seq * 127.5 + 127.5
+            pred_seq = pred_seq * 127.5 + 127.5
+
+            mae_error = []
+            mse_error = []
+            for i in range(int(VIDEO_LENGTH / 2)):
+                mae_errors[index, i] = (mae(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
+                mae_error.append(mae_errors[index, i])
+
+
+                mse_errors[index, i] = (mse(y_test[0, i].flatten(), predicted_images[0, i].flatten()))
+                mse_error.append(mse_errors[index, i])
+
+            dc_mae = mae(X_test[0, 0].flatten(), y_test[0, 0].flatten())
+            mae_errors[index, -1] = dc_mae
+            dc_mse = mse(X_test[0, 0].flatten(), y_test[0, 0].flatten())
+            mse_errors[index, -1] = dc_mse
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
+            cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
+            plot_err_variation(mae_error, index, dc_mae, 'mae')
+            plot_err_variation(mse_error, index, dc_mse, 'mse')
+
+    np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
+    np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', "z_all.npy"), np.asarray(z_all))
 
     # then after each epoch/iteration
