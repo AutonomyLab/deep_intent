@@ -505,15 +505,21 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
     encoder = encoder_model()
     decoder = decoder_model()
     autoencoder = autoencoder_model(encoder, decoder)
-    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_A)
+    autoencoder.compile(loss="mean_absolute_error", optimizer=OPTIM_B)
+
+    # i = 0[[
+    # for layer in decoder.layers:
+    #     print(layer, i)
+    #     i = i + 1
 
     # Build first decoder layer output
-    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[10].output)
-    mask_gen_1 = Sequential()
-    mask_gen_1.add(encoder)
-    mask_gen_1.add(intermediate_decoder)
-    mask_gen_1.compile(loss='mean_squared_error', optimizer=OPTIM_A)
-
+    intermediate_decoder = Model(inputs=decoder.layers[0].input, outputs=decoder.layers[7].output)
+    print (intermediate_decoder.input_shape)
+    inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
+    z_rep, res_rep = encoder(inputs)
+    future = intermediate_decoder(z_rep)
+    z_model = Model(inputs=inputs, outputs=future)
+    z_model.compile(loss='mean_absolute_error', optimizer=OPTIM_B)
 
     run_utilities(encoder, decoder, autoencoder, ENC_WEIGHTS, DEC_WEIGHTS)
 
@@ -538,13 +544,14 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
 
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            z, res = encoder.predict(X_test, verbose=0)
+            enc, res = encoder.predict(X_test, verbose=0)
+            z = z_model.predict(X_test, verbose=0)
             z_all.append(z)
 
             # z_new = np.zeros(shape=(TEST_BATCH_SIZE, 1, 16, 26, 64))
             # z_new[0] = z[:, 15]
             # z_new = np.repeat(z_new, int(VIDEO_LENGTH/2), axis=1)
-            predicted_images = decoder.predict([z, res], verbose=0)
+            predicted_images = decoder.predict([enc, res], verbose=0)
             voila = np.concatenate((X_test, y_test), axis=1)
             truth_seq = arrange_images(voila)
             pred_seq = arrange_images(np.concatenate((X_test, predicted_images), axis=1))
@@ -568,8 +575,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS):
             mse_errors[index, -1] = dc_mse
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/truth/', str(index) + "_truth.png"), truth_seq)
             cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_pred.png"), pred_seq)
-            plot_err_variation(mae_error, index, dc_mae, 'mae')
-            plot_err_variation(mse_error, index, dc_mse, 'mse')
+            # plot_err_variation(mae_error, index, dc_mae, 'mae')
+            # plot_err_variation(mse_error, index, dc_mse, 'mse')
 
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mae.npy"), np.asarray(mae_errors))
     np.save(os.path.join(TEST_RESULTS_DIR + '/graphs/values/', str(index) + "_mse.npy"), np.asarray(mse_errors))

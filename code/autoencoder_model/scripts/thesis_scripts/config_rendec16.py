@@ -55,7 +55,7 @@ TF_LOG_DIR = RESULTS_DIR + 'tf_logs/'
 if not os.path.exists(TF_LOG_DIR):
     os.mkdir(TF_LOG_DIR)
 
-TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/new_experiments/'
+TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/'
 if not os.path.exists(TEST_RESULTS_DIR):
     os.mkdir(TEST_RESULTS_DIR)
 

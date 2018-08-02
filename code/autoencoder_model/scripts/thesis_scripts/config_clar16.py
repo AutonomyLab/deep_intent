@@ -98,19 +98,17 @@ print ("Loading network/training configuration...")
 print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 7
-NB_EPOCHS_CLASS = 30
+TEST_BATCH_SIZE = 1
+NB_EPOCHS_CLASS = 15
 
-OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
-# OPTIM_C = Adam(lr=0.0000002, beta_1=0.5)
-# OPTIM_C = SGD(lr=0.0001, momentum=0.9, nesterov=True)
 OPTIM_C = RMSprop(lr=0.0001, rho=0.9)
 
-cla_lr_schedule = [7, 15, 23]  # epoch_step
+cla_lr_schedule = [5, 10, 15]  # epoch_step
 def cla_schedule(epoch_idx):
     if (epoch_idx + 1) < cla_lr_schedule[0]:
         return 0.000001
     elif (epoch_idx + 1) < cla_lr_schedule[1]:
         return 0.0000001  # lr_decay_ratio = 10
     elif (epoch_idx + 1) < cla_lr_schedule[2]:
-        return 0.0000001
-    return 0.0000001
+        return 0.00000001
+    return 0.00000001

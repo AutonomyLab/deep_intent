@@ -32,6 +32,7 @@ from keras.models import Model
 from keras.models import model_from_json
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_recall_fscore_support
+from sklearn.metrics import confusion_matrix
 from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import flip_axis
@@ -337,7 +338,7 @@ def stacked_classifier_model(encoder, decoder, classifier):
     set_trainability(classifier, FINETUNE_CLASSIFIER)
     actions = classifier(future)
 
-    model = Model(inputs=input, outputs=[future, actions])
+    model = Model(inputs=input, outputs=actions)
 
     return model
 
@@ -482,13 +483,13 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         exit(0)
 
 
-def load_X_y(videos_list, index, data_dir, ped_action_cats):
-    X = np.zeros((BATCH_SIZE, VIDEO_LENGTH,) + IMG_SIZE)
+def load_X_y(videos_list, index, data_dir, ped_action_cats, batch_size=BATCH_SIZE):
+    X = np.zeros((batch_size, VIDEO_LENGTH,) + IMG_SIZE)
     y = []
-    for i in range(BATCH_SIZE):
+    for i in range(batch_size):
         y_per_vid = []
         for j in range(VIDEO_LENGTH):
-            frame_number = (videos_list[(index*BATCH_SIZE + i), j])
+            frame_number = (videos_list[(index*batch_size + i), j])
             filename = "frame_" + str(frame_number) + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
@@ -623,8 +624,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     classifier = ensemble_c3d()
     run_utilities(encoder, decoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
     sclassifier = stacked_classifier_model(encoder, decoder, classifier)
-    sclassifier.compile(loss=["mae", "binary_crossentropy"],
-                        loss_weights=LOSS_WEIGHTS,
+    sclassifier.compile(loss=["binary_crossentropy"],
                         optimizer=OPTIM_C,
                         metrics=['accuracy'])
     print (sclassifier.summary())
@@ -670,22 +670,22 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             y_true_class = y[:, CLASS_TARGET_INDEX]
             y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-            c_loss.append(sclassifier.train_on_batch(X_train, [y_true_imgs, y_true_class]))
+            c_loss.append(sclassifier.train_on_batch(X_train, y_true_class))
 
             y_train_true.extend(y_true_class)
-            y_train_pred.extend(sclassifier.predict(X_train, verbose=0)[1])
+            y_train_pred.extend(sclassifier.predict(X_train, verbose=0))
 
             arrow = int(index / (NB_ITERATIONS / 30))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                         "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1, 2]]) + "  " +
+                         "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1]]) + "  " +
                          "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            # generator = autoencoder_model(encoder, decoder)
-            # predicted_images = generator.predict(X_train)
-            predicted_images, ped_pred_class = sclassifier.predict(X_train, verbose=0)
+            z, res = encoder.predict(X_train)
+            predicted_images = decoder.predict([z, res])
+            ped_pred_class = sclassifier.predict(X_train, verbose=0)
             pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
             pred_seq = pred_seq * 127.5 + 127.5
 
@@ -739,19 +739,19 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             y_true_class = y[:, CLASS_TARGET_INDEX]
             y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
-            val_c_loss.append(sclassifier.test_on_batch(X_val, [y_true_imgs, y_true_class]))
+            val_c_loss.append(sclassifier.test_on_batch(X_val, y_true_class))
             y_val_true.extend(y_true_class)
-            y_val_pred.extend(sclassifier.predict(X_val, verbose=0)[1])
+            y_val_pred.extend(sclassifier.predict(X_val, verbose=0))
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                         "val_c_loss: " +  str([ val_c_loss[len(val_c_loss) - 1][j] for j in [0, 1, 2]]))
+                         "val_c_loss: " +  str([ val_c_loss[len(val_c_loss) - 1][j] for j in [0, 1]]))
             stdout.flush()
 
         # Save generated images to file
-        # generator = autoencoder_model(encoder, decoder)
-        # val_predicted_images = generator.predict(X_val)
-        val_predicted_images, val_ped_pred_class = sclassifier.predict(X_val, verbose=0)
+        z, res = encoder.predict(X_val)
+        val_predicted_images = decoder.predict([z, res])
+        val_ped_pred_class = sclassifier.predict(X_val, verbose=0)
         orig_image = arrange_images(X_val)
         truth_image = arrange_images(y_true_imgs)
         pred_image = arrange_images(val_predicted_images)
@@ -857,16 +857,118 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
 def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
-        # then after each epoch/iteration
-    avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
+    if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
+        os.mkdir(TEST_RESULTS_DIR + '/pred/')
 
-    print("\nAvg test_c_loss: " + str(avg_test_c_loss))
-    print("\n Std: " + str(np.std(np.asarray(test_c_loss))))
-    print("\n Variance: " + str(np.var(np.asarray(test_c_loss))))
-    print("\n Mean: " + str(np.mean(np.asarray(test_c_loss))))
-    print("\n Max: " + str(np.max(np.asarray(test_c_loss))))
-    print("\n Min: " + str(np.min(np.asarray(test_c_loss))))
-    np.save(os.path.join(TEST_RESULTS_DIR, 'L1_loss.npy'), test_c_loss)
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=0)
+    # Load test action annotations
+    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
+    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
+    print("Test Stats: " + str(test_ped_class_count))
+
+    # Build the Spatio-temporal Autoencoder
+    print("Creating models.")
+
+    # Build stacked classifier
+    encoder = encoder_model()
+    decoder = decoder_model()
+
+    # Build stacked classifier
+    classifier = ensemble_c3d()
+    run_utilities(encoder, decoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS)
+    sclassifier = stacked_classifier_model(encoder, decoder, classifier)
+    sclassifier.compile(loss=["binary_crossentropy"],
+                        optimizer=OPTIM_C,
+                        metrics=['accuracy'])
+    print(sclassifier.summary())
+
+    run_utilities(classifier, CLA_WEIGHTS)
+
+    n_test_videos = test_videos_list.shape[0]
+
+    NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 5
+
+    # Setup TensorBoard Callback
+    TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False,
+                                     write_images=False)
+    LRS_clas = lrs_callback.LearningRateScheduler(schedule=cla_schedule)
+    LRS_clas.set_model(classifier)
+
+    if CLASSIFIER:
+        print("Testing Classifier...")
+        # Run over test data
+        print('')
+        y_test_pred = []
+        y_test_true = []
+        test_c_loss = []
+        for index in range(NB_TEST_ITERATIONS):
+            X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
+                            batch_size=TEST_BATCH_SIZE)
+            X_test = X
+            y_true_class = y[:, CLASS_TARGET_INDEX]
+
+            test_c_loss.append(classifier.test_on_batch(X_test, y_true_class))
+            y_test_true.extend(y_true_class)
+            y_test_pred.extend(classifier.predict(X_test, verbose=0))
+
+            arrow = int(index / (NB_TEST_ITERATIONS / 40))
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1) + "  " +
+                         "test_c_loss: " + str([test_c_loss[len(test_c_loss) - 1][j] for j in [0, 1]]))
+            stdout.flush()
+
+            if SAVE_GENERATED_IMAGES:
+                # Save generated images to file
+                test_ped_pred_class = classifier.predict(X_test, verbose=0)
+                # pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
+                pred_seq = arrange_images(X_test)
+                pred_seq = pred_seq * 127.5 + 127.5
+
+                font = cv2.FONT_HERSHEY_SIMPLEX
+                y_orig_classes = y
+                # Add labels as text to the image
+
+                for k in range(TEST_BATCH_SIZE):
+                    for j in range(int(VIDEO_LENGTH)):
+
+                        if (y_orig_classes[k, j] > 0.5):
+                            label_true = "crossing"
+                        else:
+                            label_true = "not crossing"
+
+                        if (test_ped_pred_class[k] > 0.5):
+                            label_pred = "crossing"
+                        else:
+                            label_pred = "not crossing"
+
+                        cv2.putText(pred_seq, 'truth: ' + label_true,
+                                    (2 + j * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+                        cv2.putText(pred_seq, label_pred,
+                                    (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                    cv2.LINE_AA)
+
+                cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/pred/', str(index) + "_cla_test_pred.png"),
+                            pred_seq)
+
+        # then after each epoch
+        avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
+
+        test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
+                                                                            np.asarray(y_test_pred),
+                                                                            avg='binary',
+                                                                            pos_label=1)
+        print("\nAvg test_c_loss: " + str(avg_test_c_loss))
+        print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
+
+        print("Classification Report")
+        print(get_classification_report(np.asarray(y_test_true), np.asarray(y_test_pred)))
+
+        print("Confusion matrix")
+        tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
+        print("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
 
 
 def get_args():

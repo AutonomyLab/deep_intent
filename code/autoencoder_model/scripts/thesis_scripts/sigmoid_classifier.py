@@ -341,7 +341,7 @@ def get_action_classes(action_labels, mode='softmax'):
         action_dict = dict(ele.split(':') for ele in action_labels[i].split(', ')[2:])
         # Settle pedestrian classes
         a_clean = []
-        for key, value in action_dict.iteritems():
+        for key, value in action_dict.items():
             if 'pedestrian' in key:
                 if ',' in value:
                     splits = value.split(',')
@@ -804,13 +804,6 @@ def test(CLA_WEIGHTS):
                        optimizer=OPTIM_C,
                        # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
                        metrics=['acc'])
-
-    # Build attention layer output
-    intermediate_classifier = Model(inputs=classifier.layers[0].input, outputs=classifier.layers[1].output)
-    mask_gen_1 = Sequential()
-    # mask_gen_1.add(encoder)
-    mask_gen_1.add(intermediate_classifier)
-    mask_gen_1.compile(loss='binary_crossentropy', optimizer=OPTIM_C)
 
     run_utilities(classifier, CLA_WEIGHTS)
 
