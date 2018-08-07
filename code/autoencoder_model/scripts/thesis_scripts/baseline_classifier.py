@@ -32,7 +32,7 @@ from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import flip_axis
 from image_utils import random_brightness
-from config_sigc import *
+from config_basec import *
 from sys import stdout
 
 import tb_callback
@@ -787,8 +787,8 @@ def test(CLA_WEIGHTS):
     # Setup test
     test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
     # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8, frame_skip=0)
-    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=0)
-    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=2)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=0)
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=2)
     # Load test action annotations
     test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
@@ -901,6 +901,7 @@ def get_args():
     parser.set_defaults(nice=False)
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
     args = get_args()

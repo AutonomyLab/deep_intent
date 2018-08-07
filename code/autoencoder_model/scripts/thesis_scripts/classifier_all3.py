@@ -7,6 +7,7 @@ import numpy as np
 
 np.random.seed(2 ** 10)
 from keras import backend as K
+
 K.set_image_dim_ordering('tf')
 import tensorflow as tf
 import time
@@ -54,88 +55,41 @@ def encoder_model():
     inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 208, 3))
 
     # 10x128x128
-    conv_1 = Conv3D(filters=128,
-                     strides=(1, 4, 4),
+    conv_1 = Conv3D(filters=32,
+                     strides=(1, 2, 2),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 11, 11),
+                     kernel_size=(3, 3, 3),
                      padding='same')(inputs)
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
-    conv_2a = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 5, 5),
-                     padding='same')(out_1)
-    x = TimeDistributed(BatchNormalization())(conv_2a)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_2a = TimeDistributed(Dropout(0.5))(x)
-
-    conv_2b = Conv3D(filters=64,
-                    strides=(1, 1, 1),
-                    dilation_rate=(2, 1, 1),
-                    kernel_size=(2, 5, 5),
-                    padding='same')(out_2a)
-    x = TimeDistributed(BatchNormalization())(conv_2b)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_2b = TimeDistributed(Dropout(0.5))(x)
-
-    conv_2c = TimeDistributed(Conv2D(filters=64,
-                                        kernel_size=(1, 1),
-                                        strides=(1, 1),
-                                        padding='same'))(out_1)
-    x = TimeDistributed(BatchNormalization())(conv_2c)
-    out_1_less = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-
-    res_1 = add([out_1_less, out_2b])
-
     conv_3 = Conv3D(filters=64,
                      strides=(1, 2, 2),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
-                     padding='same')(res_1)
+                     kernel_size=(3, 3, 3),
+                     padding='same')(out_1)
     x = TimeDistributed(BatchNormalization())(conv_3)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = TimeDistributed(Dropout(0.5))(x)
 
     # 10x16x16
     conv_4a = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 3, 3),
+                     strides=(1, 2, 2),
+                     dilation_rate=(1, 1, 1),
+                     kernel_size=(3, 3, 3),
                      padding='same')(out_3)
     x = TimeDistributed(BatchNormalization())(conv_4a)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_4a = TimeDistributed(Dropout(0.5))(x)
+    z = TimeDistributed(Dropout(0.5))(x)
 
-    conv_4b = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 3, 3),
-                     padding='same')(out_4a)
-    x = TimeDistributed(BatchNormalization())(conv_4b)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_4b = TimeDistributed(Dropout(0.5))(x)
-
-    z = add([out_3, out_4b])
-
-    model = Model(inputs=inputs, outputs=[z, res_1])
+    model = Model(inputs=inputs, outputs=z)
 
     return model
 
 
 def decoder_model():
     inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 64))
-    residual_input = Input(shape=(int(VIDEO_LENGTH/2), 32, 52, 64), name='res_input')
-
-    # Adjust residual input
-    def adjust_res(x):
-        pad = K.zeros_like(x[:, 1:])
-        res = x[:, 0:1]
-        return K.concatenate([res, pad], axis=1)
-
-    enc_input = Lambda(adjust_res)(residual_input)
 
     # 10x16x16
     convlstm_1 = ConvLSTM2D(filters=64,
@@ -147,17 +101,7 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     out_1 = TimeDistributed(Activation('tanh'))(x)
 
-    convlstm_2 = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_1)
-    x = TimeDistributed(BatchNormalization())(convlstm_2)
-    out_2 = TimeDistributed(Activation('tanh'))(x)
-
-    res_1 = add([inputs, out_2])
-    res_1 = UpSampling3D(size=(1, 2, 2))(res_1)
+    res_1 = UpSampling3D(size=(1, 2, 2))(out_1)
 
     # 10x32x32
     convlstm_3a = ConvLSTM2D(filters=64,
@@ -169,20 +113,10 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_3a)
     out_3a = TimeDistributed(Activation('tanh'))(x)
 
-    convlstm_3b = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_3a)
-    x = TimeDistributed(BatchNormalization())(convlstm_3b)
-    out_3b = TimeDistributed(Activation('tanh'))(x)
-
-    res_2 = add([res_1, out_3b, enc_input])
-    res_2 = UpSampling3D(size=(1, 2, 2))(res_2)
+    res_2 = UpSampling3D(size=(1, 2, 2))(out_3a)
 
     # 10x64x64
-    convlstm_4a = ConvLSTM2D(filters=16,
+    convlstm_4a = ConvLSTM2D(filters=32,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -191,23 +125,7 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_4a)
     out_4a = TimeDistributed(Activation('tanh'))(x)
 
-    convlstm_4b = ConvLSTM2D(filters=16,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_4a)
-    x = TimeDistributed(BatchNormalization())(convlstm_4b)
-    out_4b = TimeDistributed(Activation('tanh'))(x)
-
-    conv_4c = TimeDistributed(Conv2D(filters=16,
-                                        kernel_size=(1, 1),
-                                        strides=(1, 1),
-                                        padding='same'))(res_2)
-    x = TimeDistributed(BatchNormalization())(conv_4c)
-    res_2_less = TimeDistributed(Activation('tanh'))(x)
-    res_3 = add([res_2_less, out_4b])
-    res_3 = UpSampling3D(size=(1, 2, 2))(res_3)
+    res_3 = UpSampling3D(size=(1, 2, 2))(out_4a)
 
     # 10x128x128
     convlstm_5 = ConvLSTM2D(filters=3,
@@ -218,9 +136,10 @@ def decoder_model():
                             recurrent_dropout=0.2)(res_3)
     predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
 
-    model = Model(inputs=[inputs, residual_input], outputs=predictions)
+    model = Model(inputs=inputs, outputs=predictions)
 
     return model
+
 
 
 def process_prec3d():
@@ -322,8 +241,8 @@ def set_trainability(model, trainable):
 
 def autoencoder_model(encoder, decoder):
     inputs = Input(shape=(int(VIDEO_LENGTH / 2), 128, 208, 3))
-    z, res = encoder(inputs)
-    future = decoder([z, res])
+    z = encoder(inputs)
+    future = decoder(z)
 
     model = Model(inputs=inputs, outputs=future)
 
@@ -370,24 +289,23 @@ def arrange_images(video_stack):
     return image
 
 
-
 def load_weights(weights_file, model):
     model.load_weights(weights_file)
 
 
 def run_utilities(encoder, decoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     if PRINT_MODEL_SUMMARY:
-        print ("Encoder:")
-        print (encoder.summary())
-        print ("Decoder:")
-        print (decoder.summary())
+        print("Encoder:")
+        print(encoder.summary())
+        print("Decoder:")
+        print(decoder.summary())
         if CLASSIFIER:
             print("Classifier:")
-            print (classifier.summary())
+            print(classifier.summary())
 
     # Save model to file
     if SAVE_MODEL:
-        print ("Saving models to file.")
+        print("Saving models to file.")
         model_json = encoder.to_json()
         with open(os.path.join(MODEL_DIR, "encoder.json"), "w") as json_file:
             json_file.write(model_json)
@@ -408,10 +326,10 @@ def run_utilities(encoder, decoder, classifier, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WE
                 plot_model(classifier, to_file=os.path.join(MODEL_DIR, 'classifier.png'), show_shapes=True)
 
     if ENC_WEIGHTS != "None":
-        print ("Pre-loading encoder with weights.")
+        print("Pre-loading encoder with weights.")
         load_weights(ENC_WEIGHTS, encoder)
     if DEC_WEIGHTS != "None":
-        print ("Pre-loading decoder with weights.")
+        print("Pre-loading decoder with weights.")
         load_weights(DEC_WEIGHTS, decoder)
     if CLASSIFIER:
         if CLA_WEIGHTS != "None":
@@ -433,9 +351,9 @@ def random_augmentation(video):
     elif k == 1:
         # Random Rotation
         theta = np.random.uniform(-ROT_MAX, ROT_MAX)
-        for i in range (VIDEO_LENGTH):
-            video[i] = random_rotation(video[i], (i*theta)/VIDEO_LENGTH, row_axis=0,
-                            col_axis=1, channel_axis=2, fill_mode="nearest")
+        for i in range(VIDEO_LENGTH):
+            video[i] = random_rotation(video[i], (i * theta) / VIDEO_LENGTH, row_axis=0,
+                                       col_axis=1, channel_axis=2, fill_mode="nearest")
             video[i] = (video[i].astype(np.float32) - 127.5) / 127.5
 
     elif k == 2:
@@ -469,7 +387,7 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         X = []
         y = []
         for i in range(BATCH_SIZE):
-            video = np.take(frames, videos_list[(index*BATCH_SIZE + i)], axis=0)
+            video = np.take(frames, videos_list[(index * BATCH_SIZE + i)], axis=0)
             if RANDOM_AUGMENTATION:
                 video = random_augmentation(video)
             X.append(video)
@@ -480,7 +398,7 @@ def load_X_y_RAM(videos_list, index, frames, ped_action_cats):
         y = np.asarray(y)
         return X, y
     else:
-        print ("RAM usage flag not set. Are you sure you want to do this?")
+        print("RAM usage flag not set. Are you sure you want to do this?")
         exit(0)
 
 
@@ -490,15 +408,15 @@ def load_X_y(videos_list, index, data_dir, ped_action_cats, batch_size=BATCH_SIZ
     for i in range(batch_size):
         y_per_vid = []
         for j in range(VIDEO_LENGTH):
-            frame_number = (videos_list[(index*batch_size + i), j])
+            frame_number = (videos_list[(index * batch_size + i), j])
             filename = "frame_" + str(frame_number) + ".png"
             im_file = os.path.join(data_dir, filename)
             try:
                 frame = cv2.imread(im_file, cv2.IMREAD_COLOR)
                 X[i, j] = (frame.astype(np.float32) - 127.5) / 127.5
             except AttributeError as e:
-                print (im_file)
-                print (e)
+                print(im_file)
+                print(e)
             if (len(ped_action_cats) != 0):
                 try:
                     y_per_vid.append(ped_action_cats[frame_number - 1])
@@ -539,8 +457,8 @@ def get_action_classes(action_labels):
         for action in ped_actions_per_frame:
             # Get ped action number and map it to simple set
             if action.lower() not in ped_actions:
-                print ("Unknown action in labels. Exiting.")
-                print (action)
+                print("Unknown action in labels. Exiting.")
+                print(action)
                 exit(0)
             if action.lower() == 'crossing':
                 ped_action = simple_ped_set.index('crossing')
@@ -566,12 +484,12 @@ def get_video_lists(frames_source, stride, frame_skip=0):
     while (end_frame_index <= len(frames_source)):
         frame_list = frames_source[start_frame_index:end_frame_index]
         if (len(set(frame_list)) == 1):
-            videos_list.append(range(start_frame_index, end_frame_index, frame_skip+1))
+            videos_list.append(range(start_frame_index, end_frame_index, frame_skip + 1))
             start_frame_index = start_frame_index + stride
             end_frame_index = end_frame_index + stride
         else:
             start_frame_index = end_frame_index - 1
-            end_frame_index = start_frame_index + (frame_skip+1)*VIDEO_LENGTH -frame_skip
+            end_frame_index = start_frame_index + (frame_skip + 1) * VIDEO_LENGTH - frame_skip
 
     videos_list = np.asarray(videos_list, dtype=np.int32)
 
@@ -617,7 +535,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print("Val Stats: " + str(val_ped_class_count))
 
     # Build the Spatio-temporal Autoencoder
-    print ("Creating models.")
+    print("Creating models.")
     encoder = encoder_model()
     decoder = decoder_model()
 
@@ -628,13 +546,13 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     sclassifier.compile(loss=["binary_crossentropy"],
                         optimizer=OPTIM_C,
                         metrics=['accuracy'])
-    print (sclassifier.summary())
+    print(sclassifier.summary())
 
     n_videos = videos_list.shape[0]
     n_val_videos = val_videos_list.shape[0]
-    NB_ITERATIONS = int(n_videos/BATCH_SIZE)
+    NB_ITERATIONS = int(n_videos / BATCH_SIZE)
     # NB_ITERATIONS = 1
-    NB_VAL_ITERATIONS = int(n_val_videos/BATCH_SIZE)
+    NB_VAL_ITERATIONS = int(n_val_videos / BATCH_SIZE)
     # NB_VAL_ITERATIONS = 1
 
     # Setup TensorBoard Callback
@@ -642,12 +560,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     LRS_cla = lrs_callback.LearningRateScheduler(schedule=cla_schedule)
     LRS_cla.set_model(sclassifier)
 
-    print ("Beginning Training.")
+    print("Beginning Training.")
     # Begin Training
 
     # Train Classifier
     print("Training Classifier...")
-    for epoch in range(1, NB_EPOCHS_CLASS+1):
+    for epoch in range(1, NB_EPOCHS_CLASS + 1):
         print("\n\nEpoch ", epoch)
         c_loss = []
         val_c_loss = []
@@ -678,14 +596,14 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             arrow = int(index / (NB_ITERATIONS / 30))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_ITERATIONS - 1) + "  " +
-                         "c_loss: " + str([ c_loss[len(c_loss) - 1][j]  for j in [0, 1]]) + "  " +
+                         "c_loss: " + str([c_loss[len(c_loss) - 1][j] for j in [0, 1]]) + "  " +
                          "\t    [" + "{0}>".format("=" * (arrow)))
             stdout.flush()
 
         if SAVE_GENERATED_IMAGES:
             # Save generated images to file
-            z, res = encoder.predict(X_train)
-            predicted_images = decoder.predict([z, res])
+            z = encoder.predict(X_train)
+            predicted_images = decoder.predict(z)
             ped_pred_class = sclassifier.predict(X_train, verbose=0)
             pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
             pred_seq = pred_seq * 127.5 + 127.5
@@ -746,12 +664,12 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
             arrow = int(index / (NB_VAL_ITERATIONS / 40))
             stdout.write("\rIter: " + str(index) + "/" + str(NB_VAL_ITERATIONS - 1) + "  " +
-                         "val_c_loss: " +  str([ val_c_loss[len(val_c_loss) - 1][j] for j in [0, 1]]))
+                         "val_c_loss: " + str([val_c_loss[len(val_c_loss) - 1][j] for j in [0, 1]]))
             stdout.flush()
 
         # Save generated images to file
-        z, res = encoder.predict(X_val)
-        val_predicted_images = decoder.predict([z, res])
+        z = encoder.predict(X_val)
+        val_predicted_images = decoder.predict(z)
         val_ped_pred_class = sclassifier.predict(X_val, verbose=0)
         orig_image = arrange_images(X_val)
         truth_image = arrange_images(y_true_imgs)
@@ -812,9 +730,9 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                                                                 avg='binary',
                                                                                 pos_label=1)
         val_prec, val_rec, val_fbeta, val_support = get_sklearn_metrics(np.asarray(y_val_true),
-                                                                            np.asarray(y_val_pred),
-                                                                            avg='binary',
-                                                                            pos_label=1)
+                                                                        np.asarray(y_val_pred),
+                                                                        avg='binary',
+                                                                        pos_label=1)
 
         print("\nTrain Prec: %.2f, Recall: %.2f, Fbeta: %.2f" % (train_prec, train_rec, train_fbeta))
         print("Val Prec: %.2f, Recall: %.2f, Fbeta: %.2f" % (val_prec, val_rec, val_fbeta))
@@ -855,9 +773,7 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     print(get_classification_report(np.asarray(y_val_true), np.asarray(y_val_pred)))
 
 
-
 def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
-
     if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
         os.mkdir(TEST_RESULTS_DIR + '/pred/')
     if not os.path.exists(TEST_RESULTS_DIR + '/truth/'):
@@ -892,7 +808,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
     # NB_TEST_ITERATIONS = 5
-    
+
     if CLASSIFIER:
         print("Testing Classifier...")
         # Run over test data
@@ -925,8 +841,8 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             stdout.flush()
 
             # Save generated images to file
-            z, res = encoder.predict(X_test)
-            test_predicted_images = decoder.predict([z, res])
+            z = encoder.predict(X_test)
+            test_predicted_images = decoder.predict(z)
             test_ped_pred_class = sclassifier.predict(X_test, verbose=0)
             pred_seq = arrange_images(np.concatenate((X_test, test_predicted_images), axis=1))
             pred_seq = pred_seq * 127.5 + 127.5
@@ -989,10 +905,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
         print("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
 
-        print ("Mean time taken to make " + str(NB_TEST_ITERATIONS) + " predictions: %f"
-               %(np.mean(np.asarray(iter_endtime)-np.asarray(iter_starttime))))
-        print ("Standard Deviation %f"
-               %(np.std(np.asarray(iter_endtime)-np.asarray(iter_starttime))))
+        print("Mean time taken to make " + str(NB_TEST_ITERATIONS) + " predictions: %f"
+              % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
+        print("Standard Deviation %f"
+              % (np.std(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
 
         print("Mean time taken to make load and process" + str(NB_TEST_ITERATIONS) + " predictions: %f"
               % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_loadtime))))
@@ -1034,7 +950,7 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     n_test_videos = test_videos_list.shape[0]
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
-    print ("Number of iterations %d" %NB_TEST_ITERATIONS)
+    print("Number of iterations %d" % NB_TEST_ITERATIONS)
     # NB_TEST_ITERATIONS = 5
 
     if CLASSIFIER:
@@ -1051,17 +967,18 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         while index < NB_TEST_ITERATIONS:
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                             batch_size=TEST_BATCH_SIZE)
-            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
-            y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+            # X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            # y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
             y_past_class = y[:, 0]
-            y_end_class = y[:,-1]
+
+            y_end_class = y[:, -1]
 
             if y_end_class[0] == y_past_class[0]:
                 index = index + 1
                 continue
             else:
-                for fnum in range (VIDEO_LENGTH):
+                for fnum in range(VIDEO_LENGTH):
 
                     X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                                     batch_size=TEST_BATCH_SIZE)
@@ -1077,8 +994,8 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     y_test_true.extend(y_true_class)
 
                     # Save generated images to file
-                    z, res = encoder.predict(X_test)
-                    test_predicted_images = decoder.predict([z, res])
+                    z = encoder.predict(X_test)
+                    test_predicted_images = decoder.predict(z)
                     test_ped_pred_class = sclassifier.predict(X_test, verbose=0)
                     pred_seq = arrange_images(np.concatenate((X_test, test_predicted_images), axis=1))
                     pred_seq = pred_seq * 127.5 + 127.5
@@ -1127,16 +1044,15 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                 truth_image)
 
                     if y_true_class[0] != np.round(y_pred_class[0]):
-                        print ("Wrong prediction! Slide window and try again.")
+                        print("Wrong prediction! Slide window and try again.")
                         index = index + 1
                         continue
                     else:
-                        print ("Correct prediction. Record data.")
+                        print("Correct prediction. Record data.")
                         tcp_list.append(fnum + 1)
                         index = index + int(VIDEO_LENGTH / 2)
                         # Break from the for loop
                         break
-
 
         # then after each epoch
         avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
@@ -1148,7 +1064,7 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         print("\nAvg test_c_loss: " + str(avg_test_c_loss))
         print("Mean time to change prediction: " + str(np.mean(np.asarray(tcp_list))))
         print("Standard Deviation " + str(np.std(np.asarray(tcp_list))))
-        print ("Number of correct predictions " + str(len(tcp_list)))
+        print("Number of correct predictions " + str(len(tcp_list)))
         print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
 
         print("Classification Report")
@@ -1170,6 +1086,7 @@ def get_args():
     parser.set_defaults(nice=False)
     args = parser.parse_args()
     return args
+
 
 if __name__ == "__main__":
     args = get_args()

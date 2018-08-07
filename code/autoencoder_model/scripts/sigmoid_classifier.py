@@ -32,7 +32,7 @@ from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import flip_axis
 from image_utils import random_brightness
-from config_sigc import *
+from config_basec import *
 from sys import stdout
 
 import tb_callback

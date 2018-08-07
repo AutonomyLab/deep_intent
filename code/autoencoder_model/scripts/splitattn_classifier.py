@@ -60,7 +60,7 @@ from image_utils import random_zoom
 from image_utils import flip_axis
 from custom_layers import AttnLossLayer
 from image_utils import random_brightness
-from config_sigc import *
+from config_basec import *
 from sys import stdout
 
 import tb_callback

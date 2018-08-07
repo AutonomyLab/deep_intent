@@ -8,22 +8,23 @@ np.random.seed(2**10)
 
 def build_tsne(z, labels):
     # PCA plot
-    perplexity = 350
-    pca = PCA(n_components=100)
-    pca_result = pca.fit_transform(z)
+    # perplexity = 350
+    # pca = PCA(n_components=100)
+    # pca_result = pca.fit_transform(z)
+    #
+    # tsne3 = TSNE(n_components=3, verbose=2, perplexity=perplexity, n_iter=2000)
+    # tsne3_results = tsne3.fit_transform(pca_result)
+    #
+    # tsne2 = TSNE(n_components=2, verbose=2, perplexity=perplexity, n_iter=2000)
+    # tsne2_results = tsne2.fit_transform(pca_result)
+    #
+    # np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec3-enc-' + str(perplexity) + '.npy', tsne3_results)
+    # np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec2-enc-' + str(perplexity) + '.npy', tsne2_results)
+    # np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels-rendec-enc-' + str(perplexity) + '.npy', labels)
 
-    tsne3 = TSNE(n_components=3, verbose=2, perplexity=perplexity, n_iter=2000)
-    tsne3_results = tsne3.fit_transform(pca_result)
-
-    tsne2 = TSNE(n_components=2, verbose=2, perplexity=perplexity, n_iter=2000)
-    tsne2_results = tsne2.fit_transform(pca_result)
-
-    np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec3-enc-' + str(perplexity) + '.npy', tsne3_results)
-    np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec2-enc-' + str(perplexity) + '.npy', tsne2_results)
-    np.save('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels-rendec-enc-' + str(perplexity) + '.npy', labels)
-
-    # tsne3_results = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec3-lstm-100.npy')
-    # labels = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels-rendec-lstm-100.npy')
+    tsne3_results = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec3-lstm-100.npy')
+    tsne2_results = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/t-sne-rendec2-lstm-100.npy')
+    labels = np.load('/local_home/JAAD_Dataset/thesis/plots/data/t-sne/labels-rendec-lstm-100.npy')
 
     a1 = tsne3_results[:, 0]
     a2 = tsne3_results[:, 1]
