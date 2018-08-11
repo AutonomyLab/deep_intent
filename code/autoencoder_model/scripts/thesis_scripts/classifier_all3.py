@@ -18,6 +18,7 @@ from keras.layers.core import Activation
 from keras.utils.vis_utils import plot_model
 from keras.layers.wrappers import TimeDistributed
 from keras.layers.convolutional import Conv3D
+from keras.layers.convolutional import Conv3DTranspose
 from keras.layers.convolutional import Conv2D
 from keras.layers.convolutional import UpSampling3D
 from keras.layers.convolutional_recurrent import ConvLSTM2D
@@ -50,38 +51,77 @@ import math
 import cv2
 import os
 
-
 def encoder_model():
     inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 208, 3))
 
     # 10x128x128
-    conv_1 = Conv3D(filters=32,
-                     strides=(1, 2, 2),
+    conv_1 = Conv3D(filters=128,
+                     strides=(1, 4, 4),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
+                     kernel_size=(3, 11, 11),
                      padding='same')(inputs)
     x = TimeDistributed(BatchNormalization())(conv_1)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_1 = TimeDistributed(Dropout(0.5))(x)
 
+    conv_2a = Conv3D(filters=64,
+                     strides=(1, 1, 1),
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 5, 5),
+                     padding='same')(out_1)
+    x = TimeDistributed(BatchNormalization())(conv_2a)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2a = TimeDistributed(Dropout(0.5))(x)
+
+    conv_2b = Conv3D(filters=64,
+                    strides=(1, 1, 1),
+                    dilation_rate=(2, 1, 1),
+                    kernel_size=(2, 5, 5),
+                    padding='same')(out_2a)
+    x = TimeDistributed(BatchNormalization())(conv_2b)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_2b = TimeDistributed(Dropout(0.5))(x)
+
+    conv_2c = TimeDistributed(Conv2D(filters=64,
+                                        kernel_size=(1, 1),
+                                        strides=(1, 1),
+                                        padding='same'))(out_1)
+    x = TimeDistributed(BatchNormalization())(conv_2c)
+    out_1_less = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+
+    res_1 = add([out_1_less, out_2b])
+    # res_1 = LeakyReLU(alpha=0.2)(res_1)
+
     conv_3 = Conv3D(filters=64,
                      strides=(1, 2, 2),
                      dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
-                     padding='same')(out_1)
+                     kernel_size=(3, 5, 5),
+                     padding='same')(res_1)
     x = TimeDistributed(BatchNormalization())(conv_3)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
     out_3 = TimeDistributed(Dropout(0.5))(x)
 
     # 10x16x16
     conv_4a = Conv3D(filters=64,
-                     strides=(1, 2, 2),
-                     dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 3, 3),
+                     strides=(1, 1, 1),
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 3, 3),
                      padding='same')(out_3)
     x = TimeDistributed(BatchNormalization())(conv_4a)
     x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    z = TimeDistributed(Dropout(0.5))(x)
+    out_4a = TimeDistributed(Dropout(0.5))(x)
+
+    conv_4b = Conv3D(filters=64,
+                     strides=(1, 1, 1),
+                     dilation_rate=(2, 1, 1),
+                     kernel_size=(2, 3, 3),
+                     padding='same')(out_4a)
+    x = TimeDistributed(BatchNormalization())(conv_4b)
+    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
+    out_4b = TimeDistributed(Dropout(0.5))(x)
+
+    z = add([out_3, out_4b])
+    # res_1 = LeakyReLU(alpha=0.2)(res_1)
 
     model = Model(inputs=inputs, outputs=z)
 
@@ -101,7 +141,23 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_1)
     out_1 = TimeDistributed(Activation('tanh'))(x)
 
-    res_1 = UpSampling3D(size=(1, 2, 2))(out_1)
+    convlstm_2 = ConvLSTM2D(filters=64,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.2)(out_1)
+    x = TimeDistributed(BatchNormalization())(convlstm_2)
+    out_2 = TimeDistributed(Activation('tanh'))(x)
+
+    # conv_1c = TimeDistributed(Conv2D(filters=64,
+    #                                  kernel_size=(1, 1),
+    #                                  strides=(1, 1),
+    #                                  padding='same'))(inputs)
+    # x = TimeDistributed(BatchNormalization())(conv_1c)
+    # res_0_less = TimeDistributed(Activation('tanh'))(x)
+    res_1 = add([inputs, out_2])
+    res_1 = UpSampling3D(size=(1, 2, 2))(res_1)
 
     # 10x32x32
     convlstm_3a = ConvLSTM2D(filters=64,
@@ -113,10 +169,26 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_3a)
     out_3a = TimeDistributed(Activation('tanh'))(x)
 
-    res_2 = UpSampling3D(size=(1, 2, 2))(out_3a)
+    convlstm_3b = ConvLSTM2D(filters=64,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.2)(out_3a)
+    x = TimeDistributed(BatchNormalization())(convlstm_3b)
+    out_3b = TimeDistributed(Activation('tanh'))(x)
+
+    # conv_3c = TimeDistributed(Conv2D(filters=64,
+    #                                     kernel_size=(1, 1),
+    #                                     strides=(1, 1),
+    #                                     padding='same'))(res_1)
+    # x = TimeDistributed(BatchNormalization())(conv_3c)
+    # res_1_less = TimeDistributed(Activation('tanh'))(x)
+    res_2 = add([res_1, out_3b])
+    res_2 = UpSampling3D(size=(1, 2, 2))(res_2)
 
     # 10x64x64
-    convlstm_4a = ConvLSTM2D(filters=32,
+    convlstm_4a = ConvLSTM2D(filters=16,
                             kernel_size=(3, 3),
                             strides=(1, 1),
                             padding='same',
@@ -125,7 +197,23 @@ def decoder_model():
     x = TimeDistributed(BatchNormalization())(convlstm_4a)
     out_4a = TimeDistributed(Activation('tanh'))(x)
 
-    res_3 = UpSampling3D(size=(1, 2, 2))(out_4a)
+    convlstm_4b = ConvLSTM2D(filters=16,
+                            kernel_size=(3, 3),
+                            strides=(1, 1),
+                            padding='same',
+                            return_sequences=True,
+                            recurrent_dropout=0.2)(out_4a)
+    x = TimeDistributed(BatchNormalization())(convlstm_4b)
+    out_4b = TimeDistributed(Activation('tanh'))(x)
+
+    conv_4c = TimeDistributed(Conv2D(filters=16,
+                                        kernel_size=(1, 1),
+                                        strides=(1, 1),
+                                        padding='same'))(res_2)
+    x = TimeDistributed(BatchNormalization())(conv_4c)
+    res_2_less = TimeDistributed(Activation('tanh'))(x)
+    res_3 = add([res_2_less, out_4b])
+    res_3 = UpSampling3D(size=(1, 2, 2))(res_3)
 
     # 10x128x128
     convlstm_5 = ConvLSTM2D(filters=3,
@@ -139,7 +227,6 @@ def decoder_model():
     model = Model(inputs=inputs, outputs=predictions)
 
     return model
-
 
 
 def process_prec3d():
@@ -950,7 +1037,7 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     n_test_videos = test_videos_list.shape[0]
 
     NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
-    print("Number of iterations %d" % NB_TEST_ITERATIONS)
+    print ("Number of iterations %d" %NB_TEST_ITERATIONS)
     # NB_TEST_ITERATIONS = 5
 
     if CLASSIFIER:
@@ -967,18 +1054,17 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         while index < NB_TEST_ITERATIONS:
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                             batch_size=TEST_BATCH_SIZE)
-            # X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
-            # y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
             y_past_class = y[:, 0]
-
-            y_end_class = y[:, -1]
+            y_end_class = y[:,-1]
 
             if y_end_class[0] == y_past_class[0]:
                 index = index + 1
                 continue
             else:
-                for fnum in range(VIDEO_LENGTH):
+                for fnum in range (int(VIDEO_LENGTH/2)):
 
                     X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                                     batch_size=TEST_BATCH_SIZE)
@@ -994,8 +1080,8 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                     y_test_true.extend(y_true_class)
 
                     # Save generated images to file
-                    z = encoder.predict(X_test)
-                    test_predicted_images = decoder.predict(z)
+                    z, res = encoder.predict(X_test)
+                    test_predicted_images = decoder.predict([z, res])
                     test_ped_pred_class = sclassifier.predict(X_test, verbose=0)
                     pred_seq = arrange_images(np.concatenate((X_test, test_predicted_images), axis=1))
                     pred_seq = pred_seq * 127.5 + 127.5
@@ -1015,7 +1101,7 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                             else:
                                 label_orig = "not crossing"
 
-                            if y_true_classes[k][0] > 0.5:
+                            if y_true_classes[k][j] > 0.5:
                                 label_true = "crossing"
                             else:
                                 label_true = "not crossing"
@@ -1044,15 +1130,17 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                 truth_image)
 
                     if y_true_class[0] != np.round(y_pred_class[0]):
-                        print("Wrong prediction! Slide window and try again.")
+                        print ("Wrong prediction! Slide window and try again.")
                         index = index + 1
                         continue
                     else:
-                        print("Correct prediction. Record data.")
+                        print ("Correct prediction. Record data.")
+                        print (fnum+1)
                         tcp_list.append(fnum + 1)
                         index = index + int(VIDEO_LENGTH / 2)
                         # Break from the for loop
                         break
+
 
         # then after each epoch
         avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
@@ -1064,7 +1152,7 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         print("\nAvg test_c_loss: " + str(avg_test_c_loss))
         print("Mean time to change prediction: " + str(np.mean(np.asarray(tcp_list))))
         print("Standard Deviation " + str(np.std(np.asarray(tcp_list))))
-        print("Number of correct predictions " + str(len(tcp_list)))
+        print ("Number of correct predictions " + str(len(tcp_list)))
         print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
 
         print("Classification Report")

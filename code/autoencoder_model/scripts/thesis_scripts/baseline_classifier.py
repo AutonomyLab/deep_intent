@@ -38,6 +38,7 @@ from sys import stdout
 import tb_callback
 import lrs_callback
 import argparse
+import time
 import cv2
 import os
 
@@ -824,10 +825,18 @@ def test(CLA_WEIGHTS):
         y_test_pred = []
         y_test_true = []
         test_c_loss = []
+        iter_loadtime = []
+        iter_starttime = []
+        iter_endtime = []
         for index in range(NB_TEST_ITERATIONS):
+            iter_loadtime.append(time.time())
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes, batch_size=TEST_BATCH_SIZE)
             X_test = X
             y_true_class = y[:, CLASS_TARGET_INDEX]
+
+            iter_starttime.append(time.time())
+            test_ped_pred_class = classifier.predict(X_test, verbose=0)
+            iter_endtime.append(time.time())
 
             test_c_loss.append(classifier.test_on_batch(X_test, y_true_class))
             y_test_true.extend(y_true_class)
@@ -888,6 +897,16 @@ def test(CLA_WEIGHTS):
         print ("Confusion matrix")
         tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
         print ("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
+
+        print("Mean time taken to make " + str(NB_TEST_ITERATIONS) + " predictions: %f"
+              % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
+        print("Standard Deviation %f"
+              % (np.std(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
+
+        print("Mean time taken to load and process " + str(NB_TEST_ITERATIONS) + " predictions: %f"
+              % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_loadtime))))
+        print("Standard Deviation %f"
+              % (np.std(np.asarray(iter_endtime) - np.asarray(iter_loadtime))))
 
 
 def get_args():

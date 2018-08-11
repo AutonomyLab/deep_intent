@@ -4,8 +4,10 @@ from __future__ import print_function
 
 from keras.optimizers import SGD
 from keras.optimizers import Adam
+from keras.optimizers import adadelta
+from keras.optimizers import rmsprop
+from keras.layers import Layer
 from keras import backend as K
-from keras.optimizers import RMSprop
 K.set_image_dim_ordering('tf')
 import socket
 import os
@@ -27,11 +29,9 @@ DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/train/'
 VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
+# TEST_DATA_DIR= '/local_home/JAAD_Dataset/fun_experiments/resized/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec-cla/'
-
-PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
-PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec-latent/'
 
 # MODEL_DIR = './../' + path_var + 'models'
 MODEL_DIR = RESULTS_DIR + 'models/'
@@ -43,21 +43,17 @@ CHECKPOINT_DIR = RESULTS_DIR + 'checkpoints/'
 if not os.path.exists(CHECKPOINT_DIR):
     os.mkdir(CHECKPOINT_DIR)
 
-GEN_IMAGES_DIR = RESULTS_DIR + 'generated_images'
+GEN_IMAGES_DIR = RESULTS_DIR + 'generated_images/'
 if not os.path.exists(GEN_IMAGES_DIR):
     os.mkdir(GEN_IMAGES_DIR)
-
-CLA_GEN_IMAGES_DIR = RESULTS_DIR + 'generated_images/cla_gen/'
-if not os.path.exists(CLA_GEN_IMAGES_DIR):
-    os.mkdir(CLA_GEN_IMAGES_DIR)
 
 LOG_DIR = RESULTS_DIR + 'logs/'
 if not os.path.exists(LOG_DIR):
     os.mkdir(LOG_DIR)
 
-TF_LOG_CLA_DIR = RESULTS_DIR + 'tf_cla_logs/'
-if not os.path.exists(TF_LOG_CLA_DIR):
-    os.mkdir(TF_LOG_CLA_DIR)
+TF_LOG_DIR = RESULTS_DIR + 'tf_logs/'
+if not os.path.exists(TF_LOG_DIR):
+    os.mkdir(TF_LOG_DIR)
 
 TEST_RESULTS_DIR = RESULTS_DIR + 'test_results/'
 if not os.path.exists(TEST_RESULTS_DIR):
@@ -68,47 +64,39 @@ SAVE_MODEL = True
 PLOT_MODEL = True
 SAVE_GENERATED_IMAGES = True
 SHUFFLE = True
+VIDEO_LENGTH = 32
 IMG_SIZE = (128, 208, 3)
 RAM_DECIMATE = True
-VIDEO_LENGTH = 32
+REVERSE = True
 
-RANDOM_AUGMENTATION = False
-ROT_MAX = 5
-SFT_H_MAX = 0.02
-SFT_V_MAX = 0.02
-ZOOM_MAX = 0.2
-BRIGHT_RANGE_L = 0.5
-BRIGHT_RANGE_H = 1.5
-
-CLASSIFIER = True
-CLASS_TARGET_INDEX = 24
-FINETUNE_ENCODER = False
-FINETUNE_DECODER = False
-FINETUNE_CLASSIFIER = True
-LOSS_WEIGHTS = [0, 1]
-
-ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
-               'clear path', 'handwave', 'crossing', 'looking', 'no ped']
-
-simple_ped_set = ['crossing']
 
 # -------------------------------------------------
 # Network configuration:
-print ("Loading network/training configuration...")
+print ("Loading network/training configuration.")
 print ("Config file: " + str(__name__))
 
-BATCH_SIZE = 7
+BATCH_SIZE = 8
+
 TEST_BATCH_SIZE = 1
-NB_EPOCHS_CLASS = 15
+NB_EPOCHS_AUTOENCODER = 30
 
-OPTIM_C = RMSprop(lr=0.0001, rho=0.9)
+# OPTIM_A = Adam(lr=0.0001, beta_1=0.5)
+OPTIM_A = rmsprop(lr=0.0001, rho=0.9)
+OPTIM_B = rmsprop(lr=0.00001, rho=0.9)
+# OPTIM_A = SGD(lr=0.000001, momentum=0.5, nesterov=True)
 
-cla_lr_schedule = [5, 10, 15]  # epoch_step
-def cla_schedule(epoch_idx):
-    if (epoch_idx + 1) < cla_lr_schedule[0]:
-        return 0.000001
-    elif (epoch_idx + 1) < cla_lr_schedule[1]:
-        return 0.0000001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < cla_lr_schedule[2]:
-        return 0.00000001
-    return 0.00000001
+lr_schedule = [7, 14, 20, 30]  # epoch_step
+
+def schedule(epoch_idx):
+    if (epoch_idx) <= lr_schedule[0]:
+        return 0.001
+    elif (epoch_idx) <= lr_schedule[1]:
+        return 0.0001  # lr_decay_ratio = 10
+    elif (epoch_idx) <= lr_schedule[2]:
+        return 0.00001  # lr_decay_ratio = 10
+    elif (epoch_idx) <= lr_schedule[3]:
+        return 0.00001
+    return 0.00001
+
+
+

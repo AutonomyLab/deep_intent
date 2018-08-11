@@ -28,7 +28,7 @@ VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec-cla/'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec-sports-cla/'
 
 PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
 PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
@@ -99,16 +99,29 @@ print ("Config file: " + str(__name__))
 
 BATCH_SIZE = 7
 TEST_BATCH_SIZE = 1
-NB_EPOCHS_CLASS = 15
+NB_EPOCHS_CLASS = 30 
 
 OPTIM_C = RMSprop(lr=0.0001, rho=0.9)
 
-cla_lr_schedule = [5, 10, 15]  # epoch_step
+cla_lr_schedule = [7, 16, 30, 30]  # epoch_step
+
 def cla_schedule(epoch_idx):
-    if (epoch_idx + 1) < cla_lr_schedule[0]:
-        return 0.000001
-    elif (epoch_idx + 1) < cla_lr_schedule[1]:
+    if (epoch_idx) <= cla_lr_schedule[0]:
+        return 0.00001
+    elif (epoch_idx) <= cla_lr_schedule[1]:
+        return 0.000001  # lr_decay_ratio = 10
+    elif (epoch_idx) <= cla_lr_schedule[2]:
         return 0.0000001  # lr_decay_ratio = 10
-    elif (epoch_idx + 1) < cla_lr_schedule[2]:
-        return 0.00000001
-    return 0.00000001
+    elif (epoch_idx) <= cla_lr_schedule[3]:
+        return 0.0000001
+    return 0.0000001
+
+#cla_lr_schedule = [5, 10, 15]  # epoch_step
+#def cla_schedule(epoch_idx):
+#    if (epoch_idx + 1) < cla_lr_schedule[0]:
+#        return 0.000001
+#    elif (epoch_idx + 1) < cla_lr_schedule[1]:
+#        return 0.0000001  # lr_decay_ratio = 10
+#    elif (epoch_idx + 1) < cla_lr_schedule[2]:
+#        return 0.00000001
+#    return 0.00000001
