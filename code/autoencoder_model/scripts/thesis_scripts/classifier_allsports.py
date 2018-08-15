@@ -793,7 +793,7 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
     # test_videos_list = np.concatenate((videos_list_1, videos_list_2), axis=0)
 
     # Load test action annotations
-    test_action_labels = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_test_208.hkl'))
+    test_action_labels = hkl.load(os.path.join(VAL_DATA_DIR, 'annotations_val_208.hkl'))
     test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels)
     print("Test Stats: " + str(test_ped_class_count))
 
