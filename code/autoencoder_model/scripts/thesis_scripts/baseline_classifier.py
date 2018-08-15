@@ -28,6 +28,9 @@ from keras.models import model_from_json
 from sklearn.metrics import classification_report
 from sklearn.metrics import precision_recall_fscore_support
 from sklearn.metrics import confusion_matrix
+from sklearn.metrics import precision_recall_curve
+from sklearn.metrics import average_precision_score
+from sklearn.metrics import accuracy_score
 from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import flip_axis
@@ -883,30 +886,248 @@ def test(CLA_WEIGHTS):
 
         # then after each epoch
         avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
-
         test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
-                                                                        np.asarray(y_test_pred),
-                                                                        avg='binary',
-                                                                        pos_label=1)
+                                                                            np.asarray(y_test_pred),
+                                                                            avg='binary',
+                                                                            pos_label=1)
         print("\nAvg test_c_loss: " + str(avg_test_c_loss))
         print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
 
-        print ("Classification Report")
+        test_acc = accuracy_score(y_test_true, np.round(y_test_pred))
+        print("Test Accuracy: %.4f" % (test_acc))
+
+        avg_prec = average_precision_score(y_test_true, y_test_pred)
+        print("Average precision: %.4f" % (avg_prec))
+
+        precisions, recalls, thresholds = precision_recall_curve(y_test_true, y_test_pred)
+        print("PR curve precisions: "  + str(precisions))
+        print("PR curve recalls: " + str(recalls))
+        print("PR curve thresholds: " + str(thresholds))
+        print("PR curve prec mean: %.4f" %(np.mean(precisions)))
+        print("PR curve prec std: %.4f" %(np.std(precisions)))
+        print("Number of thresholds: %.4f" %(len(thresholds)))
+
+        print("Classification Report")
         print(get_classification_report(np.asarray(y_test_true), np.asarray(y_test_pred)))
 
-        print ("Confusion matrix")
+        print("Confusion matrix")
         tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
-        print ("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
+        print("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
 
         print("Mean time taken to make " + str(NB_TEST_ITERATIONS) + " predictions: %f"
               % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
         print("Standard Deviation %f"
               % (np.std(np.asarray(iter_endtime) - np.asarray(iter_starttime))))
 
-        print("Mean time taken to load and process " + str(NB_TEST_ITERATIONS) + " predictions: %f"
+        print("Mean time taken to make load and process" + str(NB_TEST_ITERATIONS) + " predictions: %f"
               % (np.mean(np.asarray(iter_endtime) - np.asarray(iter_loadtime))))
         print("Standard Deviation %f"
               % (np.std(np.asarray(iter_endtime) - np.asarray(iter_loadtime))))
+
+
+def test_mtcp(CLA_WEIGHTS):
+
+    if not os.path.exists(TEST_RESULTS_DIR + '/pred/'):
+        os.mkdir(TEST_RESULTS_DIR + '/pred/')
+
+    # Setup test
+    test_frames_source = hkl.load(os.path.join(TEST_DATA_DIR, 'sources_test_208.hkl'))
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=8, frame_skip=0)
+    test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=0)
+    # test_videos_list = get_video_lists(frames_source=test_frames_source, stride=16, frame_skip=2)
+    # Load test action annotations
+    test_action_labels = hkl.load(os.path.join(TEST_DATA_DIR, 'annotations_test_208.hkl'))
+    test_ped_action_classes, test_ped_class_count = get_action_classes(test_action_labels, mode='sigmoid')
+    print("Test Stats: " + str(test_ped_class_count))
+
+    # Build the Spatio-temporal Autoencoder
+    print("Creating models.")
+    # Build stacked classifier
+    # classifier = pretrained_c3d()
+    classifier = ensemble_c3d()
+    # classifier = c3d_scratch()
+    classifier.compile(loss="binary_crossentropy",
+                       optimizer=OPTIM_C,
+                       # metrics=[metric_precision, metric_recall, metric_mpca, 'accuracy'])
+                       metrics=['acc'])
+
+    run_utilities(classifier, CLA_WEIGHTS)
+
+    n_test_videos = test_videos_list.shape[0]
+
+    NB_TEST_ITERATIONS = int(n_test_videos / TEST_BATCH_SIZE)
+    # NB_TEST_ITERATIONS = 5
+
+    # Setup TensorBoard Callback
+    TC_cla = tb_callback.TensorBoard(log_dir=TF_LOG_CLA_DIR, histogram_freq=0, write_graph=False,
+                                     write_images=False)
+    LRS_clas = lrs_callback.LearningRateScheduler(schedule=schedule)
+    LRS_clas.set_model(classifier)
+    if CLASSIFIER:
+        print("Testing Classifier...")
+        # Run over test data
+        print('')
+        # Time to correct prediction
+        tcp_list = []
+        tcp_true_list = []
+        tcp_pred_list = []
+        y_test_pred = []
+        y_test_true = []
+        test_c_loss = []
+        index = 0
+        tcp = 1
+        while index < NB_TEST_ITERATIONS:
+            X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
+                            batch_size=TEST_BATCH_SIZE)
+
+            y_past_class = y[:, 0]
+            y_end_class = y[:,-1]
+
+            if y_end_class[0] == y_past_class[0]:
+                index = index + 1
+                continue
+            else:
+                stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1))
+                stdout.flush()
+                for fnum in range (int(VIDEO_LENGTH/2) + 1):
+
+                    X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
+                                    batch_size=TEST_BATCH_SIZE)
+                    X_test = X
+
+                    y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
+                    y_true_class = y[:, VIDEO_LENGTH - fnum - 1]
+                    if y[:, 0] == y_true_class[0]:
+                        break
+
+                    if (fnum + 1 > 16):
+                        tcp_pred_list.append(y_pred_class[0])
+                        tcp_true_list.append(y_true_class[0])
+                        break
+
+                    y_pred_class = classifier.predict(X_test, verbose=0)
+                    y_test_pred.extend(classifier.predict(X_test, verbose=0))
+                    test_c_loss.append(classifier.test_on_batch(X_test, y_true_class))
+                    y_test_true.extend(y_true_class)
+
+                    test_ped_pred_class = classifier.predict(X_test, verbose=0)
+                    # pred_seq = arrange_images(np.concatenate((X_train, predicted_images), axis=1))
+                    pred_seq = arrange_images(X_test)
+                    pred_seq = pred_seq * 127.5 + 127.5
+
+                    # Save generated images to file
+                    z = encoder.predict(X_test)
+                    test_predicted_images = decoder.predict(z)
+                    test_ped_pred_class = sclassifier.predict(X_test, verbose=0)
+                    pred_seq = arrange_images(np.concatenate((X_test, test_predicted_images), axis=1))
+                    pred_seq = pred_seq * 127.5 + 127.5
+
+                    truth_image = arrange_images(y_true_imgs)
+                    truth_image = truth_image * 127.5 + 127.5
+
+                    font = cv2.FONT_HERSHEY_SIMPLEX
+                    y_orig_classes = y[:, 0: int(VIDEO_LENGTH / 2)]
+                    y_true_classes = y[:, int(VIDEO_LENGTH / 2):]
+
+                    # Add labels as text to the image
+                    for k in range(TEST_BATCH_SIZE):
+                        for j in range(int(VIDEO_LENGTH / 2)):
+                            if y_orig_classes[k, j] > 0.5:
+                                label_orig = "crossing"
+                            else:
+                                label_orig = "not crossing"
+
+                            if y_true_classes[k][j] > 0.5:
+                                label_true = "crossing"
+                            else:
+                                label_true = "not crossing"
+
+                            if test_ped_pred_class[k][0] > 0.5:
+                                label_pred = "crossing"
+                            else:
+                                label_pred = "not crossing"
+
+                            cv2.putText(pred_seq, label_orig,
+                                        (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                            cv2.putText(pred_seq, label_pred,
+                                        (2 + (j + 16) * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                            cv2.putText(pred_seq, 'truth: ' + label_true,
+                                        (2 + (j + 16) * (208), 94 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+                            cv2.putText(truth_image, label_true,
+                                        (2 + j * (208), 114 + k * 128), font, 0.5, (255, 255, 255), 1,
+                                        cv2.LINE_AA)
+
+                    cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/mtcp-pred//', str(index) + "_cla_test_pred.png"),
+                                pred_seq)
+                    cv2.imwrite(os.path.join(TEST_RESULTS_DIR + '/mtcp-truth/', str(index) + "_cla_test_truth.png"),
+                                truth_image)
+
+                    if y_true_class[0] != np.round(y_pred_class[0]):
+                        index = index + 1
+                        continue
+                    else:
+                        tcp_pred_list.append(y_pred_class[0])
+                        tcp_true_list.append(y_true_class[0])
+                        tcp_list.append(fnum + 1)
+                        index = index + int(VIDEO_LENGTH / 2)
+                        # Break from the for loop
+                        break
+
+
+        # then after each epoch
+        avg_test_c_loss = np.mean(np.asarray(test_c_loss, dtype=np.float32), axis=0)
+
+        test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(y_test_true),
+                                                                            np.asarray(y_test_pred),
+                                                                            avg='binary',
+                                                                            pos_label=1)
+        print("\nAvg test_c_loss: " + str(avg_test_c_loss))
+        print("Mean time to change prediction: " + str(np.mean(np.asarray(tcp_list))))
+        print("Standard Deviation " + str(np.std(np.asarray(tcp_list))))
+        print ("Number of correct predictions " + str(len(tcp_list)))
+        print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
+
+        print("Classification Report")
+        print(get_classification_report(np.asarray(y_test_true), np.asarray(y_test_pred)))
+
+        print("Confusion matrix")
+        tn, fp, fn, tp = confusion_matrix(y_test_true, np.round(y_test_pred)).ravel()
+        print("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
+
+        print ("-------------------------------------------")
+        print ("Test cases where there is a change in label")
+
+        test_prec, test_rec, test_fbeta, test_support = get_sklearn_metrics(np.asarray(tcp_true_list),
+                                                                            np.asarray(tcp_pred_list),
+                                                                            avg='binary',
+                                                                            pos_label=1)
+        print("Test Prec: %.4f, Recall: %.4f, Fbeta: %.4f" % (test_prec, test_rec, test_fbeta))
+
+        test_acc = accuracy_score(tcp_true_list, np.round(tcp_pred_list))
+        print("Test Accuracy: %.4f" % (test_acc))
+
+        avg_prec = average_precision_score(tcp_true_list, tcp_pred_list)
+        print("Average precision: %.4f" % (avg_prec))
+
+        precisions, recalls, thresholds = precision_recall_curve(tcp_true_list, tcp_pred_list)
+        print("PR curve precisions: " + str(precisions))
+        print("PR curve recalls: " + str(recalls))
+        print("PR curve thresholds: " + str(thresholds))
+        print("PR curve prec mean: %.4f" % (np.mean(precisions)))
+        print("PR curve prec std: %.4f" % (np.std(precisions)))
+        print("Number of thresholds: %.4f" % (len(thresholds)))
+
+        print("Classification Report")
+        print(get_classification_report(np.asarray(tcp_true_list), np.asarray(tcp_pred_list)))
+
+        print("Confusion matrix")
+        tn, fp, fn, tp = confusion_matrix(tcp_true_list, np.round(tcp_pred_list)).ravel()
+        print("TN: %.2f, FP: %.2f, FN: %.2f, TP: %.2f" % (tn, fp, fn, tp))
+
+
 
 
 def get_args():

@@ -28,7 +28,7 @@ VAL_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/val/'
 
 TEST_DATA_DIR= '/local_home/JAAD_Dataset/iros/resized_imgs_208_thesis/test/'
 
-RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rendec-cla/'
+RESULTS_DIR = '/local_home/JAAD_Dataset/thesis/results/rev-cla/'
 
 PRETRAINED_C3D= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.json'
 PRETRAINED_C3D_WEIGHTS= '/home/pratik/git_projects/c3d-keras/models/sports1M_weights_tf.h5'
@@ -86,6 +86,7 @@ FINETUNE_ENCODER = False
 FINETUNE_DECODER = False
 FINETUNE_CLASSIFIER = True
 LOSS_WEIGHTS = [0, 1]
+REV = False
 
 ped_actions = ['slow down', 'standing', 'walking', 'speed up', 'nod', 'unknown',
                'clear path', 'handwave', 'crossing', 'looking', 'no ped']

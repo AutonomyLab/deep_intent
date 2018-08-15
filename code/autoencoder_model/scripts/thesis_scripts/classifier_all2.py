@@ -38,8 +38,10 @@ from image_utils import random_rotation
 from image_utils import random_shift
 from image_utils import flip_axis
 from image_utils import random_brightness
-from config_clar16 import *
+from config_call2 import *
 from sys import stdout
+from rev_16 import encoder_model
+from rev_16 import decoder_model
 
 import tb_callback
 import lrs_callback
@@ -48,179 +50,6 @@ import random
 import math
 import cv2
 import os
-
-
-def encoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 128, 208, 3))
-
-    # 10x128x128
-    conv_1 = Conv3D(filters=128,
-                     strides=(1, 4, 4),
-                     dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 11, 11),
-                     padding='same')(inputs)
-    x = TimeDistributed(BatchNormalization())(conv_1)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_1 = TimeDistributed(Dropout(0.5))(x)
-
-    conv_2a = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 5, 5),
-                     padding='same')(out_1)
-    x = TimeDistributed(BatchNormalization())(conv_2a)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_2a = TimeDistributed(Dropout(0.5))(x)
-
-    conv_2b = Conv3D(filters=64,
-                    strides=(1, 1, 1),
-                    dilation_rate=(2, 1, 1),
-                    kernel_size=(2, 5, 5),
-                    padding='same')(out_2a)
-    x = TimeDistributed(BatchNormalization())(conv_2b)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_2b = TimeDistributed(Dropout(0.5))(x)
-
-    conv_2c = TimeDistributed(Conv2D(filters=64,
-                                        kernel_size=(1, 1),
-                                        strides=(1, 1),
-                                        padding='same'))(out_1)
-    x = TimeDistributed(BatchNormalization())(conv_2c)
-    out_1_less = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-
-    res_1 = add([out_1_less, out_2b])
-
-    conv_3 = Conv3D(filters=64,
-                     strides=(1, 2, 2),
-                     dilation_rate=(1, 1, 1),
-                     kernel_size=(3, 5, 5),
-                     padding='same')(res_1)
-    x = TimeDistributed(BatchNormalization())(conv_3)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_3 = TimeDistributed(Dropout(0.5))(x)
-
-    # 10x16x16
-    conv_4a = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 3, 3),
-                     padding='same')(out_3)
-    x = TimeDistributed(BatchNormalization())(conv_4a)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_4a = TimeDistributed(Dropout(0.5))(x)
-
-    conv_4b = Conv3D(filters=64,
-                     strides=(1, 1, 1),
-                     dilation_rate=(2, 1, 1),
-                     kernel_size=(2, 3, 3),
-                     padding='same')(out_4a)
-    x = TimeDistributed(BatchNormalization())(conv_4b)
-    x = TimeDistributed(LeakyReLU(alpha=0.2))(x)
-    out_4b = TimeDistributed(Dropout(0.5))(x)
-
-    z = add([out_3, out_4b])
-
-    model = Model(inputs=inputs, outputs=[z, res_1])
-
-    return model
-
-
-def decoder_model():
-    inputs = Input(shape=(int(VIDEO_LENGTH/2), 16, 26, 64))
-    residual_input = Input(shape=(int(VIDEO_LENGTH/2), 32, 52, 64), name='res_input')
-
-    # Adjust residual input
-    def adjust_res(x):
-        pad = K.zeros_like(x[:, 1:])
-        res = x[:, 0:1]
-        return K.concatenate([res, pad], axis=1)
-
-    enc_input = Lambda(adjust_res)(residual_input)
-
-    # 10x16x16
-    convlstm_1 = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(inputs)
-    x = TimeDistributed(BatchNormalization())(convlstm_1)
-    out_1 = TimeDistributed(Activation('tanh'))(x)
-
-    convlstm_2 = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_1)
-    x = TimeDistributed(BatchNormalization())(convlstm_2)
-    out_2 = TimeDistributed(Activation('tanh'))(x)
-
-    res_1 = add([inputs, out_2])
-    res_1 = UpSampling3D(size=(1, 2, 2))(res_1)
-
-    # 10x32x32
-    convlstm_3a = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(res_1)
-    x = TimeDistributed(BatchNormalization())(convlstm_3a)
-    out_3a = TimeDistributed(Activation('tanh'))(x)
-
-    convlstm_3b = ConvLSTM2D(filters=64,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_3a)
-    x = TimeDistributed(BatchNormalization())(convlstm_3b)
-    out_3b = TimeDistributed(Activation('tanh'))(x)
-
-    res_2 = add([res_1, out_3b, enc_input])
-    res_2 = UpSampling3D(size=(1, 2, 2))(res_2)
-
-    # 10x64x64
-    convlstm_4a = ConvLSTM2D(filters=16,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(res_2)
-    x = TimeDistributed(BatchNormalization())(convlstm_4a)
-    out_4a = TimeDistributed(Activation('tanh'))(x)
-
-    convlstm_4b = ConvLSTM2D(filters=16,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(out_4a)
-    x = TimeDistributed(BatchNormalization())(convlstm_4b)
-    out_4b = TimeDistributed(Activation('tanh'))(x)
-
-    conv_4c = TimeDistributed(Conv2D(filters=16,
-                                        kernel_size=(1, 1),
-                                        strides=(1, 1),
-                                        padding='same'))(res_2)
-    x = TimeDistributed(BatchNormalization())(conv_4c)
-    res_2_less = TimeDistributed(Activation('tanh'))(x)
-    res_3 = add([res_2_less, out_4b])
-    res_3 = UpSampling3D(size=(1, 2, 2))(res_3)
-
-    # 10x128x128
-    convlstm_5 = ConvLSTM2D(filters=3,
-                            kernel_size=(3, 3),
-                            strides=(1, 1),
-                            padding='same',
-                            return_sequences=True,
-                            recurrent_dropout=0.2)(res_3)
-    predictions = TimeDistributed(Activation('tanh'))(convlstm_5)
-
-    model = Model(inputs=[inputs, residual_input], outputs=predictions)
-
-    return model
 
 
 def process_prec3d():
@@ -667,7 +496,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             else:
                 X, y = load_X_y(videos_list, index, DATA_DIR, ped_action_classes)
 
-            X_train = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            if REV:
+                X_train = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            else:
+                X_train = X[:, 0: int(VIDEO_LENGTH / 2)]
             y_true_class = y[:, CLASS_TARGET_INDEX]
             y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
@@ -736,7 +568,10 @@ def train(BATCH_SIZE, ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         y_val_true = []
         for index in range(NB_VAL_ITERATIONS):
             X, y = load_X_y(val_videos_list, index, VAL_DATA_DIR, val_ped_action_classes)
-            X_val = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            if REV:
+                X_val = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            else:
+                X_val = X[:, 0: int(VIDEO_LENGTH / 2)]
             y_true_class = y[:, CLASS_TARGET_INDEX]
             y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
@@ -907,7 +742,10 @@ def test(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
             iter_loadtime.append(time.time())
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                             batch_size=TEST_BATCH_SIZE)
-            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            if REV:
+                X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+            else:
+                X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
             y_true_class = y[:, CLASS_TARGET_INDEX]
             y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
@@ -1049,10 +887,10 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
         index = 0
         tcp = 1
         while index < NB_TEST_ITERATIONS:
+            stdout.write("\rIter: " + str(index) + "/" + str(NB_TEST_ITERATIONS - 1))
+            stdout.flush()
             X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                             batch_size=TEST_BATCH_SIZE)
-            X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
-            y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
 
             y_past_class = y[:, 0]
             y_end_class = y[:,-1]
@@ -1065,7 +903,10 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
 
                     X, y = load_X_y(test_videos_list, index, TEST_DATA_DIR, test_ped_action_classes,
                                     batch_size=TEST_BATCH_SIZE)
-                    X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+                    if REV:
+                        X_test = np.flip(X[:, 0: int(VIDEO_LENGTH / 2)], axis=1)
+                    else:
+                        X_test = X[:, 0: int(VIDEO_LENGTH / 2)]
                     y_true_imgs = X[:, int(VIDEO_LENGTH / 2):]
                     y_true_class = y[:, VIDEO_LENGTH - fnum - 1]
                     if y[:, 0] == y_true_class[0]:
@@ -1127,12 +968,9 @@ def test_mtcp(ENC_WEIGHTS, DEC_WEIGHTS, CLA_WEIGHTS):
                                 truth_image)
 
                     if y_true_class[0] != np.round(y_pred_class[0]):
-                        print ("Wrong prediction! Slide window and try again.")
                         index = index + 1
                         continue
                     else:
-                        print ("Correct prediction. Record data.")
-                        print (fnum+1)
                         tcp_list.append(fnum + 1)
                         index = index + int(VIDEO_LENGTH / 2)
                         # Break from the for loop

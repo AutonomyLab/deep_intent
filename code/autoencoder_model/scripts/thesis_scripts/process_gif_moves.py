@@ -4,9 +4,9 @@ import glob
 import shutil
 from shutil import copyfile
 
-src = '/local_home/JAAD_Dataset/thesis/results/rendec-gifs/imgs/'
-src_gif = '/local_home/JAAD_Dataset/thesis/results/rendec-gifs/'
-dst = '/local_home/JAAD_Dataset/thesis/public_posts/pred/rendec/'
+src = '/local_home/JAAD_Dataset/thesis/results/gifs/imgs/'
+src_gif = '/local_home/JAAD_Dataset/thesis/results/gifs/'
+dst = '/local_home/JAAD_Dataset/thesis/public_posts/pred/rev/'
 vids = ['23', '40', '44', '47', '63', '64', '65', '98', '130', '140', '148', '154', '171',
         '183', '223', '225', '234', '247', '263', '275', '284', '298', '353', '361', '362',
         '367', '376', '377', '444', '509', '526', '527', '532', '537', '616', '621', '629',
