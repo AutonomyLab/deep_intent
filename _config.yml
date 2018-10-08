@@ -3,7 +3,7 @@ permalink:           pretty
 
 # Setup
 title:               Look Before You Leap
-tagline:             Reasoning About Pedestrian Intent by Video Prediction
+tagline:             Classifying Pedestrian Actions In Advance Using Predicted Video of Urban Driving Scenes
 url:                 http://autonomylab.org
 paginate:            1
 baseurl:             /deep_intent
@@ -18,7 +18,7 @@ sass:
 # About/contact
 author:
   name:              Pratik Gujjar
-  url:               http://autonomylab.org
+  url:               http://www.sfu.ca/~pgujjar/
   email:             pgujjar@sfu.ca
 
 # Custom vars
