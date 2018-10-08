@@ -5,9 +5,8 @@ We explore prediction of urban pedestrian actions by generating a video future o
 [Pratik Gujjar](https://www.sfu.ca/~pgujjar/) and [Richard Vaughan](http://rtv.github.io/) <br />
 <i class="fa fa-github"></i>&nbsp;<a href="https://github.com/AutonomyLab/deep_intent">Code</a>
 
-##### Future Frames Prediction
-The encoder is a spatio-temporal neural network composed of three 3D convolutional layers.
-The decoder is composed of ConvLSTM layers. Unlike the encoder, the decoder layers up-sample steadily to facilitate fluid transforms.
+##### Future Prediction 
+Our objective is to predict the future positions of salient objects like vehicles and pedestrians by learning their motion. Functionally, an encoder reads a sequence of frames $x = {x_{T} , ..., x_{1} }$ to yield dense representations z = {z 1 , ..., z T }. Conditioned on z, a decoder will then auto-regressively predict an image sequence y 0 = {y T 0 +1 , ..., y 2T} by minimizing a pixel-wise loss between y 0 and ground truth frames y = {y T +1 , ..., y 2T }. Each generated frame is of the same resolution as the input. We reverse the temporal ordering of input data to condition the latent space with spatial information from the latest frame. The most recent frame carries forward the closest contextual resemblance. Recursively learning representations from each input frame, we expect to first learn a temporal regularity in the early representations and parametrize a temporal variance in the later representations.
 
 <p style="text-align:center;"><img src="./public/abstract_net.png" align="center" width="60%"></p>
 <img src="./public/network.png" width="150%">
