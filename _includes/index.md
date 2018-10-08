@@ -1,10 +1,9 @@
-### Abstract
-
-Humans are constantly engaged in making predictions about our surroundings in order to safely navigate them. These predictions depend on our models of the objects in the environment and the relationships between them. This work is motivated to provide an autonomous car with a predictive intelligence that enhances it role in human interaction scenarios. One commonly encountered case is that of a pedestrian crossing a road. We model the visual structure of the traffic scene by learning to generate a sequence of frames that depict its future. Our spatio-temporal network architecture considers the context of all objects in motion against traditional approaches of segmenting pedestrian motion out for action recognition. We further analyze the predicted video using a deep neural network to identify pedestrians' actions. This work is focused on learning representations that account for motion and complex relationships of objects in a traffic scene in order to anticipate adverse pedestrian behaviour 10-20 frames in the future or 400-600 ms prior to its occurrence. We also show that the predictions are extensible to difficult road conditions like snowy weather or sun-glare on camera lens. Recognizing adverse pedestrian actions in advance, we can add precious time to supplement a driver's response, potentially saving human lives.
+### Abstract 
+We explore prediction of urban pedestrian actions by generating a video future of the traffic scene, and show promising results in classifying pedestrian behaviour before it is observed. We compare several encoder-decoder network models that predict 16 frames (400-600 milliseconds of video) from the preceding 16 frames. Our main contribution is a method for learning a sequence of representations to iteratively transform features learnt from the input to the future. Then we use a binary action classifier network for determining a pedestrian’s crossing intent from predicted video. Our results show an average precision of 81%, significantly higher than previous methods. The model with best classification performance runs for 117 ms on commodity GPU, giving an effective look-ahead of 416 ms.
 <br />
+
 [Pratik Gujjar](https://www.sfu.ca/~pgujjar/) and [Richard Vaughan](http://rtv.github.io/) <br />
 <i class="fa fa-github"></i>&nbsp;<a href="https://github.com/AutonomyLab/deep_intent">Code</a>
-<a href="https://docs.google.com/presentation/d/1iRiFNqW0-Q5b8KaCYM9JfhME_rDH-ZGX-Ka-yxU9bb4/edit?usp=sharing">Slides</a>
 
 ##### Future Frames Prediction
 The encoder is a spatio-temporal neural network composed of three 3D convolutional layers.
