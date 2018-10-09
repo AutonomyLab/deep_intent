@@ -9,7 +9,7 @@ We explore prediction of urban pedestrian actions by generating a video future o
 <p align="center">
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=UHMBtu43Gi4
 " target="_blank"><img src="./public/video_img.png" 
-alt="DeepIntent" width="1274" height="716" border="0" /></a>
+alt="DeepIntent" width="637" height="358" border="0" /></a>
 </p>
 
 
