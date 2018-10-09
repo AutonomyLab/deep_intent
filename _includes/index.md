@@ -7,7 +7,7 @@ We explore prediction of urban pedestrian actions by generating a video future o
 <a href="https://github.com/AutonomyLab/deep_intent">[code]</a>
 
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=UHMBtu43Gi4
-" target="_blank"><img src="../public/video_img.png" 
+" target="_blank"><img src="./public/video_img.png" 
 alt="DeepIntent" width="640" height="480" border="0" /></a>
 
 ### Future Prediction 
