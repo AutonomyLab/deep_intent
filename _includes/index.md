@@ -25,7 +25,7 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
 
 <style> table, th, td { border: 0px solid black; } </style>
 <table>
-  <tr>
+  <tr
     <td align="center"><img src="./public/conv.png" width="70%"></td>
     <td align="center"><img src="./public/segment.png" width="70%"></td>
   </tr>
@@ -35,7 +35,7 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
   </tr>
   <tr>
     <td align="center"><img src="./public/res.png" width="70%"></td>
-    <td aligh="center"><img src="./public/rendec.png" width="70%"></td>
+    <td aligh="center"><img src="./public/rendec.png"  width="70%"></td>
   </tr>
    <tr>
     <td align="center">Res model</td>
@@ -44,7 +44,7 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
 </table>
 
 
-### Action Recognition
+### Crossing Intent
 The task of action recognition is motivated by the idea that by looking ahead in time, we could react to a hazardous pedestrian interaction a little earlier, with safety benefits. We do this end-to-end by appending a binary action classifier to our future video generator. In this task, we want to learn to predict a pedestrian’s crossing intent across a multitude of crossing scenarios and behaviours.
 
 <p align="center">
@@ -53,7 +53,6 @@ The task of action recognition is motivated by the idea that by looking ahead in
 
 
 ### Experiments
-
 
 <style> table, th, td { border: 0px solid black; } </style>
 
