@@ -21,7 +21,7 @@ Our objective is to predict the future positions of salient objects like vehicle
 </p>
 
 ##### Experiments
-We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec).
+We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames. We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec). We perform ablation studies on our Res-EnDec model to determine the importance of the residual connections, dilated convolutions and reversal of image data. 
 
 <style> table, th, td { border: 0px solid black; } </style>
 <table>
@@ -30,8 +30,16 @@ We train three kinds of models for future prediction: a fully convolutional mode
     <td align="center"><img src="./public/segment.png" width="70%"></td>
   </tr>
   <tr>
+    <td align="center">Conv model</td>
+    <td align="center">Segment model</td>
+  </tr>
+  <tr>
     <td align="center"><img src="./public/res.png" width="70%"></td>
     <td aligh="center"><img src="./public/rendec.png" width="70%"></td>
+  </tr>
+   <tr>
+    <td align="center">Res model</td>
+    <td align="center">Res-EnDec model</td>
   </tr>
 </table>
 
@@ -45,7 +53,7 @@ The task of action recognition is motivated by the idea that by looking ahead in
 
 
 ### Experiments
-We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames.
+
 
 <style> table, th, td { border: 0px solid black; } </style>
 
