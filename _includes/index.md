@@ -28,7 +28,7 @@ We train three kinds of models for future prediction: a fully convolutional mode
 <img src="./public/segment.png" alt="kernel" width="237" height="58" border="0" />
 </p>
 
-
+![alt-text-1](./public/conv.png "title-1") ![alt-text-2](./public/segment.png "title-2")
 
 
 ### Action Recognition
