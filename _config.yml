@@ -2,8 +2,8 @@
 permalink:           pretty
 
 # Setup
-title:               Look Before You Leap
-tagline:             Classifying Pedestrian Actions In Advance Using Predicted Video of Urban Driving Scenes
+title:               Classifying Pedestrian Actions In Advance Using Predicted Video of Urban Driving Scenes
+tagline:            
 url:                 http://autonomylab.org
 paginate:            1
 baseurl:             /deep_intent
