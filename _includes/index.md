@@ -29,7 +29,7 @@ The task of action recognition is motivated by the idea that by looking ahead in
 
 
 ### Experiments
-We use the JAAD(http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset [paper](https://arxiv.org/abs/1609.04741) consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames.
+We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames.
 
 <table>
   <tr>
