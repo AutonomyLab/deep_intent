@@ -30,6 +30,17 @@ We train three kinds of models for future prediction: a fully convolutional mode
 
 ![alt-text-1](./public/conv.png "title-1") ![alt-text-2](./public/segment.png "title-2")
 
+<table>
+  <tr>
+    <td align="center"><img src="./public/conv.png" width="65%"></td>
+    <td align="center"><img src="./public/gifs/segment.png" width="65%"></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/gifs/pred/res.png" width="65%"></td>
+    <td aligh="center"><img src="./public/gifs/truth/rendec.png" width="65%"></td>
+  </tr>
+</table>
+
 
 ### Action Recognition
 The task of action recognition is motivated by the idea that by looking ahead in time, we could react to a hazardous pedestrian interaction a little earlier, with safety benefits. We do this end-to-end by appending a binary action classifier to our future video generator. In this task, we want to learn to predict a pedestrian’s crossing intent across a multitude of crossing scenarios and behaviours.
