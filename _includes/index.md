@@ -23,21 +23,15 @@ Our objective is to predict the future positions of salient objects like vehicle
 ##### Experiments
 We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec).
 
-<p align="left">
-<img src="./public/conv.png" alt="conv" width="237" height="158" border="0" />
-<img src="./public/segment.png" alt="kernel" width="237" height="158" border="0" />
-</p>
-
-![alt-text-1](./public/conv.png "title-1") ![alt-text-2](./public/segment.png "title-2")
-
+<style> table, th, td { border: 0px solid black; } </style>
 <table>
   <tr>
-    <td align="center"><img src="./public/conv.png" width="65%"></td>
-    <td align="center"><img src="./public/segment.png" width="65%"></td>
+    <td align="center"><img src="./public/conv.png" width="70%"></td>
+    <td align="center"><img src="./public/segment.png" width="70%"></td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/res.png" width="65%"></td>
-    <td aligh="center"><img src="./public/rendec.png" width="65%"></td>
+    <td align="center"><img src="./public/res.png" width="70%"></td>
+    <td aligh="center"><img src="./public/rendec.png" width="70%"></td>
   </tr>
 </table>
 
