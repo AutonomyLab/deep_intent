@@ -17,14 +17,14 @@ alt="DeepIntent" width="637" height="358" border="0" /></a>
 Our objective is to predict the future positions of salient objects like vehicles and pedestrians by learning their motion. Functionally, an encoder reads a sequence of frames __x__ to yield dense representations __z__. Conditioned on __z__, a decoder will then auto-regressively predict an image sequence __y'__ by minimizing a pixel-wise loss between __y'__ and ground truth frames __y__. Each generated frame is of the same resolution as the input. We reverse the temporal ordering of input data to condition the latent space with spatial information from the latest frame. The most recent frame carries forward the closest contextual resemblance. Recursively learning representations from each input frame, we expect to first learn a temporal regularity in the early representations and parametrize a temporal variance in the later representations.
 
 <p align="center">
-<img src="./public/abstract-net.svg" alt="abstract-net" border="0" /></a>
+<img src="./public/abstract-net.svg" alt="abstract-net" width="637" height="358" border="0" />
 </p>
 
 ### Action Recognition
 The task of action recognition is motivated by the idea that by looking ahead in time, we could react to a hazardous pedestrian interaction a little earlier, with safety benefits. We do this end-to-end by appending a binary action classifier to our future video generator. In this task, we want to learn to predict a pedestrian’s crossing intent across a multitude of crossing scenarios and behaviours.
 
 <p align="center">
-<img src="./public/abstract-net-cla.svg" alt="abstract-net" border="0" /></a>
+<img src="./public/abstract-net-cla.svg" alt="abstract-net-cla" width="637" height="358" border="0" />
 </p>
 
 
