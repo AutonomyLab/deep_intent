@@ -33,11 +33,11 @@ We train three kinds of models for future prediction: a fully convolutional mode
 <table>
   <tr>
     <td align="center"><img src="./public/conv.png" width="65%"></td>
-    <td align="center"><img src="./public/gifs/segment.png" width="65%"></td>
+    <td align="center"><img src="./public/segment.png" width="65%"></td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/res.png" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/rendec.png" width="65%"></td>
+    <td align="center"><img src="./public/res.png" width="65%"></td>
+    <td aligh="center"><img src="./public/rendec.png" width="65%"></td>
   </tr>
 </table>
 
