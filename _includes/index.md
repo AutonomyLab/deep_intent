@@ -20,6 +20,18 @@ Our objective is to predict the future positions of salient objects like vehicle
 <img src="./public/abstract-net.svg" alt="abstract-net" width="537" height="258" border="0" />
 </p>
 
+##### Experiments
+We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec).
+
+<p align="left">
+<img src="./public/conv.png" alt="abstract-net" width="537" height="258" border="0" />
+</p>
+<p align="right">
+<img src="./public/segment.png" alt="abstract-net" width="537" height="258" border="0" />
+</p>
+
+
+
 ### Action Recognition
 The task of action recognition is motivated by the idea that by looking ahead in time, we could react to a hazardous pedestrian interaction a little earlier, with safety benefits. We do this end-to-end by appending a binary action classifier to our future video generator. In this task, we want to learn to predict a pedestrian’s crossing intent across a multitude of crossing scenarios and behaviours.
 
