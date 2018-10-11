@@ -23,9 +23,9 @@ Our objective is to predict the future positions of salient objects like vehicle
 ##### Experiments
 We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec).
 
-<p align="center">
-<img src="./public/conv.png" alt="conv" width="237" height="58" border="0" />
-<img src="./public/segment.png" alt="kernel" width="237" height="58" border="0" />
+<p align="left">
+<img src="./public/conv.png" alt="conv" width="237" height="158" border="0" />
+<img src="./public/segment.png" alt="kernel" width="237" height="158" border="0" />
 </p>
 
 ![alt-text-1](./public/conv.png "title-1") ![alt-text-2](./public/segment.png "title-2")
