@@ -42,7 +42,7 @@ Our objective is to predict the future positions of salient objects like vehicle
 <img src="./public/abstract-net.svg" alt="abstract-net" width="537" height="258" border="0" />
 </p>-->
 
-##### Experiments
+### Experiments
 We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames. We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec). We perform ablation studies on our Res-EnDec model to determine the importance of the residual connections, dilated convolutions and reversal of image data. 
 
 <!--<style> table, th, td { border: 0px solid black; } </style>
@@ -139,58 +139,36 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
   </tr>
 </table>
 
-
-
 ### Crossing Intent
 The task of action recognition is motivated by the idea that by looking ahead in time, we could react to a hazardous pedestrian interaction a little earlier, with safety benefits. We do this end-to-end by appending a binary action classifier to our future video generator. In this task, we want to learn to predict a pedestrian’s crossing intent across a multitude of crossing scenarios and behaviours.
 
-<p align="center">
-<img src="./public/abstract-net-cla.svg" alt="abstract-net-cla" width="637" height="358" border="0" />
-</p>
-
-
-### Experiments
-
-<style> table, th, td { border: 0px solid black; } </style>
-
 <table>
   <tr>
-    <td align="center">Past + Predicted Frames</td>
-    <td align="center">Past + Ground Truth</td>
+    <td align="center">History + Ground Truth</td>
+    <td align="center">History + Prediction</td>
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_23.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_23.gif" width="77.5%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_231.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_231.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_91.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_91.gif" width="77.5%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_272.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_272.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_165.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_165.gif" width="77.5%"></td>
-   </tr>
-   <tr>
-   <td align="center"><img src="./public/gifs/pred/vid_232.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_232.gif" width="77.5%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_429.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_429.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_306.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_306.gif" width="77.5%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_91.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_91.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_350.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_350.gif" width="77.5%"></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_417.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_417.gif" width="77.5%"></td>
-  </tr>
-  <tr>
-    <td align="center"><img src="./public/gifs/pred/vid_471.gif" width="65%"></td>
-    <td aligh="center"><img src="./public/gifs/truth/vid_471.gif" width="77.5%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_526.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_526.gif" width="100%"></td> 
   </tr>
 </table>
+
 
 
 
