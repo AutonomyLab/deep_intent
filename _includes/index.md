@@ -70,18 +70,36 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
     <td align="center">History + Ground Truth</td>
     <td align="center" colspan="4">History + Prediction</td>
   </tr>
-   <tr>
+  <tr>
     <td align="center"></td>
     <td align="center">Conv</td>
-    <td align="center">Segment</td>
-    <td align="center">Res</td>
-    <td align="center">Res-EnDec</td>
   </tr>
   <tr>
     <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="100%"></td>
     <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Segment</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
     <td align="center"><img src="./public/github_examples/future/pred/kernel/vid_710.gif" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Res</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
     <td align="center"><img src="./public/github_examples/future/pred/res/vid_710.gif" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Res-EnDec</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
     <td align="center"><img src="./public/github_examples/future/pred/rendec/vid_710.gif" width="100%"></td>
   </tr>
 </table>
