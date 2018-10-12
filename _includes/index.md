@@ -72,11 +72,12 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
   </tr>
   <tr>
     <td align="center"></td>
-    <td align="center">Conv</td>
+    <td align="center">Conv</td> <br>
+    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="100%"></td>
-    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="100%"></td>
+    
   </tr>
   <tr>
     <td align="center"></td>
