@@ -157,16 +157,16 @@ The task of action recognition is motivated by the idea that by looking ahead in
     <td align="center"><img src="./public/github_examples/crossing/pred/vid_272.gif" width="100%"></td> 
   </tr>
   <tr>
-    <td align="center"><img src="./public/github_examples/crossing/truth/vid_429.gif" width="100%"></td>
-    <td align="center"><img src="./public/github_examples/crossing/pred/vid_429.gif" width="100%"></td> 
-  </tr>
-  <tr>
     <td align="center"><img src="./public/github_examples/crossing/truth/vid_91.gif" width="100%"></td>
     <td align="center"><img src="./public/github_examples/crossing/pred/vid_91.gif" width="100%"></td> 
   </tr>
   <tr>
     <td align="center"><img src="./public/github_examples/crossing/truth/vid_526.gif" width="100%"></td>
     <td align="center"><img src="./public/github_examples/crossing/pred/vid_526.gif" width="100%"></td> 
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/github_examples/crossing/truth/vid_429.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/crossing/pred/vid_429.gif" width="100%"></td> 
   </tr>
 </table>
 
