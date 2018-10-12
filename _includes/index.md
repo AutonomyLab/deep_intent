@@ -23,7 +23,7 @@ add precious time before one decides to act.
 Commonly expected crossing behaviour *Standing-Looking-Crossing* and *Crossing-Looking* only account for half the situations observed. In more than 90% of the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset, pedestrians are observed to use some-form of non-verbal communication in their crossing behaviour. The most prominent signal is to look at oncoming traffic. 
 
 <table>
-  <tr
+  <tr>
     <td align="center"><img src="./public/look.png" width="50%"></td>
     <td align="center"><img src="./public/step-forward.png" width="50%"></td>
   </tr>
