@@ -174,17 +174,17 @@ The task of action recognition is motivated by the idea that by looking ahead in
 [Rasouli2018](http://openaccess.thecvf.com/content_ICCV_2017_workshops/papers/w3/Rasouli_Are_They_Going_ICCV_2017_paper.pdf)
 
 <p align="center">
-<img src="./public/AP.png" border="0" width="40%" />
+<img src="./public/AP.png" border="0" width="50%" />
 </p>
 
 <p align="center">
-<img src="./public/acc_scores.png" border="0" width="40%" />
+<img src="./public/acc_scores.png" border="0" width="50%" />
 </p>
 
 ### Run-Time Analysis
 
 <p align="center">
-<img src="./public/timings.png" border="0" width="10%" />
+<img src="./public/timings.png" border="0" width="30%" />
 </p>
 
 
