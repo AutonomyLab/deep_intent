@@ -24,8 +24,8 @@ Commonly expected crossing behaviour *Standing-Looking-Crossing* and *Crossing-L
 
 <table>
   <tr
-    <td align="center"><img src="./public/looking.png" width="70%"></td>
-    <td align="center"><img src="./public/step-forward.png" width="70%"></td>
+    <td align="center"><img src="./public/look.png" width="50%"></td>
+    <td align="center"><img src="./public/step-forward.png" width="50%"></td>
   </tr>
 </table>
 
@@ -35,12 +35,12 @@ Without contextual knowledge, the pedestrian in the example below is likely to b
 <img src="./public/context.gif" border="0" />
 </p>
 
-### Technical Description
+<!--### Technical Description
 Our objective is to predict the future positions of salient objects like vehicles and pedestrians by learning their motion. Functionally, an encoder reads a sequence of frames __x__ to yield dense representations __z__. Conditioned on __z__, a decoder will then auto-regressively predict an image sequence __y'__ by minimizing a pixel-wise loss between __y'__ and ground truth frames __y__. Each generated frame is of the same resolution as the input. We reverse the temporal ordering of input data to condition the latent space with spatial information from the latest frame. The most recent frame carries forward the closest contextual resemblance. Recursively learning representations from each input frame, we expect to first learn a temporal regularity in the early representations and parametrize a temporal variance in the later representations.
-
-<p align="center">
+-->
+<!--<p align="center"> 
 <img src="./public/abstract-net.svg" alt="abstract-net" width="537" height="258" border="0" />
-</p>
+</p>-->
 
 ##### Experiments
 We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames. We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec). We perform ablation studies on our Res-EnDec model to determine the importance of the residual connections, dilated convolutions and reversal of image data. 
