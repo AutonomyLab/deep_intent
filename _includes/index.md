@@ -72,12 +72,11 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
   </tr>
   <tr>
     <td align="center"></td>
-    <td align="center">Conv</td> <br>
-    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="100%"></td>
-    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="100%"></td> 
+    <td align="center">Conv</td>
   </tr>
   <tr>
-    
+    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="100%"></td> 
   </tr>
   <tr>
     <td align="center"></td>
@@ -102,6 +101,41 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
   <tr>
     <td align="center"></td>
     <td align="center"><img src="./public/github_examples/future/pred/rendec/vid_710.gif" width="100%"></td>
+  </tr>
+</table>
+
+<table>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Conv</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_758.gif" width="100%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_758.gif" width="100%"></td> 
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Segment</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/kernel/vid_758.gif" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Res</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/res/vid_758.gif" width="100%"></td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center">Res-EnDec</td>
+  </tr>
+  <tr>
+    <td align="center"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/rendec/vid_758.gif" width="100%"></td>
   </tr>
 </table>
 
