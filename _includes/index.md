@@ -12,8 +12,17 @@ We explore prediction of urban pedestrian actions by generating a video future o
 alt="DeepIntent" width="637" height="358" border="0" /></a>
 </p>
 
+### Predicting a Future
+Typically, three-quarters of a second are needed to see a hazard and to decide to stop. Three-quarters more of a second are needed to actuate the brakes to stop a vehicle. An early prediction of a potentially hazardous action, could
+add precious time before one decides to act.
 
-### Future Prediction 
+<p align="center">
+<img src="./public/see-think-do.png" border="0" />
+</p>
+
+Typically expected crossing behaviour *Standing-Looking-Crossing* and *Crossing-Looking* only account for half the situations observed. In more than 90% of the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset, pedestrians are observed to use some-form of non-verbal communication in their crossing behaviour. The most prominent signal is to look at oncoming traffic. 
+
+### Technical Description
 Our objective is to predict the future positions of salient objects like vehicles and pedestrians by learning their motion. Functionally, an encoder reads a sequence of frames __x__ to yield dense representations __z__. Conditioned on __z__, a decoder will then auto-regressively predict an image sequence __y'__ by minimizing a pixel-wise loss between __y'__ and ground truth frames __y__. Each generated frame is of the same resolution as the input. We reverse the temporal ordering of input data to condition the latent space with spatial information from the latest frame. The most recent frame carries forward the closest contextual resemblance. Recursively learning representations from each input frame, we expect to first learn a temporal regularity in the early representations and parametrize a temporal variance in the later representations.
 
 <p align="center">
