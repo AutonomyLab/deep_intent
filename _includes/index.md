@@ -45,7 +45,7 @@ Our objective is to predict the future positions of salient objects like vehicle
 ##### Experiments
 We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a href="https://arxiv.org/abs/1609.04741">[paper]</a> consisting of 346 high resolution videos in pedestrian interaction scenarios. We train our encoder-decoder stack to optimize for a combination of *l1* and *l2* losses. The losses are calculated between the *N* pixels of T predicted frames __y'__ and ground truth frames __y__. For video prediction experiments we set N = 128 × 208 and T = 16 frames. We train three kinds of models for future prediction: a fully convolutional model (Conv3D), a recurrent decoder model (Segment) and a residual encoder-decoder model (Res-EnDec). We perform ablation studies on our Res-EnDec model to determine the importance of the residual connections, dilated convolutions and reversal of image data. 
 
-<style> table, th, td { border: 0px solid black; } </style>
+<!--<style> table, th, td { border: 0px solid black; } </style>
 <table>
   <tr
     <td align="center"><img src="./public/conv.png" width="70%"></td>
@@ -63,7 +63,28 @@ We use the [JAAD](http://data.nvision2.eecs.yorku.ca/JAAD_dataset/) dataset <a h
     <td align="center">Res model</td>
     <td align="center">Res-EnDec model</td>
   </tr>
+</table>-->
+
+<table>
+  <tr>
+    <td align="center">History + Prediction</td>
+    <td align="center">History + Ground Truth</td>
+  </tr>
+   <tr>
+    <td align="center">Conv</td>
+    <td align="center">Segment</td>
+    <td align="center">Res</td>
+    <td align="center">Res-EnDec</td>
+  </tr>
+  <tr>
+    <td align="center"><img src="./public/github_examples/future/truth/rendec/vid_710.gif" width="65%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/conv/vid_710.gif" width="65%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/kernel/vid_710.gif" width="65%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/res/vid_710.gif" width="65%"></td>
+    <td align="center"><img src="./public/github_examples/future/pred/rendec/vid_710.gif" width="65%"></td>
+  </tr>
 </table>
+
 
 
 ### Crossing Intent
