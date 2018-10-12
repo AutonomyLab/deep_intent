@@ -178,13 +178,13 @@ The task of action recognition is motivated by the idea that by looking ahead in
 </p>
 
 <p align="center">
-<img src="./public/acc_scores" border="0" width="40%" />
+<img src="./public/acc_scores.png" border="0" width="40%" />
 </p>
 
 ### Run-Time Analysis
 
 <p align="center">
-<img src="./public/timings.png" border="0" width="20%" />
+<img src="./public/timings.png" border="0" width="10%" />
 </p>
 
 
