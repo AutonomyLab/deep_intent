@@ -12,6 +12,8 @@ We explore prediction of urban pedestrian actions by generating a video future o
 alt="DeepIntent" width="637" height="358" border="0" /></a>
 </p>
 
+<iframe width="640" height="360" src="https://www.youtube.com/embed/UHMBtu43Gi4" frameborder="0" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+
 ### Predicting a Future
 Typically, three-quarters of a second are needed to see a hazard and to decide to stop. Three-quarters more of a second are needed to actuate the brakes to stop a vehicle. An early prediction of a potentially hazardous action, could
 add precious time before one decides to act.
