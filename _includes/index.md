@@ -4,7 +4,7 @@ We explore prediction of urban pedestrian actions by generating a video future o
 
 [Pratik Gujjar](https://www.sfu.ca/~pgujjar/) and [Richard Vaughan](http://rtv.github.io/) <br />
 
-<a href="https://github.com/AutonomyLab/deep_intent">[code]</a> <a href="http://autonomy.cs.sfu.ca/doc/gujjar_icra19.pdf">[paper]</a> <a href="./public/cite_icra19.bib">[bibtex]</a> 
+<a href="http://autonomy.cs.sfu.ca/doc/gujjar_icra19.pdf">[paper]</a> <a href="./public/cite_icra19.bib">[bibtex]</a> <a href="https://github.com/AutonomyLab/deep_intent">[code]</a>
 
 <!--<p align="center">
 <a href="http://www.youtube.com/watch?feature=player_embedded&v=UHMBtu43Gi4
